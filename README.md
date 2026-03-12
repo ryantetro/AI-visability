@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI-visability
 
-## Getting Started
+A well-structured **React** + **Next.js** (App Router) application with TypeScript, Tailwind CSS, and ESLint.
 
-First, run the development server:
+## Quick start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command       | Description                |
+|---------------|----------------------------|
+| `npm run dev` | Start dev server (Turbopack) |
+| `npm run build` | Production build          |
+| `npm run start` | Start production server   |
+| `npm run lint` | Run ESLint                |
 
-## Learn More
+## Repository structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+├── public/                 # Static assets (images, favicon, etc.)
+├── src/
+│   ├── app/                # Next.js App Router (routes, layouts, pages)
+│   │   ├── layout.tsx      # Root layout
+│   │   ├── page.tsx        # Home page
+│   │   └── globals.css     # Global styles
+│   ├── components/         # React components
+│   │   └── ui/             # Reusable UI primitives
+│   ├── hooks/              # Custom React hooks
+│   ├── lib/                # Utilities, helpers, API clients
+│   ├── types/              # Shared TypeScript types
+│   └── styles/             # Additional styles (if needed)
+├── next.config.ts
+├── postcss.config.mjs      # Tailwind v4 (PostCSS)
+├── tsconfig.json           # Path alias: @/* → src/*
+└── package.json
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Conventions
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Routes**: Add pages under `src/app/` using the [App Router](https://nextjs.org/docs/app) (e.g. `src/app/about/page.tsx` → `/about`).
+- **Components**: Put reusable components in `src/components/`, with primitives in `src/components/ui/`. Use the `@/` alias for imports (e.g. `import { Button } from '@/components/ui/Button'`).
+- **Utilities**: Put pure helpers and shared logic in `src/lib/`.
+- **Types**: Shared interfaces and types live in `src/types/`.
 
-## Deploy on Vercel
+## Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Next.js 16** (App Router, React Server Components)
+- **React 19**
+- **TypeScript**
+- **Tailwind CSS v4**
+- **ESLint** (Next.js config)
