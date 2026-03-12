@@ -50,18 +50,32 @@ export function ScoreRing({ score, color, size = 180 }: ScoreRingProps) {
       <div
         className="absolute flex flex-col items-center justify-center rounded-full border"
         style={{
-          width: size - 42,
-          height: size - 42,
+          width: Math.max(28, size - 42),
+          height: Math.max(28, size - 42),
           borderColor: `${color}22`,
           background:
             'linear-gradient(180deg, var(--surface-card) 0%, var(--surface-page) 100%)',
           backdropFilter: 'blur(10px)',
         }}
       >
-        <span className="text-4xl font-bold tracking-tight" style={{ color }}>
+        <span
+          className="font-bold tracking-tight"
+          style={{
+            color,
+            fontSize: size >= 120 ? '2.25rem' : size >= 90 ? '1.5rem' : '1rem',
+          }}
+        >
           {animatedScore}
         </span>
-        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>/ 100</span>
+        <span
+          className="shrink-0"
+          style={{
+            color: 'var(--text-muted)',
+            fontSize: size >= 120 ? '0.875rem' : size >= 90 ? '0.75rem' : '0.625rem',
+          }}
+        >
+          / 100
+        </span>
       </div>
     </div>
   );

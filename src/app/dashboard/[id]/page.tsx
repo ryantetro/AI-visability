@@ -14,12 +14,16 @@ import {
   FileCode2,
   FileJson2,
   Globe2,
+  Home,
+  Info,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
+  Target,
+  Terminal,
   type LucideIcon,
 } from 'lucide-react';
 import { formatPlatformLabel } from '@/lib/platform-detection';
+import { getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { cn } from '@/lib/utils';
 
 interface GeneratedFile {
@@ -42,7 +46,6 @@ interface FileMeta {
   installTarget: string;
   verify: string;
   icon: LucideIcon;
-  chipClass: string;
 }
 
 const FILE_META: Record<string, FileMeta> = {
@@ -52,7 +55,6 @@ const FILE_META: Record<string, FileMeta> = {
     installTarget: 'Serve as /llms.txt from your public site root.',
     verify: 'Open /llms.txt in a private browser window and confirm content loads publicly.',
     icon: Bot,
-    chipClass: 'border-emerald-400/35 bg-emerald-500/14 text-emerald-200',
   },
   'robots.txt': {
     subtitle: 'Crawler Access Policy',
@@ -60,7 +62,6 @@ const FILE_META: Record<string, FileMeta> = {
     installTarget: 'Publish as /robots.txt and preserve any existing required directives.',
     verify: 'Open /robots.txt and verify bot allow rules plus sitemap directives are present.',
     icon: ShieldCheck,
-    chipClass: 'border-amber-400/35 bg-amber-500/14 text-amber-200',
   },
   'organization-schema.json': {
     subtitle: 'Entity Definition',
@@ -68,7 +69,6 @@ const FILE_META: Record<string, FileMeta> = {
     installTarget: 'Embed as one JSON-LD script block in your homepage <head>.',
     verify: 'Inspect source and confirm one valid schema script block is rendered.',
     icon: FileJson2,
-    chipClass: 'border-cyan-400/35 bg-cyan-500/14 text-cyan-200',
   },
   'sitemap.xml': {
     subtitle: 'Discovery Map',
@@ -76,7 +76,6 @@ const FILE_META: Record<string, FileMeta> = {
     installTarget: 'Serve as /sitemap.xml and reference it from robots.txt.',
     verify: 'Open /sitemap.xml and check that URLs are live and canonical.',
     icon: Globe2,
-    chipClass: 'border-indigo-400/35 bg-indigo-500/14 text-indigo-200',
   },
 };
 
@@ -86,7 +85,6 @@ const DEFAULT_META: FileMeta = {
   installTarget: 'Deploy this file as part of your web configuration.',
   verify: 'Publish and re-run scan to validate impact.',
   icon: FileCode2,
-  chipClass: 'border-stone-400/35 bg-stone-400/14 text-stone-200',
 };
 
 function getFileMeta(filename: string): FileMeta {
@@ -103,17 +101,52 @@ function formatGeneratedAt(timestamp: number): string {
   }).format(timestamp);
 }
 
-function getDomain(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return url;
-  }
-}
-
 function verificationPath(baseUrl: string, filename: string) {
   const normalized = baseUrl.replace(/\/$/, '');
   return filename === 'organization-schema.json' ? `${normalized}/` : `${normalized}/${filename}`;
+}
+
+function buildCursorPrompt(
+  file: GeneratedFile,
+  domain: string,
+  platform: string,
+  meta: FileMeta,
+  baseUrl: string
+): string {
+  const isSchema = file.filename === 'organization-schema.json';
+  const siteUrl = baseUrl.replace(/\/$/, '');
+
+  if (isSchema) {
+    return `Implement this AI visibility improvement for ${domain} (${platform} site).
+
+TASK: Add Organization JSON-LD schema to the homepage.
+
+Add a single <script type="application/ld+json"> block to the <head> of the site's homepage. The schema should be the exact JSON below—do not modify it.
+
+\`\`\`json
+${file.content}
+\`\`\`
+
+After implementing, verify the schema appears in the page source at ${siteUrl}/`;
+  }
+
+  const filePath = file.filename === 'llms.txt' ? '/llms.txt' : `/${file.filename}`;
+
+  return `Implement this AI visibility improvement for ${domain} (${platform} site).
+
+TASK: Create the file ${filePath} at the site root (public directory).
+
+This file improves AI discoverability. Create it with the exact content below—do not modify it.
+
+\`\`\`
+${file.content}
+\`\`\`
+
+File: ${file.filename}
+Purpose: ${meta.purpose}
+Install: ${meta.installTarget}
+
+After implementing, verify the file is publicly accessible at ${siteUrl}${filePath}`;
 }
 
 function downloadTextFile(filename: string, content: string) {
@@ -137,6 +170,8 @@ export default function DashboardPage() {
   const [reauditLoading, setReauditLoading] = useState(false);
   const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
   const [copiedFile, setCopiedFile] = useState<string | null>(null);
+  const [copiedSinglePrompt, setCopiedSinglePrompt] = useState(false);
+  const [copiedAllPrompts, setCopiedAllPrompts] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -211,18 +246,40 @@ export default function DashboardPage() {
     }
   };
 
-  const secondaryActionClass =
-    'inline-flex items-center justify-center gap-1.5 rounded-full border border-white/20 bg-white/[0.03] px-3.5 py-2 text-xs font-semibold text-stone-100 transition hover:-translate-y-0.5 hover:bg-white/[0.08]';
-  const primaryActionClass =
-    'inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 px-4 py-2 text-xs font-semibold text-emerald-950 shadow-[0_18px_36px_rgba(16,185,129,0.25)] transition hover:-translate-y-0.5 hover:from-emerald-400 hover:to-cyan-300';
+  const handleCopyPrompt = async (file: GeneratedFile, domain: string, platform: string) => {
+    const meta = getFileMeta(file.filename);
+    const prompt = buildCursorPrompt(file, domain, platform, meta, files!.url);
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedSinglePrompt(true);
+      window.setTimeout(() => setCopiedSinglePrompt(false), 2500);
+    } catch {
+      setActionError('Copy failed. Your browser blocked clipboard access.');
+    }
+  };
+
+  const handleCopyAllPrompts = async () => {
+    const platform = formatPlatformLabel(files.detectedPlatform);
+    const prompts = files.files.map((file) => {
+      const meta = getFileMeta(file.filename);
+      return buildCursorPrompt(file, domain, platform, meta, files.url);
+    });
+    const combined = prompts.map((p, i) => `--- FILE ${i + 1} ---\n\n${p}`).join('\n\n');
+    try {
+      await navigator.clipboard.writeText(combined);
+      setCopiedAllPrompts(true);
+      window.setTimeout(() => setCopiedAllPrompts(false), 2500);
+    } catch {
+      setActionError('Copy failed. Your browser blocked clipboard access.');
+    }
+  };
 
   if (loading) {
     return (
-      <div className="page-dark relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_20%_0%,rgba(16,185,129,0.2)_0%,transparent_45%),radial-gradient(circle_at_80%_10%,rgba(6,182,212,0.18)_0%,transparent_42%),linear-gradient(180deg,#070505_0%,#0c0a09_55%,#140f0c_100%)]">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(250,250,249,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(250,250,249,0.03)_1px,transparent_1px)] bg-[size:44px_44px] opacity-45" />
-        <div className="relative flex items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-4 backdrop-blur">
-          <div className="aiso-spinner h-5 w-5 animate-spin rounded-full" />
-          <p className="text-sm text-stone-200">Loading implementation studio...</p>
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400" />
+          <p className="text-sm text-zinc-400">Loading your files...</p>
         </div>
       </div>
     );
@@ -230,12 +287,18 @@ export default function DashboardPage() {
 
   if (loadError) {
     return (
-      <div className="page-dark min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(220,38,38,0.24)_0%,transparent_40%),linear-gradient(180deg,#070505_0%,#0c0a09_60%,#140f0c_100%)] px-4 py-16">
-        <div className="mx-auto max-w-2xl rounded-[28px] border border-red-400/35 bg-red-500/10 p-8 text-center shadow-[0_26px_70px_rgba(127,29,29,0.3)] backdrop-blur">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-200">Dashboard Error</p>
-          <h1 className="mt-3 text-2xl font-semibold text-red-50">Unable to load generated files</h1>
-          <p className="mt-3 text-sm text-red-100/80">{loadError}</p>
-          <Link href="/" className={cn(primaryActionClass, 'mt-6')}>
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4">
+        <div className="mx-auto max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/80 p-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+            <span className="text-xl text-red-400">!</span>
+          </div>
+          <h1 className="text-xl font-semibold text-white">Unable to load files</h1>
+          <p className="mt-2 text-sm text-zinc-400">{loadError}</p>
+          <Link
+            href="/"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+          >
+            <ArrowLeft className="h-4 w-4" />
             Back home
           </Link>
         </div>
@@ -254,102 +317,146 @@ export default function DashboardPage() {
   const fileLines = activeFile.content.split('\n');
 
   return (
-    <div className="page-dark relative min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_0%_0%,rgba(16,185,129,0.18)_0%,transparent_38%),radial-gradient(circle_at_100%_0%,rgba(20,184,166,0.2)_0%,transparent_42%),linear-gradient(180deg,#060504_0%,#0c0a09_55%,#181310_100%)]">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(250,250,249,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(250,250,249,0.02)_1px,transparent_1px)] bg-[size:52px_52px] opacity-50" />
-        <div className="absolute -left-24 top-12 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.26)_0%,transparent_70%)] blur-3xl" />
-        <div className="absolute right-[-120px] top-8 h-[340px] w-[340px] rounded-full bg-[radial-gradient(circle,rgba(6,182,212,0.24)_0%,transparent_70%)] blur-3xl" />
-      </div>
-
-      <div className="relative mx-auto w-full max-w-[1260px] px-4 pb-12 pt-7 sm:px-6 lg:px-8">
-        <header className="rounded-[30px] border border-white/15 bg-[linear-gradient(160deg,rgba(28,25,23,0.92),rgba(12,10,9,0.86))] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.45)] backdrop-blur sm:p-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="inline-flex items-center rounded-full border border-emerald-400/35 bg-emerald-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200">
-                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                  Implementation Studio
-                </span>
-                <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.03] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-200">
-                  {files.files.length} Files Ready
-                </span>
-              </div>
-
-              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-stone-50 sm:text-[2.1rem]">
-                Deploy-ready AI visibility files for {domain}
-              </h1>
-
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                <MetaPill label="Platform" value={formatPlatformLabel(files.detectedPlatform)} />
-                <MetaPill label="Generated" value={formatGeneratedAt(files.generatedAt)} />
-                <MetaPill label="Selected file" value={activeFile.filename} />
-              </div>
+    <div className="flex min-h-screen bg-zinc-950">
+      {/* Left sidebar */}
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/50 lg:flex">
+        <div className="flex h-14 items-center gap-2 border-b border-zinc-800 px-4">
+          <Link href="/" className="flex items-center gap-2 font-semibold text-white">
+            <Target className="h-5 w-5 text-emerald-500" />
+            AISO
+          </Link>
+        </div>
+        <nav className="flex flex-1 flex-col gap-0.5 p-3">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </Link>
+          <Link
+            href={`/scan/${id}`}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+          >
+            <Target className="h-4 w-4" />
+            Scan report
+          </Link>
+          <div className="mt-4 flex flex-col gap-1 border-t border-zinc-800 pt-4">
+            <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              Implementation
+            </p>
+            <div className="rounded-lg bg-emerald-500/10 px-3 py-2.5">
+              <p className="text-xs font-semibold text-emerald-400">Deploy files</p>
+              <p className="mt-0.5 text-[11px] text-zinc-400">Current page</p>
             </div>
+          </div>
+        </nav>
+      </aside>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Link href="/" className={secondaryActionClass}>
-                <ArrowLeft className="h-3.5 w-3.5" />
-                New scan
-              </Link>
-
-              <button
-                type="button"
-                onClick={handleReaudit}
-                disabled={reauditLoading}
-                className={secondaryActionClass}
-              >
-                <RefreshCw className={cn('h-3.5 w-3.5', reauditLoading && 'animate-spin')} />
-                {reauditLoading ? 'Re-auditing...' : 'Re-audit'}
-              </button>
-
-              <a href={files.url} target="_blank" rel="noreferrer" className={secondaryActionClass}>
-                Visit site
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </a>
-
-              <a href={`/api/scan/${id}/files/archive`} className={primaryActionClass}>
-                <Download className="h-3.5 w-3.5" />
-                Download ZIP
-              </a>
+      {/* Main content */}
+      <div className="flex-1 overflow-x-hidden">
+        {/* Top bar */}
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-zinc-800 bg-zinc-950/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-zinc-400">
+              <Link href="/" className="hover:text-white">Home</Link>
+              <span>/</span>
+              <Link href={`/scan/${id}`} className="hover:text-white">Audit</Link>
+              <span>/</span>
+              <span className="text-white">Deploy files</span>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleReaudit}
+              disabled={reauditLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-50"
+            >
+              <RefreshCw className={cn('h-4 w-4', reauditLoading && 'animate-spin')} />
+              Re-audit
+            </button>
+            <a
+              href={files.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+            >
+              Visit site
+              <ArrowUpRight className="h-4 w-4" />
+            </a>
+            <button
+              type="button"
+              onClick={handleCopyAllPrompts}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+                copiedAllPrompts
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'bg-emerald-500 text-white hover:bg-emerald-600'
+              )}
+            >
+              <Terminal className="h-4 w-4" />
+              {copiedAllPrompts ? 'Copied!' : 'Copy all prompts for Cursor'}
+            </button>
+            <a
+              href={`/api/scan/${id}/files/archive`}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-700 hover:text-white"
+            >
+              <Download className="h-4 w-4" />
+              Download ZIP
+            </a>
           </div>
         </header>
 
-        {actionError && (
-          <div className="mt-4 rounded-xl border border-red-400/35 bg-red-500/12 px-4 py-2.5 text-xs font-medium text-red-100">
-            {actionError}
+        <div className="px-4 py-6 sm:px-6 lg:px-8">
+          {/* Domain overview */}
+          <div className="mb-6 flex items-center gap-3">
+            <img src={getFaviconUrl(domain)} alt="" className="h-8 w-8 rounded" />
+            <div>
+              <h1 className="text-lg font-semibold text-white">{domain}</h1>
+              <p className="text-sm text-zinc-400">Deploy-ready AI visibility files</p>
+            </div>
           </div>
-        )}
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-[330px,minmax(0,1fr)]">
-          <aside className="space-y-3">
-            <section className="rounded-[24px] border border-white/15 bg-[linear-gradient(170deg,rgba(28,25,23,0.92),rgba(12,10,9,0.9))] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-400">Deployment Rail</p>
+          {/* Metric cards */}
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              title="Files ready"
+              description="Generated for your site"
+              value={String(files.files.length)}
+            />
+            <MetricCard
+              title="Platform"
+              description="Detected stack"
+              value={formatPlatformLabel(files.detectedPlatform)}
+            />
+            <MetricCard
+              title="Generated"
+              description="When files were created"
+              value={formatGeneratedAt(files.generatedAt)}
+            />
+            <MetricCard
+              title="Status"
+              description="Ready to deploy"
+              value="Complete"
+              valueColor="text-emerald-400"
+            />
+          </div>
 
-              <div className="mt-3 -mx-1 overflow-x-auto xl:hidden">
-                <div className="flex gap-2 px-1 pb-1">
-                  {files.files.map((file, index) => {
-                    const active = file.filename === activeFile.filename;
-                    return (
-                      <button
-                        key={file.filename}
-                        type="button"
-                        onClick={() => setSelectedFilename(file.filename)}
-                        className={cn(
-                          'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium',
-                          active
-                            ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
-                            : 'border-white/15 bg-white/[0.03] text-stone-300'
-                        )}
-                      >
-                        {index + 1}. {file.filename}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          {actionError && (
+            <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              {actionError}
+            </div>
+          )}
 
-              <div className="mt-3 hidden space-y-2 xl:block">
+          {/* Two-column: File list + File detail */}
+          <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
+            {/* Top providers style — file list */}
+            <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                Generated files
+              </p>
+              <div className="mt-4 space-y-1">
                 {files.files.map((file, index) => {
                   const meta = getFileMeta(file.filename);
                   const Icon = meta.icon;
@@ -361,28 +468,17 @@ export default function DashboardPage() {
                       type="button"
                       onClick={() => setSelectedFilename(file.filename)}
                       className={cn(
-                        'w-full rounded-xl border p-3 text-left transition',
-                        active
-                          ? 'border-emerald-400/35 bg-emerald-500/12 shadow-[0_18px_36px_rgba(16,185,129,0.18)]'
-                          : 'border-white/12 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.05]'
+                        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
+                        active ? 'bg-emerald-500/15 text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
                       )}
                     >
-                      <div className="flex items-start gap-3">
-                        <span className={cn('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', active ? 'border-emerald-300/40 bg-emerald-500/15 text-emerald-100' : meta.chipClass)}>
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', active ? 'text-emerald-200' : 'text-stone-400')}>
-                            Step {index + 1}
-                          </p>
-                          <p className={cn('mt-0.5 truncate text-sm font-semibold', active ? 'text-stone-50' : 'text-stone-100')}>
-                            {file.filename}
-                          </p>
-                          <p className={cn('mt-0.5 text-xs', active ? 'text-emerald-100/80' : 'text-stone-300')}>
-                            {meta.subtitle}
-                          </p>
-                        </div>
-                        <ChevronRight className={cn('mt-0.5 h-4 w-4 shrink-0', active ? 'text-emerald-200' : 'text-stone-500')} />
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-zinc-800 text-[10px] font-bold text-zinc-500">
+                        {index + 1}
+                      </span>
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{file.filename}</p>
+                        <p className="truncate text-[11px] text-zinc-500">{meta.subtitle}</p>
                       </div>
                     </button>
                   );
@@ -390,128 +486,172 @@ export default function DashboardPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-cyan-400/35 bg-cyan-500/10 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">Launch Checklist</p>
-              <ul className="mt-3 space-y-2 text-xs leading-5 text-cyan-100/90">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5" />
-                  Install each file in sequence from the rail.
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5" />
-                  Validate endpoint availability after publishing.
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5" />
-                  Re-audit to confirm score improvement.
-                </li>
-              </ul>
-            </section>
-          </aside>
-
-          <main className="space-y-3">
-            <section className="rounded-[24px] border border-white/15 bg-[linear-gradient(165deg,rgba(28,25,23,0.92),rgba(12,10,9,0.9))] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.36)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]', activeMeta.chipClass)}>
-                    {activeMeta.subtitle}
-                  </span>
-                  <h2 className="mt-2 text-xl font-semibold text-stone-50">{activeFile.filename}</h2>
-                  <p className="mt-2 text-sm leading-6 text-stone-300">{activeFile.description}</p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(activeFile)}
-                    className={secondaryActionClass}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    {copiedFile === activeFile.filename ? 'Copied' : 'Copy file'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => downloadTextFile(activeFile.filename, activeFile.content)}
-                    className={secondaryActionClass}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download file
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                <DetailCard title="What this does" body={activeMeta.purpose} />
-                <DetailCard title="Where to install" body={activeMeta.installTarget} />
-                <div className="rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-400">Verify</p>
-                  <p className="mt-1 text-xs leading-5 text-stone-300">{activeMeta.verify}</p>
-                  <a href={verifyUrl} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-200 hover:text-emerald-100">
-                    Open verification target
-                    <ArrowUpRight className="h-3 w-3" />
-                  </a>
-                </div>
-              </div>
-            </section>
-
-            <details open className="overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(170deg,rgba(28,25,23,0.9),rgba(12,10,9,0.88))] shadow-[0_14px_40px_rgba(0,0,0,0.3)]">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-stone-100 hover:bg-white/[0.04]">
-                Install instructions
-              </summary>
-              <div className="border-t border-white/10 px-4 py-3 text-sm leading-6 text-stone-300">
-                {activeFile.installInstructions}
-              </div>
-            </details>
-
-            <details className="overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(170deg,rgba(28,25,23,0.9),rgba(12,10,9,0.88))] shadow-[0_14px_40px_rgba(0,0,0,0.3)]">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-stone-100 hover:bg-white/[0.04]">
-                Code preview
-              </summary>
-              <div className="border-t border-white/10 p-3">
-                <div className="overflow-hidden rounded-xl border border-white/15 bg-[#090807] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
-                  <div className="flex items-center justify-between border-b border-white/10 bg-[#12100e] px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-[#ef4444]" />
-                      <span className="h-2.5 w-2.5 rounded-full bg-[#f59e0b]" />
-                      <span className="h-2.5 w-2.5 rounded-full bg-[#10b981]" />
-                    </div>
-                    <p className="font-mono text-[11px] text-stone-300">{activeFile.filename}</p>
+            {/* File detail + code */}
+            <main className="space-y-6">
+              <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <span className="inline-block rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400">
+                      {activeMeta.subtitle}
+                    </span>
+                    <h2 className="mt-2 text-xl font-semibold text-white">{activeFile.filename}</h2>
+                    <p className="mt-1 text-sm text-zinc-400">{activeFile.description}</p>
                   </div>
-                  <div className="max-h-[460px] overflow-auto">
-                    <ol className="font-mono text-[12px] leading-6 text-[#d1fae5]">
-                      {fileLines.map((line, index) => (
-                        <li key={`${activeFile.filename}-${index}`} className="grid grid-cols-[46px,minmax(0,1fr)] gap-3 border-b border-white/5 px-3 py-1 last:border-b-0">
-                          <span className="select-none text-right text-[10px] text-stone-500">{index + 1}</span>
-                          <code className="whitespace-pre-wrap break-words">{line.length > 0 ? line : ' '}</code>
-                        </li>
-                      ))}
-                    </ol>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPrompt(activeFile, domain, formatPlatformLabel(files.detectedPlatform))}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors',
+                        copiedSinglePrompt
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                      )}
+                    >
+                      <Terminal className="h-4 w-4" />
+                      {copiedSinglePrompt ? 'Copied!' : 'Copy prompt for Cursor'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(activeFile)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
+                    >
+                      <Copy className="h-4 w-4" />
+                      {copiedFile === activeFile.filename ? 'Copied' : 'Copy file'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadTextFile(activeFile.filename, activeFile.content)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download
+                    </button>
                   </div>
                 </div>
-              </div>
-            </details>
-          </main>
+
+                <p className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-200/90">
+                  <strong>Easiest path:</strong> Copy the prompt above, paste it into Cursor, and let the AI implement this fix for you.
+                </p>
+
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                  <InfoCard title="What it does" body={activeMeta.purpose} />
+                  <InfoCard title="Where to install" body={activeMeta.installTarget} />
+                  <InfoCard
+                    title="How to verify"
+                    body={activeMeta.verify}
+                    action={
+                      <a
+                        href={verifyUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                      >
+                        Open URL
+                        <ArrowUpRight className="h-3 w-3" />
+                      </a>
+                    }
+                  />
+                </div>
+              </section>
+
+              <details className="group rounded-xl border border-zinc-800 bg-zinc-900/50" open>
+                <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-semibold text-white hover:bg-zinc-800/50">
+                  Cursor prompt — copy & paste to implement
+                  <ChevronRight className="h-4 w-4 text-zinc-500 transition-transform group-open:rotate-90" />
+                </summary>
+                <div className="border-t border-zinc-800 px-5 py-4">
+                  <p className="mb-3 text-xs text-zinc-500">
+                    Paste this into Cursor and let the AI implement the fix for you.
+                  </p>
+                  <pre className="max-h-[320px] overflow-auto rounded-lg border border-zinc-700 bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap">
+                    {buildCursorPrompt(
+                      activeFile,
+                      domain,
+                      formatPlatformLabel(files.detectedPlatform),
+                      activeMeta,
+                      files.url
+                    )}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPrompt(activeFile, domain, formatPlatformLabel(files.detectedPlatform))}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+                  >
+                    <Copy className="h-4 w-4" />
+                    {copiedSinglePrompt ? 'Copied!' : 'Copy prompt'}
+                  </button>
+                </div>
+              </details>
+
+              <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
+                <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
+                  <p className="text-sm font-semibold text-white">Code preview</p>
+                  <p className="font-mono text-xs text-zinc-500">{activeFile.filename}</p>
+                </div>
+                <div className="max-h-[420px] overflow-auto bg-[#0d1117]">
+                  <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-2">
+                    <span className="h-2 w-2 rounded-full bg-red-500" />
+                    <span className="h-2 w-2 rounded-full bg-amber-500" />
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  </div>
+                  <pre className="p-4 font-mono text-xs leading-relaxed text-zinc-300">
+                    {fileLines.map((line, i) => (
+                      <div key={i} className="flex gap-4">
+                        <span className="w-8 shrink-0 select-none text-right text-zinc-600">{i + 1}</span>
+                        <code className="flex-1 whitespace-pre-wrap break-words">{line || ' '}</code>
+                      </div>
+                    ))}
+                  </pre>
+                </div>
+              </section>
+            </main>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function MetaPill({ label, value }: { label: string; value: string }) {
+function MetricCard({
+  title,
+  description,
+  value,
+  valueColor = 'text-white',
+}: {
+  title: string;
+  description: string;
+  value: string;
+  valueColor?: string;
+}) {
   return (
-    <div className="rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">{label}</p>
-      <p className="mt-1 truncate text-sm font-semibold text-stone-100">{value}</p>
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{title}</p>
+          <p className="mt-1 text-[11px] text-zinc-500">{description}</p>
+        </div>
+        <Info className="h-4 w-4 shrink-0 text-zinc-600" />
+      </div>
+      <p className={cn('mt-3 text-2xl font-bold tabular-nums', valueColor)}>{value}</p>
     </div>
   );
 }
 
-function DetailCard({ title, body }: { title: string; body: string }) {
+function InfoCard({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2.5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-400">{title}</p>
-      <p className="mt-1 text-xs leading-5 text-stone-300">{body}</p>
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{title}</p>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{body}</p>
+      {action}
     </div>
   );
 }

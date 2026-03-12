@@ -1,7 +1,10 @@
 'use client';
 
-import { Check, LoaderCircle } from 'lucide-react';
+import { Check, LoaderCircle, ShieldCheck, CircleCheck, CircleX } from 'lucide-react';
 import { colors, components, brand, motion } from '@/styles/tokens';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { SubscriptionCard } from '@/components/ui/subscription-card';
 
 export default function StyleGuidePage() {
   return (
@@ -18,7 +21,7 @@ export default function StyleGuidePage() {
       {/* ─── Brand Identity ─── */}
       <Section title="Brand Identity">
         <div className="grid gap-6 sm:grid-cols-2">
-          <Card>
+          <Card className="p-6">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
               Name & Tagline
             </h3>
@@ -26,7 +29,7 @@ export default function StyleGuidePage() {
             <p className="mt-1 text-lg" style={{ color: 'var(--text-secondary)' }}>{brand.tagline}</p>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-tertiary)' }}>{brand.descriptor}</p>
           </Card>
-          <Card>
+          <Card className="p-6">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
               CTA Labels
             </h3>
@@ -40,7 +43,7 @@ export default function StyleGuidePage() {
             </div>
           </Card>
         </div>
-        <Card className="mt-6">
+        <Card className="mt-6 p-6">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
             Voice & Tone
           </h3>
@@ -142,7 +145,7 @@ export default function StyleGuidePage() {
 
       {/* ─── Typography ─── */}
       <Section title="Typography">
-        <Card>
+        <Card className="p-6">
           <div className="space-y-6">
             <TypographySample size="5xl" label="5xl — 48px" weight="bold" tracking="tight">
               AI Visibility Score
@@ -173,7 +176,7 @@ export default function StyleGuidePage() {
             </TypographySample>
           </div>
         </Card>
-        <Card className="mt-4">
+        <Card className="mt-4 p-6">
           <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
             Monospace (Code/Files)
           </h3>
@@ -192,48 +195,19 @@ AISO helps businesses become visible to AI search.`}
 
       {/* ─── Components ─── */}
       <Section title="Components">
-        {/* Buttons */}
+        {/* Buttons — StatusBadge styling (rounded-tremor-full, border, text-tremor-label) */}
         <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Buttons</h3>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            className="px-5 py-2.5 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: 'var(--color-primary-600)',
-              color: '#fff',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
+          <button className="aiso-button aiso-button-primary px-4 py-2.5 text-sm">
             {brand.cta.scan}
           </button>
-          <button
-            className="px-5 py-2.5 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: 'var(--color-primary-600)',
-              color: '#fff',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
+          <button className="aiso-button aiso-button-primary px-4 py-2.5 text-sm">
             {brand.cta.purchase} &mdash; $99
           </button>
-          <button
-            className="px-5 py-2.5 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: 'var(--surface-card-hover)',
-              color: 'var(--text-primary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-default)',
-            }}
-          >
+          <button className="aiso-button aiso-button-secondary px-4 py-2.5 text-sm">
             Secondary
           </button>
-          <button
-            className="px-5 py-2.5 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: 'transparent',
-              color: 'var(--text-secondary)',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
+          <button className="aiso-button aiso-button-ghost px-4 py-2.5 text-sm">
             Ghost
           </button>
         </div>
@@ -244,22 +218,9 @@ AISO helps businesses become visible to AI search.`}
           <input
             type="text"
             placeholder="Enter your website URL"
-            className="flex-1 px-4 py-2.5 text-sm outline-none"
-            style={{
-              backgroundColor: 'var(--surface-card)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-            }}
+            className="aiso-input flex-1 px-4 py-2.5 text-sm"
           />
-          <button
-            className="px-5 py-2.5 text-sm font-medium"
-            style={{
-              backgroundColor: 'var(--color-primary-600)',
-              color: '#fff',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
+          <button className="aiso-button aiso-button-primary px-4 py-2.5 text-sm">
             {brand.cta.scan}
           </button>
         </div>
@@ -277,64 +238,58 @@ AISO helps businesses become visible to AI search.`}
           />
         </div>
 
-        {/* Cards */}
+        {/* Cards — shadcn-style (rounded-lg, border, shadow-sm) */}
         <h3 className="mb-3 mt-8 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Cards</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div
-            className="p-5"
-            style={{
-              backgroundColor: 'var(--surface-card)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-lg)',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-          >
+          <Card className="p-6">
             <h4 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Default Card</h4>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
               Standard card with border and subtle shadow.
             </p>
-          </div>
-          <div
-            className="p-5"
-            style={{
-              backgroundColor: 'var(--surface-elevated)',
-              borderRadius: 'var(--radius-lg)',
-              boxShadow: 'var(--shadow-md)',
-            }}
-          >
+          </Card>
+          <Card className="p-6 shadow-md">
             <h4 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Elevated Card</h4>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-              No border, relies on shadow for depth.
+              Stronger shadow for depth.
             </p>
-          </div>
+          </Card>
+        </div>
+        <h3 className="mb-3 mt-8 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>SubscriptionCard (recharts)</h3>
+        <div className="flex justify-center">
+          <SubscriptionCard />
         </div>
 
-        {/* Badges */}
+        {/* Badges & Pills — StatusBadge styling */}
         <h3 className="mb-3 mt-8 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Badges & Pills</h3>
         <div className="flex flex-wrap gap-3">
-          <span className="px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: colors.band.aiReady, borderRadius: 'var(--radius-full)' }}>
-            AI Ready
-          </span>
-          <span className="px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: colors.band.needsWork, borderRadius: 'var(--radius-full)' }}>
-            Needs Work
-          </span>
-          <span className="px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: colors.band.atRisk, borderRadius: 'var(--radius-full)' }}>
-            At Risk
-          </span>
-          <span className="px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: colors.band.notVisible, borderRadius: 'var(--radius-full)' }}>
-            Not Visible
-          </span>
+          <StatusBadge
+            leftIcon={ShieldCheck}
+            rightIcon={CircleX}
+            leftLabel="Protection"
+            rightLabel="SSO login"
+            status="success"
+          />
+          <StatusBadge
+            leftIcon={CircleCheck}
+            rightIcon={CircleX}
+            leftLabel="Live"
+            rightLabel="Audit trails"
+            status="success"
+          />
+          <StatusBadge
+            leftIcon={CircleX}
+            rightIcon={ShieldCheck}
+            leftLabel="Safety checks"
+            rightLabel="Production"
+            status="error"
+          />
         </div>
         <div className="mt-3 flex flex-wrap gap-3">
-          <span className="px-3 py-1 text-xs font-medium" style={{ backgroundColor: 'var(--color-primary-50)', color: 'var(--color-primary-700)', borderRadius: 'var(--radius-full)' }}>
-            PASS
-          </span>
-          <span className="px-3 py-1 text-xs font-medium" style={{ backgroundColor: '#fef2f2', color: '#dc2626', borderRadius: 'var(--radius-full)' }}>
-            FAIL
-          </span>
-          <span className="px-3 py-1 text-xs font-medium" style={{ backgroundColor: 'var(--color-neutral-100)', color: 'var(--color-neutral-500)', borderRadius: 'var(--radius-full)' }}>
-            UNKNOWN
-          </span>
+          <span className="aiso-pill">AI Ready</span>
+          <span className="aiso-pill">Needs Work</span>
+          <span className="aiso-pill">PASS</span>
+          <span className="aiso-pill">FAIL</span>
+          <span className="aiso-pill">UNKNOWN</span>
         </div>
 
         {/* Score Ring Preview */}
@@ -348,20 +303,13 @@ AISO helps businesses become visible to AI search.`}
 
         {/* Progress Checklist Preview */}
         <h3 className="mb-3 mt-8 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Progress Checklist</h3>
-        <div
-          className="max-w-sm divide-y divide-stone-200 p-5"
-          style={{
-            backgroundColor: 'var(--surface-card)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-lg)',
-          }}
-        >
+        <Card className="max-w-sm divide-y divide-border p-5">
           <CheckItem status="done" label="Checking robots.txt" />
           <CheckItem status="done" label="Checking sitemap.xml" />
           <CheckItem status="running" label="Crawling homepage" />
           <CheckItem status="pending" label="Discovering pages" />
           <CheckItem status="pending" label="Scoring AI visibility" />
-        </div>
+        </Card>
       </Section>
 
       {/* ─── Border Radius ─── */}
@@ -406,7 +354,7 @@ AISO helps businesses become visible to AI search.`}
       {/* ─── Motion ─── */}
       <Section title="Motion">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Card>
+          <Card className="p-6">
             <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
               Durations
             </h3>
@@ -419,7 +367,7 @@ AISO helps businesses become visible to AI search.`}
               ))}
             </div>
           </Card>
-          <Card>
+          <Card className="p-6">
             <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
               Animation Classes
             </h3>
@@ -437,7 +385,7 @@ AISO helps businesses become visible to AI search.`}
 
       {/* ─── CSS Variables Reference ─── */}
       <Section title="CSS Variables Quick Reference">
-        <Card>
+        <Card className="p-6">
           <pre className="overflow-auto text-xs" style={{ color: 'var(--text-secondary)' }}>
 {`/* Use in any CSS or inline style */
 var(--color-primary-600)     /* Brand green - buttons, links */
@@ -477,20 +425,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div
-      className={`p-5 ${className}`}
-      style={{
-        backgroundColor: 'var(--surface-card)',
-        border: '1px solid var(--border-default)',
-        borderRadius: 'var(--radius-lg)',
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 function ColorRow({ colors: swatches }: { colors: { name: string; value: string }[] }) {
   return (

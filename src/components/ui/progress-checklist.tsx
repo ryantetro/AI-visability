@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, LoaderCircle, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface CheckItem {
   label: string;
@@ -13,39 +14,32 @@ interface ProgressChecklistProps {
 
 export function ProgressChecklist({ checks }: ProgressChecklistProps) {
   return (
-    <div className="w-full max-w-xl">
+    <div>
       {checks.map((check, i) => (
         <div
           key={i}
-          className="animate-fade-in"
-          style={{
-            animationDelay: `${i * 50}ms`,
-          }}
+          className={cn(
+            'animate-fade-in flex items-center gap-4 py-3.5',
+            i < checks.length - 1 && 'border-b border-border',
+          )}
+          style={{ animationDelay: `${i * 40}ms` }}
         >
-          <div
-            className="flex items-center gap-3 py-2.5"
+          <StatusIcon status={check.status} />
+          <span
+            className="text-sm leading-relaxed"
             style={{
-              borderBottom:
-                i === checks.length - 1 ? 'none' : '1px solid rgba(231, 229, 228, 0.8)',
+              color: check.status === 'done'
+                ? 'var(--text-secondary)'
+                : check.status === 'running'
+                  ? 'var(--text-primary)'
+                  : check.status === 'error'
+                    ? 'var(--color-error)'
+                    : 'var(--text-tertiary)',
+              fontWeight: check.status === 'running' ? 600 : 500,
             }}
           >
-            <StatusIcon status={check.status} />
-            <span
-              className="app-body leading-6"
-              style={{
-                color: check.status === 'done'
-                  ? 'var(--text-secondary)'
-                  : check.status === 'running'
-                    ? 'var(--text-primary)'
-                    : check.status === 'error'
-                      ? 'var(--color-error)'
-                      : 'var(--text-tertiary)',
-                fontWeight: check.status === 'running' ? 600 : 500,
-              }}
-            >
-              {check.label}
-            </span>
-          </div>
+            {check.label}
+          </span>
         </div>
       ))}
     </div>
