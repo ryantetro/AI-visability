@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildReportPromptBundle } from '@/lib/llm-prompts';
 import { getDatabase } from '@/lib/services/registry';
 import { generateAllFiles } from '@/lib/generator';
 import { CrawlData } from '@/types/crawler';
 import { GeneratedFiles } from '@/types/generated-files';
+import { ScoreResult } from '@/types/score';
 
 export async function GET(
   _request: NextRequest,
@@ -32,8 +34,11 @@ export async function GET(
     await db.saveScan(scan);
   }
 
+  const scoreResult = scan.scoreResult as ScoreResult | undefined;
+
   return NextResponse.json({
     ...(scan.generatedFiles as GeneratedFiles),
     url: scan.url,
+    copyToLlm: scoreResult ? buildReportPromptBundle(scan.url, scoreResult) : null,
   });
 }

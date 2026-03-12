@@ -24,6 +24,7 @@ export function runStructuredDataChecks(data: CrawlData): CheckResult[] {
     {
       id: 'sd-org-schema',
       dimension: 'structured-data',
+      category: 'ai',
       label: 'Organization schema markup',
       verdict: hasOrgSchema ? 'pass' : 'fail',
       points: hasOrgSchema ? 8 : 0,
@@ -35,6 +36,7 @@ export function runStructuredDataChecks(data: CrawlData): CheckResult[] {
     {
       id: 'sd-completeness',
       dimension: 'structured-data',
+      category: 'ai',
       label: 'Schema completeness',
       verdict: !hasOrgSchema ? 'unknown' : orgComplete ? 'pass' : 'fail',
       points: orgComplete ? 5 : 0,
@@ -48,6 +50,7 @@ export function runStructuredDataChecks(data: CrawlData): CheckResult[] {
     {
       id: 'sd-faq',
       dimension: 'structured-data',
+      category: 'ai',
       label: 'FAQ schema markup',
       verdict: hasFaq ? 'pass' : 'fail',
       points: hasFaq ? 4 : 0,
@@ -59,6 +62,7 @@ export function runStructuredDataChecks(data: CrawlData): CheckResult[] {
     {
       id: 'sd-validation',
       dimension: 'structured-data',
+      category: 'ai',
       label: 'Schema validity',
       verdict: allSchemas.length === 0 ? 'unknown' : allValid ? 'pass' : 'fail',
       points: allValid && allSchemas.length > 0 ? 3 : 0,

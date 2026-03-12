@@ -6,6 +6,7 @@ export function runFilePresenceChecks(data: CrawlData): CheckResult[] {
     {
       id: 'fp-llms-txt',
       dimension: 'file-presence',
+      category: 'ai',
       label: 'llms.txt file exists',
       verdict: data.llmsTxt.exists ? 'pass' : 'fail',
       points: data.llmsTxt.exists ? 8 : 0,
@@ -17,6 +18,7 @@ export function runFilePresenceChecks(data: CrawlData): CheckResult[] {
     {
       id: 'fp-robots-txt',
       dimension: 'file-presence',
+      category: 'ai',
       label: 'robots.txt exists',
       verdict: data.robotsTxt.exists ? 'pass' : 'fail',
       points: data.robotsTxt.exists ? 5 : 0,
@@ -28,6 +30,7 @@ export function runFilePresenceChecks(data: CrawlData): CheckResult[] {
     {
       id: 'fp-sitemap',
       dimension: 'file-presence',
+      category: 'ai',
       label: 'sitemap.xml exists',
       verdict: data.sitemap.exists ? 'pass' : 'fail',
       points: data.sitemap.exists ? 4 : 0,
@@ -39,6 +42,7 @@ export function runFilePresenceChecks(data: CrawlData): CheckResult[] {
     {
       id: 'fp-sitemap-in-robots',
       dimension: 'file-presence',
+      category: 'ai',
       label: 'Sitemap referenced in robots.txt',
       verdict: data.sitemap.referencedInRobots ? 'pass' : 'fail',
       points: data.sitemap.referencedInRobots ? 3 : 0,

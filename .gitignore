@@ -42,3 +42,6 @@ next-env.d.ts
 
 # AI docs (product/design context, not committed)
 /ai-docs
+
+# local smoke checks
+/scripts/live-audit-smoke.cjs

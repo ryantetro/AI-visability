@@ -23,6 +23,7 @@ export async function GET(
     url: scan.url,
     status: scan.status,
     progress: scan.progress,
+    enrichments: scan.enrichments,
     score: scan.status === 'complete' ? scoreResult?.percentage : undefined,
     band: scan.status === 'complete' ? scoreResult?.band : undefined,
     bandInfo: scan.status === 'complete' ? scoreResult?.bandInfo : undefined,

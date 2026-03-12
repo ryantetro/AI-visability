@@ -31,6 +31,7 @@ export function runEntityClarityChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ec-name',
       dimension: 'entity-clarity',
+      category: 'ai',
       label: 'Name consistency across pages',
       verdict: hasNameConsistency ? 'pass' : siteTitle ? 'fail' : 'unknown',
       points: hasNameConsistency ? 4 : 0,
@@ -44,6 +45,7 @@ export function runEntityClarityChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ec-social',
       dimension: 'entity-clarity',
+      category: 'ai',
       label: 'Social media presence linked',
       verdict: hasSocial ? 'pass' : 'fail',
       points: hasSocial ? 3 : 0,
@@ -55,6 +57,7 @@ export function runEntityClarityChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ec-authority',
       dimension: 'entity-clarity',
+      category: 'ai',
       label: 'Authority signals',
       verdict: hasAuthority ? 'pass' : 'fail',
       points: hasAuthority ? 3 : 0,

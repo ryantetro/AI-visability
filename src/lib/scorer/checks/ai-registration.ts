@@ -8,6 +8,7 @@ export function runAiRegistrationChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ar-gptbot',
       dimension: 'ai-registration',
+      category: 'ai',
       label: 'GPTBot access allowed',
       verdict: !robots.exists ? 'unknown' : robots.allowsGPTBot ? 'pass' : 'fail',
       points: robots.allowsGPTBot ? 3 : 0,
@@ -21,6 +22,7 @@ export function runAiRegistrationChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ar-perplexity',
       dimension: 'ai-registration',
+      category: 'ai',
       label: 'PerplexityBot access allowed',
       verdict: !robots.exists ? 'unknown' : robots.allowsPerplexityBot ? 'pass' : 'fail',
       points: robots.allowsPerplexityBot ? 3 : 0,
@@ -34,6 +36,7 @@ export function runAiRegistrationChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ar-claude',
       dimension: 'ai-registration',
+      category: 'ai',
       label: 'Claude/Anthropic bot access',
       verdict: !robots.exists ? 'unknown' : robots.allowsClaudeBot ? 'pass' : 'fail',
       points: robots.allowsClaudeBot ? 2 : 0,
@@ -47,6 +50,7 @@ export function runAiRegistrationChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ar-llms-refs',
       dimension: 'ai-registration',
+      category: 'ai',
       label: 'llms.txt has reference links',
       verdict: !data.llmsTxt.exists ? 'unknown' : data.llmsTxt.links.length >= 2 ? 'pass' : 'fail',
       points: data.llmsTxt.exists && data.llmsTxt.links.length >= 2 ? 2 : 0,

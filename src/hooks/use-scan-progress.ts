@@ -6,6 +6,14 @@ interface ScanData {
   id: string;
   url: string;
   status: string;
+  enrichments?: {
+    webHealth?: {
+      status: 'pending' | 'running' | 'complete' | 'unavailable';
+      startedAt?: number;
+      completedAt?: number;
+      error?: string;
+    };
+  };
   progress: {
     status: string;
     checks: { label: string; status: string }[];
@@ -46,11 +54,12 @@ export function useScanProgress(scanId: string | null) {
     if (!scanId) return;
     poll();
     const interval = setInterval(() => {
-      if (data?.status === 'complete' || data?.status === 'failed') return;
+      const webHealthRunning = data?.enrichments?.webHealth?.status === 'running';
+      if ((data?.status === 'complete' && !webHealthRunning) || data?.status === 'failed') return;
       poll();
     }, 1500);
     return () => clearInterval(interval);
-  }, [scanId, poll, data?.status]);
+  }, [scanId, poll, data?.status, data?.enrichments?.webHealth?.status]);
 
   return { data, loading, error, refetch: poll };
 }

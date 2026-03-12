@@ -35,6 +35,7 @@ export function runTopicalAuthorityChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ta-focus',
       dimension: 'topical-authority',
+      category: 'ai',
       label: 'Topical focus consistency',
       verdict: hasTopicalFocus ? 'pass' : 'fail',
       points: hasTopicalFocus ? 7 : 0,
@@ -46,6 +47,7 @@ export function runTopicalAuthorityChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ta-keywords',
       dimension: 'topical-authority',
+      category: 'ai',
       label: 'Keyword signals',
       verdict: hasKeywords ? 'pass' : 'fail',
       points: hasKeywords ? 6 : 0,
@@ -57,6 +59,7 @@ export function runTopicalAuthorityChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ta-linking',
       dimension: 'topical-authority',
+      category: 'ai',
       label: 'Internal linking structure',
       verdict: goodLinking ? 'pass' : 'fail',
       points: goodLinking ? 4 : 0,
@@ -68,6 +71,7 @@ export function runTopicalAuthorityChecks(data: CrawlData): CheckResult[] {
     {
       id: 'ta-depth',
       dimension: 'topical-authority',
+      category: 'ai',
       label: 'Content depth',
       verdict: hasDepth ? 'pass' : 'fail',
       points: hasDepth ? 3 : 0,

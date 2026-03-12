@@ -17,6 +17,7 @@ export function runContentSignalChecks(data: CrawlData): CheckResult[] {
     {
       id: 'cs-about',
       dimension: 'content-signals',
+      category: 'ai',
       label: 'About page exists',
       verdict: hasAbout ? 'pass' : 'fail',
       points: hasAbout ? 6 : 0,
@@ -28,6 +29,7 @@ export function runContentSignalChecks(data: CrawlData): CheckResult[] {
     {
       id: 'cs-service-depth',
       dimension: 'content-signals',
+      category: 'ai',
       label: 'Service/product page depth',
       verdict: hasDeepServices ? 'pass' : servicePages.length > 0 ? 'fail' : 'unknown',
       points: hasDeepServices ? 5 : 0,
@@ -41,6 +43,7 @@ export function runContentSignalChecks(data: CrawlData): CheckResult[] {
     {
       id: 'cs-freshness',
       dimension: 'content-signals',
+      category: 'ai',
       label: 'Content freshness signals',
       verdict: hasFreshnessSignals ? 'pass' : 'fail',
       points: hasFreshnessSignals ? 5 : 0,
@@ -52,6 +55,7 @@ export function runContentSignalChecks(data: CrawlData): CheckResult[] {
     {
       id: 'cs-contact',
       dimension: 'content-signals',
+      category: 'ai',
       label: 'Contact information available',
       verdict: hasContact ? 'pass' : 'fail',
       points: hasContact ? 4 : 0,

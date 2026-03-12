@@ -1,13 +1,26 @@
 export type SitePlatform = 'wordpress' | 'squarespace' | 'webflow' | 'custom';
 
+export interface PageHeading {
+  level: number;
+  text: string;
+}
+
 export interface CrawledPage {
   url: string;
   title: string;
   h1s: string[];
+  headings: PageHeading[];
   metaDescription: string;
   metaKeywords: string[];
   ogTags: Record<string, string>;
+  twitterTags: Record<string, string>;
+  canonicalUrl?: string;
+  viewport?: string;
+  hasFavicon: boolean;
+  lang?: string;
+  charset?: string;
   schemaObjects: SchemaObject[];
+  schemaParseErrors: number;
   internalLinks: string[];
   externalLinks: string[];
   textContent: string;
@@ -31,6 +44,22 @@ export type PageClassification =
 export interface SchemaObject {
   type: string;
   raw: Record<string, unknown>;
+}
+
+export interface RootHttpData {
+  finalUrl: string;
+  statusCode?: number;
+  https: boolean;
+  headers: Record<string, string>;
+  strictTransportSecurity?: string;
+  contentSecurityPolicy?: string;
+  xFrameOptions?: string;
+  xContentTypeOptions?: string;
+}
+
+export interface RenderReadinessData {
+  mode: 'server-rendered' | 'client-heavy' | 'mixed' | 'unknown';
+  detail: string;
 }
 
 export interface RobotsTxtData {
@@ -79,6 +108,8 @@ export interface CrawlData {
   llmsTxt: LlmsTxtData;
   pages: CrawledPage[];
   homepage: CrawledPage | null;
+  rootHttp: RootHttpData;
+  renderReadiness: RenderReadinessData;
   crawledAt: number;
   durationMs: number;
   errors: string[];

@@ -1,5 +1,12 @@
 export type ScanStatus = 'pending' | 'crawling' | 'scoring' | 'complete' | 'failed';
 
+export interface EnrichmentState {
+  status: 'pending' | 'running' | 'complete' | 'unavailable';
+  startedAt?: number;
+  completedAt?: number;
+  error?: string;
+}
+
 export interface CheckProgress {
   label: string;
   status: 'pending' | 'running' | 'done' | 'error';
@@ -18,6 +25,9 @@ export interface ScanJob {
   normalizedUrl: string;
   status: ScanStatus;
   progress: ScanProgress;
+  enrichments?: {
+    webHealth: EnrichmentState;
+  };
   email?: string;
   paid?: boolean;
   createdAt: number;

@@ -38,6 +38,10 @@ interface FilesData {
   generatedAt: number;
   detectedPlatform: 'wordpress' | 'squarespace' | 'webflow' | 'custom';
   url: string;
+  copyToLlm: {
+    reportPrompt: string;
+    fixPrompts: { checkId: string; label: string; prompt: string }[];
+  } | null;
 }
 
 interface FileMeta {
@@ -172,6 +176,7 @@ export default function DashboardPage() {
   const [copiedFile, setCopiedFile] = useState<string | null>(null);
   const [copiedSinglePrompt, setCopiedSinglePrompt] = useState(false);
   const [copiedAllPrompts, setCopiedAllPrompts] = useState(false);
+  const [copiedReportBrief, setCopiedReportBrief] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -259,6 +264,7 @@ export default function DashboardPage() {
   };
 
   const handleCopyAllPrompts = async () => {
+    if (!files) return;
     const platform = formatPlatformLabel(files.detectedPlatform);
     const prompts = files.files.map((file) => {
       const meta = getFileMeta(file.filename);
@@ -269,6 +275,17 @@ export default function DashboardPage() {
       await navigator.clipboard.writeText(combined);
       setCopiedAllPrompts(true);
       window.setTimeout(() => setCopiedAllPrompts(false), 2500);
+    } catch {
+      setActionError('Copy failed. Your browser blocked clipboard access.');
+    }
+  };
+
+  const handleCopyReportBrief = async () => {
+    if (!files?.copyToLlm?.reportPrompt) return;
+    try {
+      await navigator.clipboard.writeText(files.copyToLlm.reportPrompt);
+      setCopiedReportBrief(true);
+      window.setTimeout(() => setCopiedReportBrief(false), 2500);
     } catch {
       setActionError('Copy failed. Your browser blocked clipboard access.');
     }
@@ -387,6 +404,20 @@ export default function DashboardPage() {
             </a>
             <button
               type="button"
+              onClick={handleCopyReportBrief}
+              disabled={!files.copyToLlm?.reportPrompt}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                copiedReportBrief
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                  : 'border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:bg-zinc-800 hover:text-white'
+              )}
+            >
+              <Bot className="h-4 w-4" />
+              {copiedReportBrief ? 'Brief copied' : 'Copy audit brief'}
+            </button>
+            <button
+              type="button"
               onClick={handleCopyAllPrompts}
               className={cn(
                 'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
@@ -447,6 +478,41 @@ export default function DashboardPage() {
             <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
               {actionError}
             </div>
+          )}
+
+          {files.copyToLlm?.reportPrompt && (
+            <section className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Implementation brief</p>
+                  <h2 className="mt-2 text-xl font-semibold text-white">Copy the full repair brief before you deploy</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                    This packages the full AI-first audit, Web Health findings, and prioritized fixes into one prompt for ChatGPT or Claude.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-zinc-400">
+                    <span className="rounded-full border border-zinc-800 bg-zinc-950/80 px-3 py-1">
+                      {files.copyToLlm.fixPrompts.length} fix prompts included
+                    </span>
+                    <span className="rounded-full border border-zinc-800 bg-zinc-950/80 px-3 py-1">
+                      Works alongside the generated files
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyReportBrief}
+                  className={cn(
+                    'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors',
+                    copiedReportBrief
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                  )}
+                >
+                  <Copy className="h-4 w-4" />
+                  {copiedReportBrief ? 'Copied to clipboard' : 'Copy implementation brief'}
+                </button>
+              </div>
+            </section>
           )}
 
           {/* Two-column: File list + File detail */}

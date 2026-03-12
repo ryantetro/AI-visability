@@ -1,5 +1,5 @@
 import { CrawlData } from '@/types/crawler';
-import { CheckResult, DimensionKey, DimensionScore, ScoreBandInfo, ScoreResult } from '@/types/score';
+import { CheckResult, DimensionKey, DimensionScore, ScoreBandInfo, ScoreResult, WebHealthSummary } from '@/types/score';
 import { runFilePresenceChecks } from './checks/file-presence';
 import { runStructuredDataChecks } from './checks/structured-data';
 import { runContentSignalChecks } from './checks/content-signals';
@@ -24,7 +24,7 @@ const bands: ScoreBandInfo[] = [
   { band: 'not-visible', label: 'Not Visible', color: '#ef4444', min: 0, max: 39 },
 ];
 
-export function scoreCrawlData(data: CrawlData): ScoreResult {
+export function scoreCrawlData(data: CrawlData, webHealth?: WebHealthSummary): ScoreResult {
   const allChecks: CheckResult[] = [
     ...runFilePresenceChecks(data),
     ...runStructuredDataChecks(data),
@@ -60,7 +60,8 @@ export function scoreCrawlData(data: CrawlData): ScoreResult {
 
   const bandInfo = bands.find((b) => percentage >= b.min && percentage <= b.max) || bands[bands.length - 1];
 
-  const fixes = prioritizeFixes(allChecks);
+  const webChecks = webHealth?.pillars.flatMap((pillar) => pillar.checks) || [];
+  const fixes = prioritizeFixes([...allChecks, ...webChecks], { url: data.url });
 
   return {
     total,
@@ -70,6 +71,7 @@ export function scoreCrawlData(data: CrawlData): ScoreResult {
     bandInfo,
     dimensions,
     fixes,
+    webHealth,
   };
 }
 

@@ -1,4 +1,4 @@
-import { CrawlData, CrawledPage } from '@/types/crawler';
+import { CrawlData, CrawledPage, RenderReadinessData, RootHttpData } from '@/types/crawler';
 import { normalizeUrl, ensureProtocol, isLikelyPublicPage } from '@/lib/url-utils';
 import { getBrowser } from './browser';
 import { extractPageData } from './page-extractor';
@@ -24,9 +24,10 @@ export async function crawlSite(
   const errors: string[] = [];
 
   onProgress?.('Checking robots.txt...');
-  const [robotsTxt, llmsTxt] = await Promise.all([
+  const [robotsTxt, llmsTxt, rootHttp] = await Promise.all([
     fetchRobotsTxt(baseUrl),
     fetchLlmsTxt(baseUrl),
+    fetchRootHttp(baseUrl),
   ]);
 
   onProgress?.('Checking sitemap...');
@@ -84,6 +85,8 @@ export async function crawlSite(
     errors.push(`Crawl error: ${String(err)}`);
   }
 
+  const renderReadiness = deriveRenderReadiness(homepage, rootHttp);
+
   return {
     url: baseUrl,
     normalizedUrl: normalized,
@@ -93,6 +96,8 @@ export async function crawlSite(
     llmsTxt,
     pages,
     homepage,
+    rootHttp,
+    renderReadiness,
     crawledAt: Date.now(),
     durationMs: Date.now() - startTime,
     errors,
@@ -167,4 +172,78 @@ function isCrawlablePath(path: string): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchRootHttp(url: string): Promise<RootHttpData> {
+  try {
+    const res = await fetch(url, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    const headers = Object.fromEntries(
+      Array.from(res.headers.entries()).map(([key, value]) => [key.toLowerCase(), value])
+    );
+
+    return {
+      finalUrl: res.url || url,
+      statusCode: res.status,
+      https: (res.url || url).startsWith('https://'),
+      headers,
+      strictTransportSecurity: headers['strict-transport-security'],
+      contentSecurityPolicy: headers['content-security-policy'],
+      xFrameOptions: headers['x-frame-options'],
+      xContentTypeOptions: headers['x-content-type-options'],
+    };
+  } catch {
+    return {
+      finalUrl: url,
+      https: url.startsWith('https://'),
+      headers: {},
+    };
+  }
+}
+
+function deriveRenderReadiness(
+  homepage: CrawledPage | null,
+  rootHttp: RootHttpData
+): RenderReadinessData {
+  if (!homepage) {
+    return {
+      mode: 'unknown',
+      detail: 'Homepage content could not be inspected well enough to judge AI readability.',
+    };
+  }
+
+  const hasMeaningfulServerContent = homepage.wordCount >= 120 && homepage.h1s.length > 0;
+  const hasThinContent = homepage.wordCount < 60;
+  const hasCanonicalSignals = Boolean(homepage.metaDescription || homepage.canonicalUrl);
+  const hasStructuralSignals = homepage.h1s.length > 0 || homepage.internalLinks.length > 0;
+  const cacheHint = rootHttp.headers['cache-control'] || '';
+  const variesByRuntime = /(no-store|private)/i.test(cacheHint);
+
+  if (hasMeaningfulServerContent && hasCanonicalSignals && !variesByRuntime) {
+    return {
+      mode: 'server-rendered',
+      detail: 'The homepage returns meaningful content without relying entirely on client-side rendering.',
+    };
+  }
+
+  if (hasThinContent && !hasCanonicalSignals && !hasStructuralSignals) {
+    return {
+      mode: 'client-heavy',
+      detail: 'The homepage appears thin at first response, which can make AI crawler extraction less reliable.',
+    };
+  }
+
+  return {
+    mode: 'mixed',
+    detail: 'The homepage is readable, but some important signals may depend on runtime rendering or incomplete head metadata.',
+  };
 }

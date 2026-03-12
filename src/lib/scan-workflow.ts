@@ -4,6 +4,8 @@ import { scoreCrawlData } from '@/lib/scorer';
 import { getDatabase } from '@/lib/services/registry';
 import { normalizeUrl, isValidUrl } from '@/lib/url-utils';
 import { checkScanRateLimit, recordScanRequest } from '@/lib/scan-rate-limit';
+import { runWebHealthEnrichment, createUnavailableWebHealth } from '@/lib/web-health';
+import { CrawlData } from '@/types/crawler';
 import { DatabaseService } from '@/types/services';
 import { ScanJob, ScanProgress } from '@/types/scan';
 
@@ -99,6 +101,11 @@ export async function startScan(
       normalizedUrl: normalized,
       status: 'pending',
       progress: initialProgress(),
+      enrichments: {
+        webHealth: {
+          status: 'pending',
+        },
+      },
       createdAt: now,
     };
 
@@ -174,6 +181,21 @@ export async function runScan(scanId: string, db = getDatabase()) {
     scan.progress.checks[6].status = 'running';
     await db.saveScan(scan);
 
+    const enrichmentStartedAt = Date.now();
+    scan.enrichments = {
+      webHealth: {
+        status: 'running',
+        startedAt: enrichmentStartedAt,
+      },
+    };
+    await db.saveScan(scan);
+
+    const webHealthPromise = withTimeout(
+      runWebHealthEnrichment(crawlData),
+      15000,
+      'Web Health enrichment timed out before completion.'
+    ).catch((error) => createUnavailableWebHealth(String(error)));
+
     const scoreResult = scoreCrawlData(crawlData);
 
     scan.progress.checks[6].status = 'done';
@@ -189,6 +211,14 @@ export async function runScan(scanId: string, db = getDatabase()) {
     scan.scoreResult = scoreResult;
     scan.completedAt = Date.now();
     await db.saveScan(scan);
+
+    void finalizeWebHealthEnrichment({
+      scanId,
+      db,
+      crawlData,
+      startedAt: enrichmentStartedAt,
+      webHealthPromise,
+    });
   } catch (err) {
     scan.status = 'failed';
     scan.progress.status = 'failed';
@@ -200,4 +230,49 @@ export async function runScan(scanId: string, db = getDatabase()) {
     }
     await db.saveScan(scan);
   }
+}
+
+async function finalizeWebHealthEnrichment({
+  scanId,
+  db,
+  crawlData,
+  startedAt,
+  webHealthPromise,
+}: {
+  scanId: string;
+  db: DatabaseService;
+  crawlData: CrawlData;
+  startedAt: number;
+  webHealthPromise: Promise<Awaited<ReturnType<typeof runWebHealthEnrichment>>>;
+}) {
+  const webHealth = await webHealthPromise;
+  const latest = await db.getScan(scanId);
+  if (!latest || latest.status !== 'complete') {
+    return;
+  }
+
+  latest.enrichments = {
+    webHealth: {
+      status: webHealth.status === 'complete' ? 'complete' : 'unavailable',
+      startedAt,
+      completedAt: Date.now(),
+      error: webHealth.error,
+    },
+  };
+  latest.scoreResult = scoreCrawlData(crawlData, webHealth);
+  await db.saveScan(latest);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  });
 }

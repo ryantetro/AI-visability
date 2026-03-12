@@ -10,9 +10,13 @@ export async function extractPageData(
 ): Promise<CrawledPage> {
   const data = await page.evaluate(() => {
     const title = document.title || '';
-    const h1s = Array.from(document.querySelectorAll('h1')).map(
-      (el) => el.textContent?.trim() || ''
-    );
+    const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).map(
+      (el) => ({
+        level: Number(el.tagName.replace('H', '')),
+        text: el.textContent?.trim() || '',
+      })
+    ).filter((heading) => heading.text.length > 0);
+    const h1s = headings.filter((heading) => heading.level === 1).map((heading) => heading.text);
     const metaDesc =
       document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
     const metaKeywords = (
@@ -21,6 +25,20 @@ export async function extractPageData(
       .split(',')
       .map((k) => k.trim())
       .filter(Boolean);
+    const canonicalUrl =
+      document.querySelector('link[rel="canonical"]')?.getAttribute('href') || undefined;
+    const viewport =
+      document.querySelector('meta[name="viewport"]')?.getAttribute('content') || undefined;
+    const hasFavicon =
+      document.querySelector('link[rel*="icon"]') !== null ||
+      Array.from(document.querySelectorAll('link[rel]')).some((el) =>
+        (el.getAttribute('rel') || '').toLowerCase().includes('icon')
+      );
+    const lang = document.documentElement.getAttribute('lang') || undefined;
+    const charset =
+      document.querySelector('meta[charset]')?.getAttribute('charset') ||
+      document.characterSet ||
+      undefined;
     const metaGenerator =
       document.querySelector('meta[name="generator"]')?.getAttribute('content') || '';
 
@@ -31,8 +49,15 @@ export async function extractPageData(
       ogTags[prop] = el.getAttribute('content') || '';
     });
 
+    const twitterTags: Record<string, string> = {};
+    document.querySelectorAll('meta[name^="twitter:"]').forEach((el) => {
+      const name = el.getAttribute('name') || '';
+      twitterTags[name] = el.getAttribute('content') || '';
+    });
+
     // Schema/JSON-LD
     const schemaObjects: { type: string; raw: Record<string, unknown> }[] = [];
+    let schemaParseErrors = 0;
     document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => {
       try {
         const parsed = JSON.parse(el.textContent || '');
@@ -44,7 +69,7 @@ export async function extractPageData(
           });
         }
       } catch {
-        // skip invalid JSON-LD
+        schemaParseErrors += 1;
       }
     });
 
@@ -87,10 +112,18 @@ export async function extractPageData(
     return {
       title,
       h1s,
+      headings,
       metaDescription: metaDesc,
       metaKeywords,
       ogTags,
+      twitterTags,
+      canonicalUrl,
+      viewport,
+      hasFavicon,
+      lang,
+      charset,
       schemaObjects,
+      schemaParseErrors,
       internalLinks: [...new Set(internalLinks)],
       externalLinks: [...new Set(externalLinks)],
       metaGenerator,
@@ -111,10 +144,18 @@ export async function extractPageData(
     url,
     title: data.title,
     h1s: data.h1s,
+    headings: data.headings,
     metaDescription: data.metaDescription,
     metaKeywords: data.metaKeywords,
     ogTags: data.ogTags,
+    twitterTags: data.twitterTags,
+    canonicalUrl: data.canonicalUrl,
+    viewport: data.viewport,
+    hasFavicon: data.hasFavicon,
+    lang: data.lang,
+    charset: data.charset,
     schemaObjects: data.schemaObjects as SchemaObject[],
+    schemaParseErrors: data.schemaParseErrors,
     internalLinks: data.internalLinks,
     externalLinks: data.externalLinks,
     textContent: data.textContent,

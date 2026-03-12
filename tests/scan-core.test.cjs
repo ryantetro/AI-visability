@@ -13,6 +13,7 @@ const {
 } = require('../src/lib/crawler/html-fallback.ts');
 const { detectPlatform } = require('../src/lib/platform-detection.ts');
 const { scoreCrawlData } = require('../src/lib/scorer/index.ts');
+const { runWebHealthEnrichment } = require('../src/lib/web-health/index.ts');
 const { generateAllFiles } = require('../src/lib/generator/index.ts');
 const { createGeneratedFilesArchive } = require('../src/lib/files-archive.ts');
 const { estimateRemainingSeconds } = require('../src/lib/scan-eta.ts');
@@ -21,6 +22,7 @@ const { getPublicScoreSummary } = require('../src/lib/public-score.ts');
 const { resetMockDb, mockDb } = require('../src/lib/services/mock-db.ts');
 const { resetScanRateLimitStore } = require('../src/lib/scan-rate-limit.ts');
 const archiveRoute = require('../src/app/api/scan/[id]/files/archive/route.ts');
+const reportRoute = require('../src/app/api/scan/[id]/report/route.ts');
 const publicScorePage = require('../src/app/score/[id]/page.tsx');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -47,10 +49,32 @@ function createCrawlData(overrides = {}) {
     url: 'https://example.com/',
     title: 'Example Co | AI Search',
     h1s: ['Example Co'],
+    headings: [
+      { level: 1, text: 'Example Co' },
+      { level: 2, text: 'AI visibility audits' },
+      { level: 2, text: 'Structured data fixes' },
+    ],
     metaDescription:
       'Example Co helps businesses improve AI visibility with clear structured content.',
     metaKeywords: ['ai visibility', 'llms.txt'],
-    ogTags: { 'og:image': 'https://example.com/logo.png' },
+    ogTags: {
+      'og:title': 'Example Co',
+      'og:description': 'AI visibility audits for small businesses.',
+      'og:image': 'https://example.com/logo.png',
+      'og:url': 'https://example.com/',
+      'og:type': 'website',
+    },
+    twitterTags: {
+      'twitter:card': 'summary_large_image',
+      'twitter:title': 'Example Co',
+      'twitter:description': 'AI visibility audits for small businesses.',
+      'twitter:image': 'https://example.com/logo.png',
+    },
+    canonicalUrl: 'https://example.com/',
+    viewport: 'width=device-width, initial-scale=1',
+    hasFavicon: true,
+    lang: 'en',
+    charset: 'utf-8',
     schemaObjects: [
       {
         type: 'Organization',
@@ -68,6 +92,7 @@ function createCrawlData(overrides = {}) {
         },
       },
     ],
+    schemaParseErrors: 0,
     internalLinks: ['/about', '/contact', '/services/ai-audit'],
     externalLinks: [
       'https://linkedin.com/company/example',
@@ -143,6 +168,25 @@ function createCrawlData(overrides = {}) {
     url: 'https://example.com/',
     normalizedUrl: 'https://example.com',
     detectedPlatform,
+    rootHttp: {
+      finalUrl: 'https://example.com/',
+      statusCode: 200,
+      https: true,
+      headers: {
+        'strict-transport-security': 'max-age=63072000; includeSubDomains',
+        'content-security-policy': "default-src 'self'",
+        'x-frame-options': 'SAMEORIGIN',
+        'x-content-type-options': 'nosniff',
+      },
+      strictTransportSecurity: 'max-age=63072000; includeSubDomains',
+      contentSecurityPolicy: "default-src 'self'",
+      xFrameOptions: 'SAMEORIGIN',
+      xContentTypeOptions: 'nosniff',
+    },
+    renderReadiness: {
+      mode: 'server-rendered',
+      detail: 'Meaningful homepage content is visible without client-side execution.',
+    },
     robotsTxt: {
       exists: true,
       raw: 'User-agent: GPTBot\nAllow: /\nSitemap: https://example.com/sitemap.xml',
@@ -413,6 +457,26 @@ test('scoreCrawlData returns a strong score and prioritized fixes', () => {
   assert.ok(Array.isArray(score.fixes));
 });
 
+test('runWebHealthEnrichment returns quality, performance, and security pillars', async () => {
+  const webHealth = await runWebHealthEnrichment(createCrawlData());
+
+  assert.equal(webHealth.status, 'complete');
+  assert.equal(webHealth.pillars.length, 3);
+  assert.ok(webHealth.percentage >= 70);
+  assert.ok(webHealth.metrics.length >= 3);
+});
+
+test('scoreCrawlData merges AI and Web Health fixes when enrichment is available', async () => {
+  const crawlData = createCrawlData();
+  const webHealth = await runWebHealthEnrichment(crawlData);
+  const score = scoreCrawlData(crawlData, webHealth);
+
+  assert.ok(score.webHealth);
+  assert.equal(score.webHealth.status, 'complete');
+  assert.ok(score.fixes.every((fix) => typeof fix.copyPrompt === 'string' && fix.copyPrompt.length > 0));
+  assert.ok(score.fixes.every((fix) => fix.estimatedLift === fix.pointsAvailable));
+});
+
 test('generateAllFiles produces the paid deliverables', async () => {
   const files = await generateAllFiles(createCrawlData());
 
@@ -599,6 +663,29 @@ test('archive route returns a downloadable ZIP for paid scans', async () => {
     Object.keys(contents).sort(),
     ['llms.txt', 'organization-schema.json', 'robots.txt', 'sitemap.xml']
   );
+});
+
+test('report route includes web-health summary and copy-to-LLM payloads', async () => {
+  const crawlData = createCrawlData();
+  const webHealth = await runWebHealthEnrichment(crawlData);
+  await saveCompletedScan('report-payload', {
+    crawlData,
+    scoreResult: scoreCrawlData(crawlData, webHealth),
+    email: 'owner@example.com',
+  });
+
+  const response = await reportRoute.GET(
+    new Request('http://localhost/api/scan/report-payload/report'),
+    {
+      params: Promise.resolve({ id: 'report-payload' }),
+    }
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.webHealth.status, 'complete');
+  assert.match(payload.copyToLlm.reportPrompt, /Priority fixes/i);
+  assert.ok(Array.isArray(payload.copyToLlm.fixPrompts));
 });
 
 test('public score summary only resolves for completed scans', async () => {

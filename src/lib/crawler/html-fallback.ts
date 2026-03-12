@@ -52,9 +52,8 @@ export function extractFallbackPageData({
   lastModified,
 }: HtmlFallbackInput): CrawledPage {
   const title = decodeHtmlEntities(matchFirst(html, /<title[^>]*>([\s\S]*?)<\/title>/i));
-  const h1s = matchAll(html, /<h1[^>]*>([\s\S]*?)<\/h1>/gi).map((value) =>
-    decodeHtmlEntities(stripTags(value)).trim()
-  ).filter(Boolean);
+  const headings = extractHeadings(html);
+  const h1s = headings.filter((heading) => heading.level === 1).map((heading) => heading.text);
   const metaDescription = decodeHtmlEntities(
     extractMetaContent(html, 'name', 'description') ||
       extractMetaContent(html, 'property', 'og:description')
@@ -63,17 +62,21 @@ export function extractFallbackPageData({
     .split(',')
     .map((keyword) => keyword.trim())
     .filter(Boolean);
+  const twitterTags = extractMetaRecord(html, 'name', /^twitter:/i);
+  const canonicalUrl = decodeHtmlEntities(extractLinkHref(html, 'canonical'));
+  const viewport = decodeHtmlEntities(extractMetaContent(html, 'name', 'viewport'));
+  const hasFavicon = /<link\b[^>]*rel=["'][^"']*icon[^"']*["'][^>]*>/i.test(html);
+  const lang = decodeHtmlEntities(extractHtmlAttribute(html, 'lang'));
+  const charset = decodeHtmlEntities(
+    getAttribute(matchAll(html, /<meta\b[^>]*>/gi).find((tag) => /charset\s*=/.test(tag)) || '', 'charset')
+  );
   const metaGenerator = decodeHtmlEntities(extractMetaContent(html, 'name', 'generator'));
   const assetUrls = extractAssetUrlsFromHtml(html);
 
-  const ogTags: Record<string, string> = {};
-  for (const tag of matchAll(html, /<meta\b[^>]*>/gi)) {
-    const property = getAttribute(tag, 'property');
-    if (!property?.toLowerCase().startsWith('og:')) continue;
-    ogTags[property] = decodeHtmlEntities(getAttribute(tag, 'content'));
-  }
+  const ogTags = extractMetaRecord(html, 'property', /^og:/i);
 
   const schemaObjects: SchemaObject[] = [];
+  let schemaParseErrors = 0;
   for (const block of matchAll(
     html,
     /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
@@ -89,7 +92,7 @@ export function extractFallbackPageData({
         });
       }
     } catch {
-      // Ignore malformed JSON-LD in fallback mode.
+      schemaParseErrors += 1;
     }
   }
 
@@ -132,10 +135,18 @@ export function extractFallbackPageData({
     url,
     title,
     h1s,
+    headings,
     metaDescription,
     metaKeywords,
     ogTags,
+    twitterTags,
+    canonicalUrl: canonicalUrl || undefined,
+    viewport: viewport || undefined,
+    hasFavicon,
+    lang: lang || undefined,
+    charset: charset || undefined,
     schemaObjects,
+    schemaParseErrors,
     internalLinks: [...internalLinks],
     externalLinks: [...externalLinks],
     textContent: textContent.slice(0, 10000),
@@ -180,6 +191,57 @@ function extractMetaContent(
   }
 
   return '';
+}
+
+function extractMetaRecord(
+  html: string,
+  attrName: 'name' | 'property',
+  pattern: RegExp
+): Record<string, string> {
+  const record: Record<string, string> = {};
+  const metaTags = matchAll(html, /<meta\b[^>]*>/gi);
+
+  for (const tag of metaTags) {
+    const key = getAttribute(tag, attrName);
+    if (!pattern.test(key)) continue;
+    record[key] = decodeHtmlEntities(getAttribute(tag, 'content'));
+  }
+
+  return record;
+}
+
+function extractLinkHref(html: string, relValue: string): string {
+  const links = matchAll(html, /<link\b[^>]*>/gi);
+
+  for (const tag of links) {
+    const rel = getAttribute(tag, 'rel');
+    if (rel.toLowerCase() !== relValue.toLowerCase()) continue;
+    return getAttribute(tag, 'href');
+  }
+
+  return '';
+}
+
+function extractHtmlAttribute(html: string, name: string): string {
+  const match = html.match(new RegExp(`<html\\b[^>]*${name}\\s*=\\s*["']([^"']*)["']`, 'i'));
+  return match?.[1]?.trim() || '';
+}
+
+function extractHeadings(html: string): { level: number; text: string }[] {
+  const headings: { level: number; text: string }[] = [];
+  const regex = /<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(html)) !== null) {
+    const text = decodeHtmlEntities(stripTags(match[2])).trim();
+    if (!text) continue;
+    headings.push({
+      level: Number(match[1]),
+      text,
+    });
+  }
+
+  return headings;
 }
 
 function getAttribute(tag: string, name: string): string {

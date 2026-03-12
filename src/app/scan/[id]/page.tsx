@@ -7,16 +7,20 @@ import {
   ArrowLeft,
   ArrowUpRight,
   BarChart3,
+  Bot,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Copy,
+  Gauge,
   HelpCircle,
   LayoutDashboard,
   Linkedin,
   ListChecks,
   RefreshCw,
   Share2,
+  ShieldCheck,
   Sparkles,
   Target,
   TrendingUp,
@@ -34,6 +38,14 @@ import { EmailGate } from '@/components/ui/email-gate';
 interface ReportData {
   id: string;
   url: string;
+  enrichments?: {
+    webHealth?: {
+      status: 'pending' | 'running' | 'complete' | 'unavailable';
+      startedAt?: number;
+      completedAt?: number;
+      error?: string;
+    };
+  };
   score: {
     total: number;
     maxTotal: number;
@@ -48,6 +60,7 @@ interface ReportData {
       percentage: number;
       checks: {
         id: string;
+        category: 'ai';
         label: string;
         verdict: 'pass' | 'fail' | 'unknown';
         points: number;
@@ -55,16 +68,69 @@ interface ReportData {
         detail: string;
       }[];
     }[];
-    fixes: {
-      checkId: string;
-      label: string;
-      instruction: string;
-      pointsAvailable: number;
-      effort: number;
-      roi: number;
-    }[];
+    fixes: FixData[];
+    webHealth?: WebHealthSummaryData;
+  };
+  webHealth?: WebHealthSummaryData | null;
+  fixes?: FixData[];
+  copyToLlm?: {
+    reportPrompt: string;
+    fixPrompts: { checkId: string; label: string; prompt: string }[];
   };
   hasPaid: boolean;
+}
+
+interface FixData {
+  checkId: string;
+  label: string;
+  detail: string;
+  category: 'ai' | 'web';
+  instruction: string;
+  pointsAvailable: number;
+  estimatedLift: number;
+  effort: number;
+  roi: number;
+  copyPrompt: string;
+}
+
+interface WebHealthMetricData {
+  key: string;
+  label: string;
+  value: number | null;
+  displayValue: string;
+  status: 'ok' | 'warn' | 'unavailable';
+  detail: string;
+}
+
+interface WebHealthPillarCheckData {
+  id: string;
+  category: 'web';
+  pillar: 'performance' | 'quality' | 'security';
+  label: string;
+  verdict: 'pass' | 'fail' | 'unknown';
+  points: number;
+  maxPoints: number;
+  detail: string;
+}
+
+interface WebHealthPillarData {
+  key: 'performance' | 'quality' | 'security';
+  label: string;
+  score: number;
+  maxScore: number;
+  percentage: number | null;
+  status: 'pending' | 'running' | 'complete' | 'unavailable';
+  checks: WebHealthPillarCheckData[];
+}
+
+interface WebHealthSummaryData {
+  status: 'pending' | 'running' | 'complete' | 'unavailable';
+  percentage: number | null;
+  source?: 'heuristic' | 'pagespeed';
+  updatedAt?: number;
+  error?: string;
+  metrics: WebHealthMetricData[];
+  pillars: WebHealthPillarData[];
 }
 
 function effortLabel(effort: number) {
@@ -89,6 +155,13 @@ function formatDate(timestamp?: number) {
   });
 }
 
+function enrichmentLabel(status?: 'pending' | 'running' | 'complete' | 'unavailable') {
+  if (status === 'complete') return 'Ready';
+  if (status === 'running') return 'Updating';
+  if (status === 'unavailable') return 'Unavailable';
+  return 'Queued';
+}
+
 export default function ScanPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -101,6 +174,8 @@ export default function ScanPage() {
   const [reauditLoading, setReauditLoading] = useState(false);
   const [actionError, setActionError] = useState('');
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
+  const [reportPromptCopied, setReportPromptCopied] = useState(false);
+  const [copiedFixId, setCopiedFixId] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState('');
 
   useEffect(() => {
@@ -183,15 +258,18 @@ export default function ScanPage() {
     (progressChecks.length > 0 ? progressChecks[progressChecks.length - 1]?.label : 'Initializing');
 
   const reportDimensions = report?.score.dimensions ?? [];
-  const reportFixes = report?.score.fixes ?? [];
+  const reportFixes = report?.fixes ?? report?.score.fixes ?? [];
+  const webHealth = report?.webHealth ?? report?.score.webHealth ?? null;
+  const webChecks = webHealth?.pillars.flatMap((pillar) => pillar.checks) ?? [];
+  const webHealthStatus = report?.enrichments?.webHealth?.status ?? webHealth?.status ?? 'pending';
 
-  const allChecks = reportDimensions.flatMap((dimension) => dimension.checks);
+  const allChecks = [...reportDimensions.flatMap((dimension) => dimension.checks), ...webChecks];
   const failedCount = allChecks.filter((item) => item.verdict === 'fail').length;
   const passedCount = allChecks.filter((item) => item.verdict === 'pass').length;
   const unknownCount = allChecks.filter((item) => item.verdict === 'unknown').length;
 
   const topFixes = reportFixes.slice(0, 3);
-  const totalLift = topFixes.reduce((sum, fix) => sum + fix.pointsAvailable, 0);
+  const totalLift = topFixes.reduce((sum, fix) => sum + fix.estimatedLift, 0);
 
   const weakestDimension =
     reportDimensions.length > 0
@@ -201,6 +279,25 @@ export default function ScanPage() {
       : null;
 
   const domain = data?.url ? getDomain(data.url) : 'Unknown domain';
+
+  useEffect(() => {
+    if (!id || !emailSubmitted || report?.enrichments?.webHealth?.status !== 'running') {
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/scan/${id}/report`);
+        if (!res.ok) return;
+        const payload = await res.json();
+        setReport(payload);
+      } catch {
+        // Ignore silent refresh failures while enrichment finishes.
+      }
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+  }, [id, emailSubmitted, report?.enrichments?.webHealth?.status]);
 
   const handleEmailSubmit = async (email: string) => {
     void email;
@@ -270,6 +367,29 @@ export default function ScanPage() {
       setActionError('Unable to start checkout right now. Please try again.');
     } finally {
       setCheckoutLoading(false);
+    }
+  };
+
+  const handleCopyReportPrompt = async () => {
+    if (!report?.copyToLlm?.reportPrompt) return;
+    try {
+      await navigator.clipboard.writeText(report.copyToLlm.reportPrompt);
+      setReportPromptCopied(true);
+      window.setTimeout(() => setReportPromptCopied(false), 2200);
+    } catch {
+      setActionError('Copy failed. Your browser blocked clipboard access.');
+    }
+  };
+
+  const handleCopyFixPrompt = async (checkId: string, prompt: string) => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedFixId(checkId);
+      window.setTimeout(() => {
+        setCopiedFixId((current) => (current === checkId ? null : current));
+      }, 2200);
+    } catch {
+      setActionError('Copy failed. Your browser blocked clipboard access.');
     }
   };
 
@@ -583,9 +703,34 @@ export default function ScanPage() {
                       />
                       {getDomain(report.url)}
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 text-xs font-medium text-[var(--text-secondary)] dark:border-white/10 dark:bg-white/5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-[var(--color-primary-600)]" />
+                        Web Health {webHealth?.percentage !== null && webHealth?.percentage !== undefined ? `${webHealth.percentage}/100` : enrichmentLabel(webHealthStatus)}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 text-xs font-medium text-[var(--text-secondary)] dark:border-white/10 dark:bg-white/5">
+                        <Bot className="h-3.5 w-3.5 text-[var(--color-primary-600)]" />
+                        Copy-to-LLM ready
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  {report.copyToLlm?.reportPrompt && (
+                    <button
+                      type="button"
+                      onClick={handleCopyReportPrompt}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors',
+                        reportPromptCopied
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : 'border-zinc-200 bg-white/70 text-[var(--text-primary)] hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'
+                      )}
+                    >
+                      <Copy className="h-4 w-4" />
+                      {reportPromptCopied ? 'Prompt copied' : 'Copy to LLM'}
+                    </button>
+                  )}
                   {report.hasPaid && (
                     <Link
                       href={`/dashboard/${report.id}`}
@@ -612,7 +757,7 @@ export default function ScanPage() {
                 Repair Queue
               </TabButton>
               <TabButton active={activeTab === 'dimensions'} onClick={() => setTab('dimensions')} icon={BarChart3}>
-                Dimensions
+                Breakdown
               </TabButton>
               <TabButton active={activeTab === 'share'} onClick={() => setTab('share')} icon={Share2}>
                 Share
@@ -621,36 +766,74 @@ export default function ScanPage() {
 
             {/* Tab content — only active tab shown */}
             {activeTab === 'overview' && (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Domain" value={getDomain(report.url)} domain={getDomain(report.url)} />
-                <StatCard label="Failed" value={String(failedCount)} variant="error" />
-                <StatCard label="Unknown" value={String(unknownCount)} />
-                <StatCard label="Passed" value={String(passedCount)} variant="success" />
-                <StatCard
-                  label="Potential lift"
-                  value={`+${totalLift} pts`}
-                  sublabel={weakestDimension ? `Focus: ${weakestDimension.label}` : undefined}
-                  variant="success"
-                  className="sm:col-span-2"
-                />
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <StatCard label="Domain" value={getDomain(report.url)} domain={getDomain(report.url)} />
+                  <StatCard label="Failed" value={String(failedCount)} variant="error" />
+                  <StatCard label="Unknown" value={String(unknownCount)} />
+                  <StatCard label="Passed" value={String(passedCount)} variant="success" />
+                  <StatCard
+                    label="Potential lift"
+                    value={`+${totalLift} pts`}
+                    sublabel={weakestDimension ? `Focus: ${weakestDimension.label}` : undefined}
+                    variant="success"
+                    className="sm:col-span-2"
+                  />
+                  <StatCard
+                    label="Web Health"
+                    value={webHealth?.percentage !== null && webHealth?.percentage !== undefined ? `${webHealth.percentage}/100` : enrichmentLabel(webHealthStatus)}
+                    sublabel={webHealth?.source ? `Source: ${webHealth.source}` : 'Background enrichment'}
+                    className="sm:col-span-2"
+                  />
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                  <WebHealthOverviewCard webHealth={webHealth} status={webHealthStatus} />
+                  <CopyToLlmCard
+                    onCopy={handleCopyReportPrompt}
+                    copied={reportPromptCopied}
+                    fixCount={reportFixes.length}
+                  />
+                </div>
               </div>
             )}
 
             {activeTab === 'repair-queue' && (
               <div className="space-y-4">
-                <p className="text-sm text-[var(--text-secondary)]">
-                  Prioritized by impact. Fix these first to improve your AI visibility score.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Prioritized by impact across AI Visibility and Web Health. Fix these first to move the score fastest.
+                  </p>
+                  {report.copyToLlm?.reportPrompt && (
+                    <button
+                      type="button"
+                      onClick={handleCopyReportPrompt}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
+                        reportPromptCopied
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : 'border-zinc-200 bg-white/70 text-[var(--text-primary)] hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'
+                      )}
+                    >
+                      <Copy className="h-4 w-4" />
+                      {reportPromptCopied ? 'Prompt copied' : 'Copy full brief'}
+                    </button>
+                  )}
+                </div>
                 {reportFixes.length > 0 ? (
                   reportFixes.slice(0, 10).map((fix, index) => (
                     <FixCard
                       key={fix.checkId}
                       index={index + 1}
+                      checkId={fix.checkId}
                       label={fix.label}
+                      detail={fix.detail}
+                      category={fix.category}
                       instruction={fix.instruction}
                       effort={fix.effort}
-                      pointsAvailable={fix.pointsAvailable}
+                      pointsAvailable={fix.estimatedLift}
                       roi={fix.roi}
+                      copied={copiedFixId === fix.checkId}
+                      onCopy={() => handleCopyFixPrompt(fix.checkId, fix.copyPrompt)}
                     />
                   ))
                 ) : (
@@ -670,27 +853,66 @@ export default function ScanPage() {
             {activeTab === 'dimensions' && (
               <div>
                 <div className="mb-8">
-                  <h2 className="text-base font-semibold text-[var(--text-primary)]">Dimension breakdown</h2>
+                  <h2 className="text-base font-semibold text-[var(--text-primary)]">Audit breakdown</h2>
                   <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                    Six scored areas that determine AI visibility. Expand each to see individual checks.
+                    AI Visibility stays primary, with Web Health shown as a supporting layer inside the same report.
                   </p>
                 </div>
-                <div className="space-y-4">
-                  {reportDimensions.map((dimension) => {
-                    const failed = dimension.checks.filter((c) => c.verdict === 'fail').length;
-                    const passed = dimension.checks.filter((c) => c.verdict === 'pass').length;
-                    const unknown = dimension.checks.filter((c) => c.verdict === 'unknown').length;
+                <div className="space-y-8">
+                  <section>
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary-500)]/10">
+                        <Target className="h-5 w-5 text-[var(--color-primary-600)]" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-[var(--text-primary)]">AI Visibility</h3>
+                        <p className="text-sm text-[var(--text-secondary)]">
+                          The original six dimensions that power the main score.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      {reportDimensions.map((dimension) => {
+                        const failed = dimension.checks.filter((c) => c.verdict === 'fail').length;
+                        const passed = dimension.checks.filter((c) => c.verdict === 'pass').length;
+                        const unknown = dimension.checks.filter((c) => c.verdict === 'unknown').length;
 
-                    return (
-                      <DimensionCard
-                        key={dimension.key}
-                        dimension={dimension}
-                        passed={passed}
-                        failed={failed}
-                        unknown={unknown}
-                      />
-                    );
-                  })}
+                        return (
+                          <DimensionCard
+                            key={dimension.key}
+                            dimension={dimension}
+                            passed={passed}
+                            failed={failed}
+                            unknown={unknown}
+                          />
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 dark:bg-white/5">
+                        <Gauge className="h-5 w-5 text-[var(--text-primary)]" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-[var(--text-primary)]">Web Health</h3>
+                        <p className="text-sm text-[var(--text-secondary)]">
+                          Performance, quality, and trust signals that support AI discoverability.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      {webHealth?.pillars?.map((pillar) => (
+                        <WebHealthPillarCard key={pillar.key} pillar={pillar} />
+                      ))}
+                      {!webHealth && (
+                        <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 p-6 text-sm text-[var(--text-secondary)] dark:border-white/10 dark:bg-white/[0.03]">
+                          Web Health is still processing in the background.
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 </div>
               </div>
             )}
@@ -1023,18 +1245,28 @@ function StatCard({
 
 function FixCard({
   index,
+  checkId,
   label,
+  detail,
+  category,
   instruction,
   effort,
   pointsAvailable,
   roi,
+  copied,
+  onCopy,
 }: {
   index: number;
+  checkId: string;
   label: string;
+  detail: string;
+  category: 'ai' | 'web';
   instruction: string;
   effort: number;
   pointsAvailable: number;
   roi: number;
+  copied: boolean;
+  onCopy: () => void;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50/80 p-6 shadow-sm transition-colors hover:border-zinc-300 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20">
@@ -1043,7 +1275,37 @@ function FixCard({
           {index}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-[var(--text-primary)]">{label}</h3>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-[var(--text-primary)]">{label}</h3>
+                <span
+                  className={cn(
+                    'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]',
+                    category === 'ai'
+                      ? 'bg-[var(--color-primary-500)]/10 text-[var(--color-primary-700)] dark:text-[var(--color-primary-300)]'
+                      : 'bg-white/80 text-[var(--text-secondary)] dark:bg-white/10'
+                  )}
+                >
+                  {category}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{detail}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onCopy}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors',
+                copied
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : 'border-zinc-200 bg-white/70 text-[var(--text-primary)] hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'
+              )}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {copied ? 'Copied' : 'Copy prompt'}
+            </button>
+          </div>
           <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{instruction}</p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center rounded-md bg-[var(--color-primary-100)] px-2.5 py-1 text-xs font-semibold text-[var(--color-primary-700)] dark:bg-[var(--color-primary-900)] dark:text-[var(--color-primary-300)]">
@@ -1055,9 +1317,194 @@ function FixCard({
             <span className="text-xs text-[var(--text-muted)]">
               ROI: {roi.toFixed(1)}
             </span>
+            <span className="text-xs text-[var(--text-muted)]">
+              Ref: {checkId}
+            </span>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CopyToLlmCard({
+  onCopy,
+  copied,
+  fixCount,
+}: {
+  onCopy: () => void;
+  copied: boolean;
+  fixCount: number;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50/80 p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex items-start gap-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-primary-500)]/10">
+          <Bot className="h-5 w-5 text-[var(--color-primary-600)]" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">Copy to LLM</p>
+          <h3 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Turn the audit into an implementation brief</h3>
+          <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+            Copy a prompt that packages the site, the strongest issues, and the highest-impact fixes for ChatGPT or Claude.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-[var(--text-muted)]">
+            <span className="rounded-full border border-zinc-200 bg-white/70 px-3 py-1 dark:border-white/10 dark:bg-white/5">
+              {fixCount} prioritized fixes
+            </span>
+            <span className="rounded-full border border-zinc-200 bg-white/70 px-3 py-1 dark:border-white/10 dark:bg-white/5">
+              AI + Web context
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onCopy}
+            className={cn(
+              'mt-5 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors',
+              copied
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                : 'bg-[var(--color-primary-600)] text-white hover:bg-[var(--color-primary-700)]'
+            )}
+          >
+            <Copy className="h-4 w-4" />
+            {copied ? 'Copied to clipboard' : 'Copy implementation brief'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WebHealthOverviewCard({
+  webHealth,
+  status,
+}: {
+  webHealth: WebHealthSummaryData | null | undefined;
+  status: 'pending' | 'running' | 'complete' | 'unavailable';
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50/80 p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">Web Health</p>
+          <h3 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Secondary signals that support AI discovery</h3>
+        </div>
+        <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-3 py-1 text-xs font-medium text-[var(--text-secondary)] dark:border-white/10 dark:bg-white/5">
+          <Gauge className="h-3.5 w-3.5 text-[var(--color-primary-600)]" />
+          {enrichmentLabel(status)}
+        </span>
+      </div>
+
+      {status === 'running' && (
+        <p className="mt-4 text-sm text-[var(--text-secondary)]">
+          Performance and technical quality are still being enriched in the background. This will update automatically.
+        </p>
+      )}
+
+      {status === 'unavailable' && (
+        <p className="mt-4 text-sm text-[var(--text-secondary)]">
+          Web Health could not be completed for this scan. The AI report is still valid, and a re-audit may recover the missing data.
+        </p>
+      )}
+
+      {webHealth?.pillars && webHealth.pillars.length > 0 && (
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {webHealth.pillars.map((pillar) => (
+            <div key={pillar.key} className="rounded-2xl border border-zinc-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{pillar.label}</p>
+                <span className="text-xs font-medium text-[var(--text-muted)]">
+                  {pillar.percentage !== null ? `${pillar.percentage}%` : 'Unavailable'}
+                </span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200/70 dark:bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[var(--color-primary-600)]"
+                  style={{ width: `${Math.max(8, pillar.percentage ?? 8)}%` }}
+                />
+              </div>
+              <p className="mt-3 text-xs text-[var(--text-muted)]">
+                {pillar.score}/{pillar.maxScore} points
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {webHealth?.metrics && webHealth.metrics.length > 0 && (
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {webHealth.metrics.slice(0, 4).map((metric) => (
+            <div key={metric.key} className="rounded-2xl border border-zinc-200 bg-white/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">{metric.label}</p>
+              <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{metric.displayValue}</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">{metric.detail}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WebHealthPillarCard({
+  pillar,
+}: {
+  pillar: WebHealthPillarData;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50/80 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-4 p-5 text-left transition-colors hover:bg-white/50 dark:hover:bg-white/5"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/70 dark:bg-white/5">
+          {pillar.key === 'security' ? (
+            <ShieldCheck className="h-5 w-5 text-[var(--text-primary)]" />
+          ) : pillar.key === 'performance' ? (
+            <Gauge className="h-5 w-5 text-[var(--text-primary)]" />
+          ) : (
+            <BarChart3 className="h-5 w-5 text-[var(--text-primary)]" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-[var(--text-primary)]">{pillar.label}</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            {pillar.percentage !== null ? `${pillar.percentage}%` : 'Unavailable'} · {pillar.score}/{pillar.maxScore} points
+          </p>
+        </div>
+        <ChevronDown className={cn('h-5 w-5 text-[var(--text-muted)] transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="border-t border-zinc-200 bg-white/30 dark:border-white/10 dark:bg-white/[0.02]">
+          <div className="divide-y divide-zinc-200 dark:divide-white/10">
+            {pillar.checks.map((check) => (
+              <div key={check.id} className="flex gap-4 px-5 py-4">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center pt-0.5">
+                  {check.verdict === 'pass' ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  ) : check.verdict === 'fail' ? (
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <HelpCircle className="h-5 w-5 text-amber-500" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-[var(--text-primary)]">{check.label}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">{check.detail}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span className="rounded-md bg-white/60 px-2 py-1 text-xs font-medium tabular-nums text-[var(--text-muted)] dark:bg-white/5">
+                    {check.points}/{check.maxPoints}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

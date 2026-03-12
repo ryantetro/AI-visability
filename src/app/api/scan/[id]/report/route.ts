@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/services/registry';
+import { buildReportPromptBundle } from '@/lib/llm-prompts';
 import { ScoreResult } from '@/types/score';
 
 export async function GET(
@@ -23,11 +24,16 @@ export async function GET(
   }
 
   const scoreResult = scan.scoreResult as ScoreResult;
+  const copyToLlm = buildReportPromptBundle(scan.url, scoreResult);
 
   return NextResponse.json({
     id: scan.id,
     url: scan.url,
     score: scoreResult,
+    webHealth: scoreResult.webHealth || null,
+    fixes: scoreResult.fixes,
+    copyToLlm,
+    enrichments: scan.enrichments,
     hasPaid: !!scan.paid,
   });
 }
