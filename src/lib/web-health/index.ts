@@ -10,6 +10,7 @@ interface PageSpeedSnapshot {
   lcpMs: number | null;
   cls: number | null;
   tbtMs: number | null;
+  inpMs: number | null;
   speedIndexMs: number | null;
 }
 
@@ -33,20 +34,12 @@ export async function runWebHealthEnrichment(data: CrawlData): Promise<WebHealth
     buildPillar('security', 'Trust & Security', securityChecks),
   ];
 
-  const totals = pillars.reduce(
-    (acc, pillar) => {
-      if (pillar.status !== 'complete') {
-        return acc;
-      }
-      return {
-        score: acc.score + pillar.score,
-        maxScore: acc.maxScore + pillar.maxScore,
-      };
-    },
-    { score: 0, maxScore: 0 }
-  );
-
-  const percentage = totals.maxScore > 0 ? Math.round((totals.score / totals.maxScore) * 100) : null;
+  const pillarPercentages = pillars
+    .map((pillar) => pillar.percentage)
+    .filter((value): value is number => value !== null);
+  const percentage = pillarPercentages.length > 0
+    ? Math.round(average(pillarPercentages))
+    : null;
 
   return {
     status: percentage === null ? 'unavailable' : 'complete',
@@ -79,19 +72,50 @@ function createPerformanceChecks(
 ): WebHealthCheckResult[] {
   const homepage = data.homepage;
   if (pageSpeed) {
-    return [
+    const categoryChecks: WebHealthCheckResult[] = [
       createCheck({
         id: 'whp-performance-score',
         pillar: 'performance',
         label: 'PageSpeed performance score',
         verdict: metricVerdict(pageSpeed.performance, 80),
-        points: pointsFromVerdict(metricVerdict(pageSpeed.performance, 80), 12),
-        maxPoints: 12,
+        points: pointsFromVerdict(metricVerdict(pageSpeed.performance, 80), 8),
+        maxPoints: 8,
         detail:
           pageSpeed.performance === null
             ? 'PageSpeed performance score was unavailable.'
             : `PageSpeed performance is ${pageSpeed.performance}/100.`,
       }),
+      createCheck({
+        id: 'whp-seo-score',
+        pillar: 'performance',
+        label: 'PageSpeed SEO score',
+        verdict: metricVerdict(pageSpeed.seo, 80),
+        points: pointsFromVerdict(metricVerdict(pageSpeed.seo, 80), 4),
+        maxPoints: 4,
+        detail: pageSpeed.seo === null ? 'PageSpeed SEO score was unavailable.' : `PageSpeed SEO is ${pageSpeed.seo}/100.`,
+      }),
+      createCheck({
+        id: 'whp-best-practices-score',
+        pillar: 'performance',
+        label: 'PageSpeed best practices score',
+        verdict: metricVerdict(pageSpeed.bestPractices, 80),
+        points: pointsFromVerdict(metricVerdict(pageSpeed.bestPractices, 80), 4),
+        maxPoints: 4,
+        detail: pageSpeed.bestPractices === null ? 'Best practices score was unavailable.' : `Best practices score is ${pageSpeed.bestPractices}/100.`,
+      }),
+      createCheck({
+        id: 'whp-accessibility-score',
+        pillar: 'performance',
+        label: 'PageSpeed accessibility score',
+        verdict: metricVerdict(pageSpeed.accessibility, 80),
+        points: pointsFromVerdict(metricVerdict(pageSpeed.accessibility, 80), 4),
+        maxPoints: 4,
+        detail: pageSpeed.accessibility === null ? 'Accessibility score was unavailable.' : `Accessibility score is ${pageSpeed.accessibility}/100.`,
+      }),
+    ];
+
+    return [
+      ...categoryChecks,
       createCheck({
         id: 'whp-lcp',
         pillar: 'performance',
@@ -127,6 +151,18 @@ function createPerformanceChecks(
           pageSpeed.tbtMs === null
             ? 'Total Blocking Time was unavailable from PageSpeed.'
             : `Total Blocking Time is ${Math.round(pageSpeed.tbtMs)}ms.`,
+      }),
+      createCheck({
+        id: 'whp-inp',
+        pillar: 'performance',
+        label: 'Interaction to Next Paint',
+        verdict: pageSpeed.inpMs !== null && pageSpeed.inpMs <= 200 ? 'pass' : 'fail',
+        points: pageSpeed.inpMs !== null && pageSpeed.inpMs <= 200 ? 4 : 0,
+        maxPoints: 4,
+        detail:
+          pageSpeed.inpMs === null
+            ? 'INP was unavailable from PageSpeed.'
+            : `Interaction to Next Paint is ${Math.round(pageSpeed.inpMs)}ms.`,
       }),
     ];
   }
@@ -433,6 +469,14 @@ function createMetrics(data: CrawlData, pageSpeed: PageSpeedSnapshot | null): We
         displayValue: pageSpeed.lcpMs === null ? 'Unavailable' : `${Math.round(pageSpeed.lcpMs)}ms`,
         status: pageSpeed.lcpMs !== null && pageSpeed.lcpMs <= 2500 ? 'ok' : 'warn',
         detail: 'Largest Contentful Paint from Lighthouse.',
+      },
+      {
+        key: 'pagespeed-seo',
+        label: 'SEO score',
+        value: pageSpeed.seo,
+        displayValue: pageSpeed.seo === null ? 'Unavailable' : `${pageSpeed.seo}/100`,
+        status: pageSpeed.seo !== null && pageSpeed.seo >= 80 ? 'ok' : 'warn',
+        detail: 'Lighthouse SEO category score.',
       }
     );
   }
@@ -554,6 +598,7 @@ async function fetchPageSpeedSnapshot(url: string): Promise<PageSpeedSnapshot | 
     lcpMs: normalizeNumeric(audits['largest-contentful-paint']?.numericValue),
     cls: normalizeNumeric(audits['cumulative-layout-shift']?.numericValue),
     tbtMs: normalizeNumeric(audits['total-blocking-time']?.numericValue),
+    inpMs: normalizeNumeric(audits['interaction-to-next-paint']?.numericValue),
     speedIndexMs: normalizeNumeric(audits['speed-index']?.numericValue),
   };
 }

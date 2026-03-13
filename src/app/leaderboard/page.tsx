@@ -1,0 +1,114 @@
+import Link from 'next/link';
+import {
+  Flame,
+  Gift,
+  MessageCircle,
+  Send,
+  Zap,
+} from 'lucide-react';
+import { listLeaderboardEntries } from '@/lib/public-proof';
+import { AppShellNav } from '@/components/app/app-shell-nav';
+import { LeaderboardContent } from './leaderboard-content';
+
+export const metadata = {
+  title: 'Leaderboard | AISO',
+  description: 'Track the top public reports. See how your site stacks up and explore what makes the leaders stand out.',
+};
+
+const DEMO_ENTRIES = [
+  { domain: 'getvoices.ai', url: 'https://getvoices.ai', overall: 98, speed: 96, quality: 100, security: 97, completedAt: Date.now() - 5 * 24 * 60 * 60 * 1000 },
+  { domain: 'webstudio.is', url: 'https://webstudio.is', overall: 98, speed: 99, quality: 97, security: 98, completedAt: Date.now() - 60 * 24 * 60 * 60 * 1000 },
+  { domain: 'launchigniter.com', url: 'https://launchigniter.com', overall: 97, speed: 95, quality: 100, security: 96, completedAt: Date.now() - 16 * 24 * 60 * 60 * 1000 },
+];
+
+const FEATURED_SPOTS = [
+  {
+    icon: Send,
+    title: 'FeatureMessage',
+    description: 'Write a message your future self will never forget',
+  },
+  {
+    icon: Flame,
+    title: 'HotUGC',
+    description: 'AI platform for high-converting UGC video ads.',
+  },
+  {
+    icon: Zap,
+    title: 'Shack - C2C reboot',
+    description: 'Marketplace: AI-native, human, local, authentic.',
+  },
+];
+
+export default async function LeaderboardPage() {
+  const entries = await listLeaderboardEntries(100);
+  const displayEntries =
+    entries.length > 0
+      ? entries.map(({ rank, summary }) => ({
+          rank,
+          domain: summary.domain,
+          url: summary.url,
+          overall: summary.percentage,
+          speed: summary.webHealth ?? Math.min(100, summary.percentage + 2),
+          quality: summary.aiVisibility,
+          security: summary.webHealth ?? Math.min(100, summary.percentage - 1),
+          completedAt: summary.completedAt,
+          hasCertified: true,
+        }))
+      : DEMO_ENTRIES.map((e, i) => ({ ...e, rank: i + 1, hasCertified: false }));
+
+  return (
+    <div className="min-h-screen bg-[var(--surface-page)]">
+      <AppShellNav active="leaderboard" actionHref="/analysis" actionLabel="New scan" />
+      <div className="mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
+        <section className="mt-6">
+          <h1 className="text-center text-[2rem] font-bold tracking-tight text-[var(--text-primary)]">
+            Leaderboard
+          </h1>
+          <p className="mx-auto mt-2 max-w-2xl text-center text-[15px] text-[var(--text-muted)]">
+            Track the top 100 public reports from the last 24 hours, 30 days, and all time. See how your site stacks up and explore what makes the leaders stand out.
+          </p>
+
+          <div className="mt-8">
+            <div className="flex items-center justify-center gap-2 text-[12px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+              <Gift className="h-4 w-4" />
+              Buy Featured Spot
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              {FEATURED_SPOTS.map(({ icon: Icon, title, description }) => (
+                <Link
+                  key={title}
+                  href="/featured"
+                  className="relative block overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.05]"
+                >
+                  <span className="absolute right-3 top-3 rounded bg-[#25c972]/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#25c972]">
+                    Featured
+                  </span>
+                  <Icon className="h-8 w-8 text-[var(--text-secondary)]" />
+                  <h3 className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
+                  <p className="mt-1.5 text-xs text-[var(--text-muted)]">{description}</p>
+                </Link>
+              ))}
+            </div>
+            <Link
+              href="/featured"
+              className="mx-auto mt-4 flex w-fit items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-[13px] font-medium text-[var(--text-muted)] transition-colors hover:bg-white/[0.06] hover:text-[var(--text-secondary)]"
+            >
+              <Gift className="h-4 w-4" />
+              Buy your featured spot
+            </Link>
+          </div>
+
+          <LeaderboardContent entries={displayEntries} />
+        </section>
+
+        <button
+          type="button"
+          className="fixed right-6 bottom-6 z-20 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#202020] px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Feedback
+        </button>
+      </div>
+    </div>
+  );
+}

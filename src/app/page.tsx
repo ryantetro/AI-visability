@@ -34,7 +34,7 @@ export default function Home() {
         throw new Error(data.error || 'Failed to start scan');
       }
       const { id } = await res.json();
-      router.push(`/scan/${id}`);
+      router.push(`/analysis?scan=${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setLoading(false);
@@ -44,7 +44,7 @@ export default function Home() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative overflow-hidden px-4 pb-20 pt-32 z-0" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section id="scan" className="relative overflow-hidden px-4 pb-20 pt-32 z-0" style={{ backgroundColor: 'var(--surface-page)' }}>
         {/* Subtle branded glow at the top center */}
         <div
           className="absolute left-1/2 top-0 -z-10 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-20 blur-[120px] pointer-events-none"
@@ -109,10 +109,15 @@ export default function Home() {
             <AnimatedStat value={100} suffix="%" label="Free Audit" />
           </div>
         </div>
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,rgba(6,6,6,0)_0%,rgba(6,6,6,0.72)_58%,rgba(6,6,6,1)_100%)]" />
       </section>
 
+      <div className="relative overflow-hidden" style={{ backgroundColor: 'var(--surface-page)' }}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[linear-gradient(180deg,rgba(255,255,255,0.02)_0%,rgba(255,255,255,0.008)_18%,rgba(6,6,6,0)_62%)]" />
+
       {/* How it works */}
-      <section className="px-4 py-20" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section id="how-it-works" className="relative px-4 py-20">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Three steps to AI visibility
@@ -147,7 +152,7 @@ export default function Home() {
       </section>
 
       {/* AI Search Engines Interstitial */}
-      <section className="px-4 py-8 pb-20 text-center" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section className="relative px-4 py-8 pb-20 text-center">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             We scan everywhere your customers are searching
@@ -162,7 +167,7 @@ export default function Home() {
       </section>
 
       {/* 6 Dimensions */}
-      <section className="px-4 pb-20" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section className="relative px-4 pb-20">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             What we check
@@ -195,7 +200,7 @@ export default function Home() {
       </section>
 
       {/* Score bands */}
-      <section className="px-4 py-20" style={{ backgroundColor: 'var(--surface-card)' }}>
+      <section id="pricing" className="relative px-4 py-20">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             What your score means
@@ -233,7 +238,7 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <section className="px-4 py-20" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section id="resources" className="relative px-4 py-20">
         <div className="mx-auto max-w-2xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Frequently asked questions
@@ -263,7 +268,7 @@ export default function Home() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="px-4 py-20 text-center" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section className="relative px-4 py-20 text-center">
         <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
           Ready to check your AI visibility?
         </h2>
@@ -276,7 +281,7 @@ export default function Home() {
       </section>
 
       {/* Landing page variants nav */}
-      <section className="border-t px-4 py-6 text-center" style={{ borderColor: 'var(--border-default)' }}>
+      <section className="relative border-t px-4 py-6 text-center" style={{ borderColor: 'var(--border-default)' }}>
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
           Landing page variants:{' '}
           <span className="font-semibold" style={{ color: 'var(--color-primary-600)' }}>A (current)</span>
@@ -286,6 +291,7 @@ export default function Home() {
           <Link href="/landing/c" className="underline" style={{ color: 'var(--text-tertiary)' }}>C — Minimal</Link>
         </p>
       </section>
+      </div>
     </div>
   );
 }

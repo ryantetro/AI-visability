@@ -30,14 +30,14 @@ export function initialProgress(): ScanProgress {
   return {
     status: 'pending',
     checks: [
-      { label: 'Checking robots.txt', status: 'pending' },
-      { label: 'Checking sitemap.xml', status: 'pending' },
+      { label: 'Fetching robots.txt & sitemap', status: 'pending' },
       { label: 'Checking llms.txt', status: 'pending' },
-      { label: 'Crawling homepage', status: 'pending' },
-      { label: 'Discovering pages', status: 'pending' },
-      { label: 'Crawling additional pages', status: 'pending' },
+      { label: 'Crawling pages', status: 'pending' },
+      { label: 'Measuring performance', status: 'pending' },
       { label: 'Analyzing structured data', status: 'pending' },
       { label: 'Scoring AI visibility', status: 'pending' },
+      { label: 'Checking Web Health', status: 'pending' },
+      { label: 'Generating report', status: 'pending' },
     ],
   };
 }
@@ -161,15 +161,15 @@ export async function runScan(scanId: string, db = getDatabase()) {
       scan.progress.currentStep = step;
       if (step.includes('sitemap')) {
         await updateStep('done');
-      } else if (step.includes('llms') || step.includes('browser')) {
+      } else if (step.includes('llms')) {
         await updateStep('done');
-      } else if (step.includes('homepage') || step.includes('Crawling /')) {
+      } else if (step.includes('homepage') || step.includes('Crawling /') || step.includes('Launching browser')) {
         await updateStep('done');
       }
       await db.saveScan(scan);
     });
 
-    for (let i = 0; i < 6; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       if (scan.progress.checks[i].status !== 'done') {
         scan.progress.checks[i].status = 'done';
       }
@@ -188,6 +188,7 @@ export async function runScan(scanId: string, db = getDatabase()) {
         startedAt: enrichmentStartedAt,
       },
     };
+    scan.progress.checks[3].status = 'running';
     await db.saveScan(scan);
 
     const webHealthPromise = withTimeout(
@@ -198,13 +199,16 @@ export async function runScan(scanId: string, db = getDatabase()) {
 
     const scoreResult = scoreCrawlData(crawlData);
 
-    scan.progress.checks[6].status = 'done';
-    scan.progress.checks[7].status = 'running';
+    scan.progress.checks[3].status = 'done';
+    scan.progress.checks[4].status = 'done';
+    scan.progress.checks[5].status = 'running';
     await db.saveScan(scan);
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    scan.progress.checks[7].status = 'done';
+    scan.progress.checks[5].status = 'done';
+    scan.progress.checks[6].status = 'running';
+    scan.progress.checks[7].status = 'running';
     scan.status = 'complete';
     scan.progress.status = 'complete';
     scan.crawlData = crawlData;
@@ -259,6 +263,8 @@ async function finalizeWebHealthEnrichment({
       error: webHealth.error,
     },
   };
+  latest.progress.checks[6].status = webHealth.status === 'complete' ? 'done' : 'error';
+  latest.progress.checks[7].status = 'done';
   latest.scoreResult = scoreCrawlData(crawlData, webHealth);
   await db.saveScan(latest);
 }

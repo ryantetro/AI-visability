@@ -2,23 +2,26 @@ import { DatabaseService, PaymentService, AIService } from '@/types/services';
 import { mockDb } from './mock-db';
 import { mockPayment } from './mock-payment';
 import { mockAi } from './mock-ai';
+import { supabaseDb, canUseSupabase } from './supabase-db';
+import { stripePayment, canUseStripe } from './stripe-payment';
+import { openAiService, canUseOpenAI } from './openai-ai';
 
-const USE_MOCKS = process.env.USE_MOCKS !== 'false'; // default to mocks
+const FORCE_MOCKS = process.env.USE_MOCKS === 'true';
 
 export function getDatabase(): DatabaseService {
-  if (USE_MOCKS) return mockDb;
-  // Future: return supabaseDb;
+  if (FORCE_MOCKS) return mockDb;
+  if (canUseSupabase()) return supabaseDb;
   return mockDb;
 }
 
 export function getPayment(): PaymentService {
-  if (USE_MOCKS) return mockPayment;
-  // Future: return stripePayment;
+  if (FORCE_MOCKS) return mockPayment;
+  if (canUseStripe()) return stripePayment;
   return mockPayment;
 }
 
 export function getAI(): AIService {
-  if (USE_MOCKS) return mockAi;
-  // Future: return claudeAi;
+  if (FORCE_MOCKS) return mockAi;
+  if (canUseOpenAI()) return openAiService;
   return mockAi;
 }

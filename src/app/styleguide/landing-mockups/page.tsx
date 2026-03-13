@@ -416,8 +416,6 @@ function MockupB() {
               <div className="flex items-center gap-3">
                 <span className="text-4xl font-bold" style={{ color: colors.band.needsWork }}>54</span>
                 <div>
-                  <span className="text-sm" style={{ color: colors.neutral[400] }}>/ 100</span>
-                  <br />
                   <span
                     className="text-xs font-semibold text-white"
                     style={{ backgroundColor: colors.band.needsWork, borderRadius: 'var(--radius-full)', padding: '2px 8px' }}

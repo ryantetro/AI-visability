@@ -18,10 +18,10 @@ const dimensionLabels: Record<DimensionKey, string> = {
 };
 
 const bands: ScoreBandInfo[] = [
-  { band: 'ai-ready', label: 'AI Ready', color: '#22c55e', min: 80, max: 100 },
-  { band: 'needs-work', label: 'Needs Work', color: '#eab308', min: 60, max: 79 },
-  { band: 'at-risk', label: 'At Risk', color: '#f97316', min: 40, max: 59 },
-  { band: 'not-visible', label: 'Not Visible', color: '#ef4444', min: 0, max: 39 },
+  { band: 'ai-ready', label: 'AI Ready', color: '#25c972', min: 80, max: 100 },
+  { band: 'needs-work', label: 'Needs Work', color: '#ff8a1e', min: 60, max: 79 },
+  { band: 'at-risk', label: 'At Risk', color: '#ff7424', min: 40, max: 59 },
+  { band: 'not-visible', label: 'Not Visible', color: '#ff5252', min: 0, max: 39 },
 ];
 
 export function scoreCrawlData(data: CrawlData, webHealth?: WebHealthSummary): ScoreResult {
@@ -57,20 +57,36 @@ export function scoreCrawlData(data: CrawlData, webHealth?: WebHealthSummary): S
   const total = dimensions.reduce((sum, d) => sum + d.score, 0);
   const maxTotal = dimensions.reduce((sum, d) => sum + d.maxScore, 0);
   const percentage = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0;
+  const aiVisibility = percentage;
 
-  const bandInfo = bands.find((b) => percentage >= b.min && percentage <= b.max) || bands[bands.length - 1];
+  const bandInfo = getBandInfo(aiVisibility);
+  const webHealthPercentage = webHealth?.status === 'complete' ? webHealth.percentage : null;
+  const overall = webHealthPercentage === null
+    ? null
+    : Math.round(aiVisibility * 0.6 + webHealthPercentage * 0.4);
+  const overallBandInfo = getBandInfo(overall ?? aiVisibility);
 
   const webChecks = webHealth?.pillars.flatMap((pillar) => pillar.checks) || [];
   const fixes = prioritizeFixes([...allChecks, ...webChecks], { url: data.url });
+  const potentialLiftBase = overall ?? aiVisibility;
+  const potentialLift = Math.max(0, 100 - potentialLiftBase);
 
   return {
     total,
     maxTotal,
-    percentage,
+    percentage: aiVisibility,
     band: bandInfo.band,
     bandInfo,
+    overallBand: overallBandInfo.band,
+    overallBandInfo,
     dimensions,
     fixes,
+    scores: {
+      aiVisibility,
+      webHealth: webHealthPercentage,
+      overall,
+      potentialLift,
+    },
     webHealth,
   };
 }

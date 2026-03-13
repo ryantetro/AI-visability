@@ -21,6 +21,16 @@ const { initialProgress, startScan } = require('../src/lib/scan-workflow.ts');
 const { getPublicScoreSummary } = require('../src/lib/public-score.ts');
 const { resetMockDb, mockDb } = require('../src/lib/services/mock-db.ts');
 const { resetScanRateLimitStore } = require('../src/lib/scan-rate-limit.ts');
+const {
+  startDomainVerification,
+  confirmDomainVerification,
+  listLeaderboardEntries,
+} = require('../src/lib/public-proof.ts');
+const {
+  addMonitoringDomain,
+  removeMonitoringDomain,
+  listMonitoringDomains,
+} = require('../src/lib/monitoring.ts');
 const archiveRoute = require('../src/app/api/scan/[id]/files/archive/route.ts');
 const reportRoute = require('../src/app/api/scan/[id]/report/route.ts');
 const publicScorePage = require('../src/app/score/[id]/page.tsx');
@@ -684,7 +694,9 @@ test('report route includes web-health summary and copy-to-LLM payloads', async 
 
   assert.equal(response.status, 200);
   assert.equal(payload.webHealth.status, 'complete');
-  assert.match(payload.copyToLlm.reportPrompt, /Priority fixes/i);
+  assert.match(payload.copyToLlm.fullPrompt, /Priority fixes/i);
+  assert.equal(payload.scores.aiVisibility, payload.score.scores.aiVisibility);
+  assert.ok(payload.scores.overall >= 0);
   assert.ok(Array.isArray(payload.copyToLlm.fixPrompts));
 });
 
@@ -748,4 +760,79 @@ test('public score page renders for completed scans and 404s otherwise', async (
       }),
     (err) => err && err.digest === 'NEXT_HTTP_ERROR_FALLBACK;404'
   );
+});
+
+test('domain verification can start, confirm, and publish a leaderboard entry', async () => {
+  const scan = await saveCompletedScan('verified-public', {
+    email: 'owner@example.com',
+  });
+
+  const started = await startDomainVerification({
+    scanId: scan.id,
+    url: scan.url,
+    email: scan.email,
+    enablePublicScore: true,
+    enableBadge: true,
+    enableLeaderboard: true,
+  });
+
+  assert.equal(started.instructions.domain, 'example.com');
+  assert.match(started.instructions.metaTag, /aiso-verification/);
+
+  await withMockFetch(
+    async (url) => {
+      if (url === 'https://example.com' || url === 'https://example.com/') {
+        return {
+          ok: true,
+          text: async () =>
+            `<!doctype html><html><head>${started.instructions.metaTag}</head><body></body></html>`,
+        };
+      }
+
+      return {
+        ok: false,
+        text: async () => '',
+      };
+    },
+    async () => {
+      const confirmed = await confirmDomainVerification({
+        domain: 'example.com',
+        enablePublicScore: true,
+        enableBadge: true,
+        enableLeaderboard: true,
+      });
+
+      assert.equal(confirmed.verified, true);
+      assert.equal(confirmed.method, 'meta-tag');
+    }
+  );
+
+  const leaderboard = await listLeaderboardEntries(10);
+  assert.equal(leaderboard.length, 1);
+  assert.equal(leaderboard[0].summary.id, scan.id);
+  assert.equal(leaderboard[0].summary.domain, 'example.com');
+});
+
+test('monitoring records can be added and removed for owned scans', async () => {
+  const scan = await saveCompletedScan('monitoring-scan', {
+    email: 'alerts@example.com',
+  });
+
+  const record = await addMonitoringDomain({
+    scanId: scan.id,
+    alertThreshold: 7,
+  });
+
+  assert.equal(record.domain, 'example.com');
+  assert.equal(record.alertThreshold, 7);
+
+  const activeRecords = await listMonitoringDomains('alerts@example.com');
+  assert.equal(activeRecords.length, 1);
+  assert.equal(activeRecords[0].scanId, scan.id);
+
+  const removed = await removeMonitoringDomain('example.com', 'alerts@example.com');
+  assert.equal(removed, true);
+
+  const remainingRecords = await listMonitoringDomains('alerts@example.com');
+  assert.equal(remainingRecords.length, 0);
 });

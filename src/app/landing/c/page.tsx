@@ -31,7 +31,7 @@ export default function LandingC() {
         throw new Error(data.error || 'Failed to start scan');
       }
       const { id } = await res.json();
-      router.push(`/scan/${id}`);
+      router.push(`/analysis?scan=${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setLoading(false);
@@ -41,7 +41,7 @@ export default function LandingC() {
   return (
     <div>
       {/* Hero — ultra minimal */}
-      <section className="px-4 pb-12 pt-32">
+      <section id="scan" className="px-4 pb-12 pt-32">
         <div className="mx-auto max-w-2xl text-center">
           <h1
             className="text-5xl font-bold leading-[1.08] tracking-tight animate-fade-in-up sm:text-6xl"
@@ -91,7 +91,7 @@ export default function LandingC() {
       </section>
 
       {/* Platform divider */}
-      <section className="px-4 py-10">
+      <section id="how-it-works" className="px-4 py-10">
         <div className="mx-auto flex max-w-md items-center justify-center gap-1">
           <div className="h-px flex-1" style={{ backgroundColor: 'var(--border-default)' }} />
           <span className="px-4 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -131,7 +131,7 @@ export default function LandingC() {
       </section>
 
       {/* Score bands — minimal strip */}
-      <section className="px-4 py-16" style={{ backgroundColor: 'var(--surface-card)' }}>
+      <section id="pricing" className="px-4 py-16" style={{ backgroundColor: 'var(--surface-card)' }}>
         <div className="mx-auto max-w-xl">
           <h2 className="mb-8 text-center text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
             Score bands
@@ -154,7 +154,7 @@ export default function LandingC() {
       </section>
 
       {/* What we check — compact */}
-      <section className="px-4 py-16" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section id="resources" className="px-4 py-16" style={{ backgroundColor: 'var(--surface-page)' }}>
         <div className="mx-auto max-w-xl">
           <h2 className="mb-8 text-center text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
             6 dimensions, 19 checks

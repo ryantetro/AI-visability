@@ -2,33 +2,78 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const scanId = searchParams.get('scanId');
+  const [resolvedScanId, setResolvedScanId] = useState(searchParams.get('scanId'));
+  const [verifying, setVerifying] = useState(Boolean(searchParams.get('session_id')));
+
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    const existingScanId = searchParams.get('scanId');
+
+    if (!sessionId || existingScanId) {
+      setResolvedScanId(existingScanId);
+      setVerifying(false);
+      return;
+    }
+
+    let active = true;
+
+    async function verify() {
+      try {
+        const res = await fetch('/api/checkout/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        });
+        if (!res.ok) {
+          throw new Error('Verification failed');
+        }
+
+        const payload = await res.json();
+        if (!active) return;
+        if (payload.paid && payload.scanId) {
+          setResolvedScanId(payload.scanId);
+        }
+      } finally {
+        if (active) {
+          setVerifying(false);
+        }
+      }
+    }
+
+    void verify();
+
+    return () => {
+      active = false;
+    };
+  }, [searchParams]);
 
   return (
     <div className="aiso-page app-page aiso-shell app-shell-compact flex min-h-screen items-center justify-center py-16">
       <div className="aiso-card flex max-w-2xl flex-col items-center gap-6 px-8 py-12 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--color-primary-50)', boxShadow: '0 14px 28px rgba(5, 150, 105, 0.16)' }}>
+        <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: 'rgba(53,109,244,0.18)', boxShadow: '0 14px 28px rgba(36, 85, 220, 0.24)' }}>
           <svg className="h-8 w-8" style={{ color: 'var(--color-primary-600)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <p className="aiso-kicker">Payment Confirmed</p>
         <h1 className="app-h2 font-bold" style={{ color: 'var(--text-primary)' }}>
-          Payment Successful!
+          Payment Successful
         </h1>
         <p className="app-body app-measure max-w-md" style={{ color: 'var(--text-tertiary)' }}>
-          Your AI visibility fix files are ready. Follow the guided install steps to boost your score.
+          {verifying
+            ? 'Confirming your checkout session and unlocking your advanced implementation tools.'
+            : 'Your AI visibility fix files are ready. Follow the guided install steps to boost your score.'}
         </p>
-        {scanId && (
+        {resolvedScanId && !verifying && (
           <Link
-            href={`/dashboard/${scanId}`}
+            href={`/advanced?report=${resolvedScanId}`}
             className="aiso-button aiso-button-primary px-6 py-3 text-sm"
           >
-            View Your Fix Files
+            Open Advanced Tools
           </Link>
         )}
       </div>

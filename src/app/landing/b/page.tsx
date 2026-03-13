@@ -31,7 +31,7 @@ export default function LandingB() {
         throw new Error(data.error || 'Failed to start scan');
       }
       const { id } = await res.json();
-      router.push(`/scan/${id}`);
+      router.push(`/analysis?scan=${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setLoading(false);
@@ -42,6 +42,7 @@ export default function LandingB() {
     <div>
       {/* Hero — dark, tool-forward */}
       <section
+        id="scan"
         className="px-4 pb-24 pt-20"
         style={{ background: `linear-gradient(180deg, ${colors.neutral[950]} 0%, ${colors.neutral[900]} 100%)` }}
       >
@@ -97,7 +98,7 @@ export default function LandingB() {
       </section>
 
       {/* Mock score card preview */}
-      <section className="px-4 py-16" style={{ backgroundColor: 'var(--surface-card)' }}>
+      <section id="how-it-works" className="px-4 py-16" style={{ backgroundColor: 'var(--surface-card)' }}>
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
             What you&apos;ll get
@@ -114,7 +115,6 @@ export default function LandingB() {
               <div className="flex items-center gap-3">
                 <span className="text-4xl font-bold" style={{ color: colors.band.needsWork }}>54</span>
                 <div>
-                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>/ 100</span><br />
                   <span className="text-xs font-semibold text-white" style={{ backgroundColor: colors.band.needsWork, borderRadius: 'var(--radius-full)', padding: '2px 8px' }}>Needs Work</span>
                 </div>
               </div>
@@ -148,7 +148,7 @@ export default function LandingB() {
       </section>
 
       {/* 19 checks breakdown */}
-      <section className="px-4 py-20" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section id="pricing" className="px-4 py-20" style={{ backgroundColor: 'var(--surface-page)' }}>
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             19 checks across 6 dimensions
@@ -207,7 +207,7 @@ export default function LandingB() {
       </section>
 
       {/* FAQ */}
-      <section className="px-4 py-20" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <section id="resources" className="px-4 py-20" style={{ backgroundColor: 'var(--surface-page)' }}>
         <div className="mx-auto max-w-2xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Common questions

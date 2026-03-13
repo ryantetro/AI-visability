@@ -4,6 +4,8 @@ export interface DatabaseService {
   getScan(id: string): Promise<ScanJob | null>;
   saveScan(scan: ScanJob): Promise<void>;
   findScanByUrl(normalizedUrl: string, maxAgeMs?: number): Promise<ScanJob | null>;
+  listCompletedScans(limit?: number): Promise<ScanJob[]>;
+  findLatestScanByDomain(domain: string): Promise<ScanJob | null>;
 }
 
 export interface CheckoutSession {

@@ -9,6 +9,7 @@ export type DimensionKey =
 export type AuditCategory = 'ai' | 'web';
 export type WebHealthStatus = 'pending' | 'running' | 'complete' | 'unavailable';
 export type WebHealthPillarKey = 'performance' | 'quality' | 'security';
+export type EffortBand = 'quick' | 'medium' | 'technical';
 
 export type CheckVerdict = 'pass' | 'fail' | 'unknown';
 
@@ -63,9 +64,12 @@ export interface PrioritizedFix {
   estimatedLift: number;
   urgency: number; // 1-5
   effort: number; // 1-5
+  effortBand: EffortBand;
   roi: number; // computed
   instruction: string;
   copyPrompt: string;
+  actualValue?: string;
+  expectedValue?: string;
 }
 
 export interface WebHealthMetric {
@@ -97,13 +101,23 @@ export interface WebHealthSummary {
   error?: string;
 }
 
+export interface ScoreSnapshot {
+  aiVisibility: number;
+  webHealth: number | null;
+  overall: number | null;
+  potentialLift: number | null;
+}
+
 export interface ScoreResult {
   total: number;
   maxTotal: number;
   percentage: number;
   band: ScoreBand;
   bandInfo: ScoreBandInfo;
+  overallBand: ScoreBand;
+  overallBandInfo: ScoreBandInfo;
   dimensions: DimensionScore[];
   fixes: PrioritizedFix[];
+  scores: ScoreSnapshot;
   webHealth?: WebHealthSummary;
 }

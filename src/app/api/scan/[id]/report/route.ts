@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/services/registry';
 import { buildReportPromptBundle } from '@/lib/llm-prompts';
+import { buildSharePayload, serializeScoreResult } from '@/lib/report-serializer';
 import { ScoreResult } from '@/types/score';
 
 export async function GET(
@@ -25,14 +26,17 @@ export async function GET(
 
   const scoreResult = scan.scoreResult as ScoreResult;
   const copyToLlm = buildReportPromptBundle(scan.url, scoreResult);
+  const score = serializeScoreResult(scoreResult);
 
   return NextResponse.json({
     id: scan.id,
     url: scan.url,
-    score: scoreResult,
-    webHealth: scoreResult.webHealth || null,
-    fixes: scoreResult.fixes,
+    score,
+    webHealth: score.webHealth,
+    fixes: score.fixes,
+    scores: score.scores,
     copyToLlm,
+    share: buildSharePayload(scan.id),
     enrichments: scan.enrichments,
     hasPaid: !!scan.paid,
   });

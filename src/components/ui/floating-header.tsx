@@ -13,6 +13,7 @@ export function FloatingHeader() {
     const links = [
         { label: 'How it works', href: '/#how-it-works' },
         { label: 'Pricing', href: '/#pricing' },
+        { label: 'Leaderboard', href: '/leaderboard' },
         { label: 'Resources', href: '/#resources' },
     ];
 
@@ -27,7 +28,7 @@ export function FloatingHeader() {
             <nav className="flex items-center justify-between p-1.5 pl-3">
                 {/* Logo Section */}
                 <Link href="/" className="hover:bg-[rgba(255,255,255,0.05)] flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 transition-colors duration-100">
-                    <div className="flex items-center justify-center rounded-full bg-[#059669] p-1 h-6 w-6">
+                    <div className="flex items-center justify-center rounded-full bg-[var(--color-primary-500)] p-1 h-6 w-6 shadow-[0_0_18px_rgba(53,109,244,0.42)]">
                         <span className="text-white text-[10px] font-bold leading-none tracking-tight">AI</span>
                     </div>
                     <p className="font-sans text-base font-bold tracking-tight">AISO</p>
@@ -49,10 +50,10 @@ export function FloatingHeader() {
                 {/* Mobile menu & CTAs */}
                 <div className="flex items-center gap-2">
                     <Button size="sm" variant="ghost" className="rounded-full hidden sm:flex hover:bg-[rgba(255,255,255,0.05)] hover:text-white text-[#d6d3d1]" asChild>
-                        <Link href="/login">Log in</Link>
+                        <Link href="/#resources">Resources</Link>
                     </Button>
-                    <Button size="sm" className="rounded-full bg-[#059669] hover:bg-[#047857] text-white shadow-[0_0_15px_rgba(5,150,105,0.3)] hidden sm:flex" asChild>
-                        <Link href="/audit">Check My AI Score</Link>
+                    <Button size="sm" className="rounded-full bg-[var(--color-primary-500)] hover:bg-[var(--color-primary-600)] text-white shadow-[0_0_20px_rgba(53,109,244,0.32)] hidden sm:flex" asChild>
+                        <Link href="/#scan">Check My AI Score</Link>
                     </Button>
 
                     <Sheet open={open} onOpenChange={setOpen}>
@@ -70,7 +71,7 @@ export function FloatingHeader() {
                             side="left"
                         >
                             <div className="flex items-center gap-2 px-6 pt-8 pb-4">
-                                <div className="flex items-center justify-center rounded-full bg-[#059669] p-1 h-6 w-6">
+                                <div className="flex items-center justify-center rounded-full bg-[var(--color-primary-500)] p-1 h-6 w-6 shadow-[0_0_18px_rgba(53,109,244,0.42)]">
                                     <span className="text-white text-[10px] font-bold leading-none tracking-tight">AI</span>
                                 </div>
                                 <p className="font-sans text-base font-bold tracking-tight text-white">AISO</p>
@@ -92,10 +93,10 @@ export function FloatingHeader() {
                             </div>
                             <SheetFooter className="px-4 pb-8 flex-col gap-3 sm:flex-col">
                                 <Button variant="outline" className="w-full rounded-full border-[rgba(255,255,255,0.1)] text-white hover:bg-[rgba(255,255,255,0.05)] h-11" onClick={() => setOpen(false)} asChild>
-                                    <Link href="/login">Log in</Link>
+                                    <Link href="/#resources">Resources</Link>
                                 </Button>
-                                <Button className="w-full rounded-full bg-[#059669] hover:bg-[#047857] text-white h-11" onClick={() => setOpen(false)} asChild>
-                                    <Link href="/audit">Check My AI Score</Link>
+                                <Button className="w-full rounded-full bg-[var(--color-primary-500)] hover:bg-[var(--color-primary-600)] text-white h-11" onClick={() => setOpen(false)} asChild>
+                                    <Link href="/#scan">Check My AI Score</Link>
                                 </Button>
                             </SheetFooter>
                         </SheetContent>

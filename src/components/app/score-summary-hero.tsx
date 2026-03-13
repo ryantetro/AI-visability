@@ -1,0 +1,103 @@
+'use client';
+
+import type { Ref } from 'react';
+import { ReactNode } from 'react';
+import { Globe2, Zap } from 'lucide-react';
+import { ScoreRing } from '@/components/ui/score-ring';
+import { cn } from '@/lib/utils';
+
+interface ScoreSummaryHeroProps {
+  domain: string;
+  url?: string;
+  dateLabel?: string;
+  coreRef?: Ref<HTMLDivElement>;
+  overall: {
+    score: number | null;
+    color: string;
+    label?: string;
+    caption?: string;
+  };
+  supporting: Array<{
+    label: string;
+    score: number | null;
+    color: string;
+    caption?: string;
+  }>;
+  note?: string;
+  actions?: ReactNode;
+  className?: string;
+}
+
+export function ScoreSummaryHero({
+  domain,
+  url,
+  dateLabel,
+  coreRef,
+  overall,
+  supporting,
+  note,
+  actions,
+  className,
+}: ScoreSummaryHeroProps) {
+  return (
+    <section className={cn('px-2 py-6 sm:py-8', className)}>
+      <div className="flex flex-col items-center text-center">
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="inline-flex items-center gap-2 text-zinc-400">
+            <Zap className="h-4 w-4 text-amber-400/90" />
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-white hover:text-zinc-200"
+              >
+                {domain}
+              </a>
+            ) : (
+              <span className="font-medium text-white">{domain}</span>
+            )}
+          </span>
+          {dateLabel ? (
+            <span className="text-[12px] text-zinc-500">{dateLabel}</span>
+          ) : null}
+        </div>
+
+        <div className="mt-8 flex justify-center">
+          <ScoreRing
+            score={overall.score}
+            size={188}
+            emphasis="hero"
+            color={overall.color}
+            label={overall.label ?? 'Overall Score'}
+            caption={overall.caption}
+            coreRef={coreRef}
+          />
+        </div>
+
+        <div className="mt-8 grid w-full max-w-[560px] grid-cols-3 gap-4">
+          {supporting.map((item) => (
+            <div key={item.label} className="flex flex-col items-center">
+              <ScoreRing
+                score={item.score}
+                size={100}
+                emphasis="compact"
+                color={item.color}
+                label={item.label}
+                caption={item.caption}
+              />
+            </div>
+          ))}
+        </div>
+
+        {note ? (
+          <p className="mt-6 max-w-[42rem] text-[13px] leading-6 text-zinc-500">
+            {note}
+          </p>
+        ) : null}
+
+        {actions ? <div className="mt-6 flex flex-wrap justify-center gap-2">{actions}</div> : null}
+      </div>
+    </section>
+  );
+}

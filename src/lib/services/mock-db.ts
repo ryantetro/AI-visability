@@ -1,5 +1,6 @@
 import { DatabaseService } from '@/types/services';
 import { ScanJob } from '@/types/scan';
+import { getDomain } from '@/lib/url-utils';
 
 // Use globalThis to survive HMR in development
 const globalStore = globalThis as unknown as {
@@ -38,5 +39,21 @@ export const mockDb: DatabaseService = {
       }
     }
     return null;
+  },
+
+  async listCompletedScans(limit = 50) {
+    return [...getStore().values()]
+      .filter((scan) => scan.status === 'complete')
+      .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))
+      .slice(0, limit);
+  },
+
+  async findLatestScanByDomain(domain: string) {
+    const normalizedDomain = domain.toLowerCase();
+    return (
+      [...getStore().values()]
+        .filter((scan) => scan.status === 'complete' && getDomain(scan.url) === normalizedDomain)
+        .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))[0] ?? null
+    );
   },
 };

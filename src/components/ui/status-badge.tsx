@@ -46,8 +46,8 @@ export function StatusBadge({
           <LeftIcon
             className={cn(
               '-ml-0.5 size-4 shrink-0',
-              status === 'success' && 'text-emerald-600 dark:text-emerald-500',
-              status === 'error' && 'text-red-600 dark:text-red-500'
+              status === 'success' && 'text-[var(--color-success)]',
+              status === 'error' && 'text-[var(--color-error)]'
             )}
             aria-hidden={true}
           />

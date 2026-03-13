@@ -38,20 +38,20 @@ const inlineIcons: Record<AlertVariant, React.ReactNode> = {
 
 const variantStyles: Record<AlertVariant, string> = {
   success:
-    "bg-emerald-500/10 border-emerald-500/20 [&>div>div:first-child]:text-emerald-400",
+    "bg-[color:rgba(37,201,114,0.10)] border-[color:rgba(37,201,114,0.20)] [&>div>div:first-child]:text-[var(--color-success)]",
   error:
-    "bg-red-500/10 border-red-500/20 [&>div>div:first-child]:text-red-400",
+    "bg-[color:rgba(255,82,82,0.10)] border-[color:rgba(255,82,82,0.20)] [&>div>div:first-child]:text-[var(--color-error)]",
   warning:
-    "bg-amber-500/10 border-amber-500/20 [&>div>div:first-child]:text-amber-400",
+    "bg-[color:rgba(255,138,30,0.10)] border-[color:rgba(255,138,30,0.20)] [&>div>div:first-child]:text-[var(--color-warning)]",
   info:
-    "bg-blue-500/10 border-blue-500/20 [&>div>div:first-child]:text-blue-400",
+    "bg-[color:rgba(13,148,136,0.10)] border-[color:rgba(13,148,136,0.20)] [&>div>div:first-child]:text-[var(--color-info)]",
 };
 
 const inlineVariantStyles: Record<AlertVariant, string> = {
-  success: "text-emerald-500 [&>div>div:first-child]:text-emerald-500",
-  error: "text-red-500 [&>div>div:first-child]:text-red-500",
-  warning: "text-amber-500 [&>div>div:first-child]:text-amber-500",
-  info: "text-blue-500 [&>div>div:first-child]:text-blue-500",
+  success: "text-[var(--color-success)] [&>div>div:first-child]:text-[var(--color-success)]",
+  error: "text-[var(--color-error)] [&>div>div:first-child]:text-[var(--color-error)]",
+  warning: "text-[var(--color-warning)] [&>div>div:first-child]:text-[var(--color-warning)]",
+  info: "text-[var(--color-info)] [&>div>div:first-child]:text-[var(--color-info)]",
 };
 
 export default function CustomAlert({

@@ -11,7 +11,7 @@ export default function StyleGuidePage() {
     <div className="mx-auto max-w-[1024px] px-6 py-12">
       <div className="mb-12">
         <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-          AISO Brand Style Guide
+          AISO Dark Product Style Guide
         </h1>
         <p className="mt-2 text-lg" style={{ color: 'var(--text-secondary)' }}>
           Design tokens, colors, typography, and component patterns.
@@ -73,7 +73,7 @@ export default function StyleGuidePage() {
 
       {/* ─── Colors ─── */}
       <Section title="Color System">
-        <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Primary — Emerald Green</h3>
+        <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Primary — Cobalt / Electric Blue</h3>
         <ColorRow
           colors={[
             { name: '50', value: colors.primary[50] },
@@ -90,7 +90,7 @@ export default function StyleGuidePage() {
           ]}
         />
 
-        <h3 className="mb-3 mt-8 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Neutral — Warm Gray</h3>
+        <h3 className="mb-3 mt-8 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Neutral — Ink / Slate</h3>
         <ColorRow
           colors={[
             { name: '50', value: colors.neutral[50] },
@@ -107,7 +107,7 @@ export default function StyleGuidePage() {
           ]}
         />
 
-        <h3 className="mb-3 mt-8 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Accent — Teal</h3>
+        <h3 className="mb-3 mt-8 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Accent — Teal Signal</h3>
         <ColorRow
           colors={[
             { name: '50', value: colors.accent[50] },
@@ -154,7 +154,7 @@ export default function StyleGuidePage() {
               Is Your Site Visible to AI?
             </TypographySample>
             <TypographySample size="3xl" label="3xl — 30px" weight="bold" tracking="tight">
-              Your Score: 54/100
+              Your Score: 54
             </TypographySample>
             <TypographySample size="2xl" label="2xl — 24px" weight="semibold">
               Dimension Breakdown
@@ -195,7 +195,7 @@ AISO helps businesses become visible to AI search.`}
 
       {/* ─── Components ─── */}
       <Section title="Components">
-        {/* Buttons — StatusBadge styling (rounded-tremor-full, border, text-tremor-label) */}
+        {/* Buttons */}
         <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Buttons</h3>
         <div className="flex flex-wrap items-center gap-3">
           <button className="aiso-button aiso-button-primary px-4 py-2.5 text-sm">
@@ -521,7 +521,6 @@ function ScoreRingPreview({ score, color, label }: { score: number; color: strin
         </svg>
         <div className="absolute flex flex-col items-center">
           <span className="text-2xl font-bold" style={{ color }}>{score}</span>
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>/ 100</span>
         </div>
       </div>
       <span className="px-3 py-0.5 text-xs font-semibold text-white" style={{ backgroundColor: color, borderRadius: 'var(--radius-full)' }}>

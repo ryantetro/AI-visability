@@ -54,8 +54,15 @@ export default function CheckoutPage() {
           </ul>
         </div>
 
-        <div className="mb-5 rounded-2xl border border-dashed px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.18em]" style={{ borderColor: 'rgba(217, 119, 6, 0.38)', backgroundColor: 'rgba(255, 251, 235, 0.9)', color: 'var(--color-warning)' }}>
-          Mock Checkout — No real payment will be charged
+        <div
+          className="mb-5 rounded-2xl border border-dashed px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.18em]"
+          style={{
+            borderColor: 'rgba(245, 158, 11, 0.34)',
+            backgroundColor: 'rgba(245, 158, 11, 0.08)',
+            color: 'var(--color-warning)',
+          }}
+        >
+          Mock / fallback checkout - no real payment will be charged
         </div>
 
         <button
@@ -63,7 +70,7 @@ export default function CheckoutPage() {
           disabled={processing}
           className="aiso-button aiso-button-primary w-full py-3 text-sm"
         >
-          {processing ? 'Processing...' : 'Simulate Payment'}
+          {processing ? 'Processing...' : 'Continue to Package Access'}
         </button>
       </div>
     </div>

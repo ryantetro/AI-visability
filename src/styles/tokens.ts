@@ -1,10 +1,10 @@
 /**
  * AISO Brand Design Tokens
  *
- * Visual direction: Trustworthy & Professional
- * Primary color: Emerald Green
- * Border radius: Slightly rounded (8px)
- * Typography: Geist Sans / Geist Mono
+ * Visual direction: Dark command center
+ * Primary color: Electric cobalt
+ * Border radius: Soft geometric
+ * Typography: Space Grotesk / Manrope / IBM Plex Mono
  *
  * Usage: These tokens are mapped to CSS custom properties in globals.css
  * and referenced throughout the app. Update here to change the brand.
@@ -13,96 +13,86 @@
 // ─── Color Palette ───────────────────────────────────────────────
 
 export const colors = {
-  // Primary — Emerald Green
+  // Primary — Cobalt / electric blue
   primary: {
-    50: '#ecfdf5',
-    100: '#d1fae5',
-    200: '#a7f3d0',
-    300: '#6ee7b7',
-    400: '#34d399',
-    500: '#10b981', // Main brand color
-    600: '#059669', // Buttons, links
-    700: '#047857', // Hover states
-    800: '#065f46',
-    900: '#064e3b',
-    950: '#022c22',
+    50: '#edf4ff',
+    100: '#dbe9ff',
+    200: '#bfd6ff',
+    300: '#93baff',
+    400: '#5f93ff',
+    500: '#356df4',
+    600: '#2455dc',
+    700: '#1f44b8',
+    800: '#1f3b93',
+    900: '#1d3376',
+    950: '#09132d',
   },
 
-  // Neutral — Warm gray (not pure gray — feels more approachable)
+  // Ink neutrals
   neutral: {
-    50: '#fafaf9',
-    100: '#f5f5f4',
-    150: '#eeeeec',
-    200: '#e7e5e4',
-    300: '#d6d3d1',
-    400: '#a8a29e',
-    500: '#78716c',
-    600: '#57534e',
-    700: '#44403c',
-    800: '#292524',
-    900: '#1c1917',
-    950: '#0c0a09',
+    50: '#f5f7ff',
+    100: '#e8ecfa',
+    150: '#dbe1f4',
+    200: '#c9d0e6',
+    300: '#aab4d0',
+    400: '#7b89ab',
+    500: '#57637e',
+    600: '#3d4660',
+    700: '#2b3348',
+    800: '#192033',
+    900: '#101726',
+    950: '#070b14',
   },
 
-  // Accent — Teal (secondary actions, highlights)
+  // Accent — cyan / teal
   accent: {
-    50: '#f0fdfa',
-    100: '#ccfbf1',
-    200: '#99f6e4',
-    300: '#5eead4',
-    400: '#2dd4bf',
-    500: '#14b8a6',
-    600: '#0d9488',
-    700: '#0f766e',
+    50: '#edffff',
+    100: '#cefefe',
+    200: '#9afcfb',
+    300: '#65f3f7',
+    400: '#33dbe7',
+    500: '#16b7ca',
+    600: '#1291a5',
+    700: '#137585',
   },
 
   // Score Band Colors — designed to feel branded, not generic traffic-light
   band: {
-    aiReady: '#059669',      // Emerald 600 — matches brand
-    needsWork: '#d97706',    // Amber 600 — warm caution
-    atRisk: '#ea580c',       // Orange 600 — urgent
-    notVisible: '#dc2626',   // Red 600 — critical
+    aiReady: '#25c972',
+    needsWork: '#ff8a1e',
+    atRisk: '#ff7424',
+    notVisible: '#ff5252',
   },
 
   // Band backgrounds (subtle, for cards)
   bandBg: {
-    aiReady: '#ecfdf5',
-    needsWork: '#fffbeb',
-    atRisk: '#fff7ed',
-    notVisible: '#fef2f2',
+    aiReady: 'rgba(37, 201, 114, 0.14)',
+    needsWork: 'rgba(255, 138, 30, 0.14)',
+    atRisk: 'rgba(255, 116, 36, 0.14)',
+    notVisible: 'rgba(255, 82, 82, 0.14)',
   },
 
   // Semantic
   semantic: {
-    success: '#059669',
-    warning: '#d97706',
-    error: '#dc2626',
+    success: '#25c972',
+    warning: '#ff8a1e',
+    error: '#ff5252',
     info: '#0d9488',
   },
 
   // Check verdict colors
   verdict: {
-    pass: '#059669',
-    fail: '#dc2626',
+    pass: '#25c972',
+    fail: '#ff5252',
     unknown: '#a8a29e',
   },
 
-  // Surface colors (light mode)
   surface: {
-    page: '#fafaf9',
-    card: '#ffffff',
-    cardHover: '#f5f5f4',
-    elevated: '#ffffff',
-    overlay: 'rgba(12, 10, 9, 0.5)',
-  },
-
-  // Surface colors (dark mode)
-  surfaceDark: {
-    page: '#0c0a09',
-    card: '#1c1917',
-    cardHover: '#292524',
-    elevated: '#292524',
-    overlay: 'rgba(0, 0, 0, 0.6)',
+    page: '#070b14',
+    card: 'rgba(12, 20, 36, 0.78)',
+    cardHover: 'rgba(18, 28, 48, 0.92)',
+    elevated: 'rgba(20, 31, 54, 0.94)',
+    overlay: 'rgba(7, 11, 20, 0.72)',
   },
 } as const;
 
@@ -110,8 +100,9 @@ export const colors = {
 
 export const typography = {
   fontFamily: {
-    sans: 'var(--font-geist-sans), system-ui, -apple-system, sans-serif',
-    mono: 'var(--font-geist-mono), "SF Mono", "Fira Code", monospace',
+    display: 'var(--font-display), "Avenir Next", sans-serif',
+    sans: 'var(--font-body), "Segoe UI", sans-serif',
+    mono: 'var(--font-mono), "SF Mono", "Fira Code", monospace',
   },
 
   fontSize: {
@@ -201,31 +192,31 @@ export const components = {
   // Button variants
   button: {
     primary: {
-      bg: '#059669',
-      bgHover: '#047857',
+      bg: '#2455dc',
+      bgHover: '#1f44b8',
       text: '#ffffff',
     },
     secondary: {
-      bg: '#f5f5f4',
-      bgHover: '#e7e5e4',
-      text: '#1c1917',
+      bg: 'rgba(18, 28, 48, 0.92)',
+      bgHover: 'rgba(28, 42, 72, 0.98)',
+      text: '#f5f7ff',
     },
     ghost: {
       bg: 'transparent',
-      bgHover: '#f5f5f4',
-      text: '#57534e',
+      bgHover: 'rgba(255, 255, 255, 0.06)',
+      text: '#c9d0e6',
     },
   },
 
   // Input styles
   input: {
-    bg: '#ffffff',
-    bgDark: '#1c1917',
-    border: '#d6d3d1',
-    borderDark: '#44403c',
-    borderFocus: '#059669',
-    ring: 'rgba(5, 150, 105, 0.2)',
-    placeholder: '#a8a29e',
+    bg: 'rgba(12, 20, 36, 0.86)',
+    bgDark: 'rgba(12, 20, 36, 0.86)',
+    border: 'rgba(131, 160, 255, 0.22)',
+    borderDark: 'rgba(131, 160, 255, 0.22)',
+    borderFocus: '#356df4',
+    ring: 'rgba(53, 109, 244, 0.24)',
+    placeholder: '#7b89ab',
   },
 } as const;
 

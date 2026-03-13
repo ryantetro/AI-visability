@@ -8,6 +8,8 @@ export interface PublicScoreSummary {
   domain: string;
   completedAt: number;
   percentage: number;
+  aiVisibility: number;
+  webHealth: number | null;
   total: number;
   maxTotal: number;
   band: string;
@@ -35,10 +37,12 @@ export async function getPublicScoreSummary(scanId: string): Promise<PublicScore
     url: scan.url,
     domain: getDomain(scan.url),
     completedAt: scan.completedAt,
-    percentage: scoreResult.percentage,
+    percentage: scoreResult.scores.overall ?? scoreResult.percentage,
+    aiVisibility: scoreResult.scores.aiVisibility,
+    webHealth: scoreResult.scores.webHealth,
     total: scoreResult.total,
     maxTotal: scoreResult.maxTotal,
-    band: scoreResult.band,
-    bandInfo: scoreResult.bandInfo,
+    band: scoreResult.overallBand,
+    bandInfo: scoreResult.overallBandInfo,
   };
 }

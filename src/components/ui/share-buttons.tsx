@@ -14,9 +14,10 @@ interface ShareButtonsProps {
 
 export function ShareButtons({ scanId, score, bandLabel, domain, compact = false, className }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false);
+  const [copiedPost, setCopiedPost] = useState(false);
 
   const shareUrl = typeof window === 'undefined' ? '' : `${window.location.origin}/score/${scanId}`;
-  const shareText = `${domain} scored ${score}/100 on AISO (${bandLabel}).`;
+  const shareText = `${domain} scored ${score} on AISO (${bandLabel}). See the public score: ${shareUrl}`;
 
   const handleCopy = async () => {
     if (!shareUrl) return;
@@ -34,12 +35,12 @@ export function ShareButtons({ scanId, score, bandLabel, domain, compact = false
       <button
         onClick={() =>
           openShareWindow(
-            `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`
+            `https://x.com/intent/post?text=${encodeURIComponent(shareText)}`
           )
         }
         className={cn('aiso-button aiso-button-secondary', compact ? 'px-3 py-2 text-xs' : 'px-5 py-2.5 text-sm')}
       >
-        Share on X
+        Post to X
       </button>
       <button
         onClick={() =>
@@ -50,6 +51,16 @@ export function ShareButtons({ scanId, score, bandLabel, domain, compact = false
         className={cn('aiso-button aiso-button-secondary', compact ? 'px-3 py-2 text-xs' : 'px-5 py-2.5 text-sm')}
       >
         Share on LinkedIn
+      </button>
+      <button
+        onClick={async () => {
+          await navigator.clipboard.writeText(shareText);
+          setCopiedPost(true);
+          setTimeout(() => setCopiedPost(false), 2000);
+        }}
+        className={cn('aiso-button aiso-button-secondary', compact ? 'px-3 py-2 text-xs' : 'px-5 py-2.5 text-sm')}
+      >
+        {copiedPost ? 'Copied Post' : 'Copy Post Text'}
       </button>
       <button
         onClick={handleCopy}
