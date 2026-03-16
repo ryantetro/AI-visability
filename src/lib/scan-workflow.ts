@@ -1,18 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { crawlSite } from '@/lib/crawler';
 import { scoreCrawlData } from '@/lib/scorer';
-import { getDatabase } from '@/lib/services/registry';
+import { getDatabase, getMentionTester } from '@/lib/services/registry';
 import { normalizeUrl, isValidUrl } from '@/lib/url-utils';
 import { checkScanRateLimit, recordScanRequest } from '@/lib/scan-rate-limit';
 import { runWebHealthEnrichment, createUnavailableWebHealth } from '@/lib/web-health';
+import { runMentionTests } from '@/lib/ai-mentions';
 import { CrawlData } from '@/types/crawler';
 import { DatabaseService } from '@/types/services';
 import { ScanJob, ScanProgress } from '@/types/scan';
+import { getOrCreateProfile, canUserScan, incrementScanCount, getUserUsage } from '@/lib/user-profile';
 
 export interface StartScanInput {
   url: string;
   force?: boolean;
   ip: string;
+  userEmail: string;
+  userId: string;
 }
 
 export interface StartScanResult {
@@ -36,6 +40,7 @@ export function initialProgress(): ScanProgress {
       { label: 'Measuring performance', status: 'pending' },
       { label: 'Analyzing structured data', status: 'pending' },
       { label: 'Scoring AI visibility', status: 'pending' },
+      { label: 'Testing AI mentions', status: 'pending' },
       { label: 'Checking Web Health', status: 'pending' },
       { label: 'Generating report', status: 'pending' },
     ],
@@ -52,7 +57,7 @@ export function getClientIp(headers: Headers): string {
 }
 
 export async function startScan(
-  { url, force = false, ip }: StartScanInput,
+  { url, force = false, ip, userEmail, userId }: StartScanInput,
   { db = getDatabase(), now = Date.now(), schedule }: StartScanOptions = {}
 ): Promise<StartScanResult> {
   if (!url || !isValidUrl(url)) {
@@ -60,6 +65,25 @@ export async function startScan(
       status: 400,
       body: { error: 'Invalid URL' },
     };
+  }
+
+  // Per-user scan limit check
+  try {
+    const profile = await getOrCreateProfile(userId, userEmail);
+    if (!canUserScan(profile)) {
+      const usage = getUserUsage(profile);
+      return {
+        status: 403,
+        body: {
+          error: 'Free scan limit reached. Upgrade to continue.',
+          upgradeRequired: true,
+          used: usage.used,
+          limit: usage.limit,
+        },
+      };
+    }
+  } catch {
+    // If profile check fails, allow scan to proceed (fail open)
   }
 
   const enforceRateLimit = process.env.NODE_ENV !== 'development';
@@ -83,7 +107,7 @@ export async function startScan(
 
     if (!force) {
       const cached = await db.findScanByUrl(normalized);
-      if (cached) {
+      if (cached && cached.email?.toLowerCase() === userEmail.toLowerCase()) {
         if (enforceRateLimit) {
           recordScanRequest(ip, now);
         }
@@ -106,12 +130,20 @@ export async function startScan(
           status: 'pending',
         },
       },
+      email: userEmail,
       createdAt: now,
     };
 
     await db.saveScan(scan);
     if (enforceRateLimit) {
       recordScanRequest(ip, now);
+    }
+
+    // Increment per-user scan count
+    try {
+      await incrementScanCount(userId);
+    } catch {
+      // Non-blocking: scan still proceeds if count update fails
     }
 
     if (schedule) {
@@ -178,7 +210,7 @@ export async function runScan(scanId: string, db = getDatabase()) {
 
     scan.status = 'scoring';
     scan.progress.status = 'scoring';
-    scan.progress.checks[6].status = 'running';
+    scan.progress.checks[7].status = 'running';
     await db.saveScan(scan);
 
     const enrichmentStartedAt = Date.now();
@@ -207,8 +239,27 @@ export async function runScan(scanId: string, db = getDatabase()) {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     scan.progress.checks[5].status = 'done';
+
+    // AI Mention testing step
     scan.progress.checks[6].status = 'running';
+    await db.saveScan(scan);
+
+    try {
+      const mentionTester = getMentionTester();
+      const mentionSummary = await withTimeout(
+        runMentionTests(crawlData, mentionTester),
+        30000,
+        'AI mention testing timed out.'
+      );
+      scan.mentionSummary = mentionSummary;
+      scan.progress.checks[6].status = 'done';
+    } catch {
+      scan.progress.checks[6].status = 'error';
+    }
+    await db.saveScan(scan);
+
     scan.progress.checks[7].status = 'running';
+    scan.progress.checks[8].status = 'running';
     scan.status = 'complete';
     scan.progress.status = 'complete';
     scan.crawlData = crawlData;
@@ -263,8 +314,8 @@ async function finalizeWebHealthEnrichment({
       error: webHealth.error,
     },
   };
-  latest.progress.checks[6].status = webHealth.status === 'complete' ? 'done' : 'error';
-  latest.progress.checks[7].status = 'done';
+  latest.progress.checks[7].status = webHealth.status === 'complete' ? 'done' : 'error';
+  latest.progress.checks[8].status = 'done';
   latest.scoreResult = scoreCrawlData(crawlData, webHealth);
   await db.saveScan(latest);
 }

@@ -94,7 +94,7 @@ const primaryFlow = [
     route: '/checkout/[sessionId]',
     title: 'Mock Checkout',
     shell: 'Conversion screen',
-    action: 'User confirms the $99 package through a simulated payment step.',
+    action: 'User confirms the $35 package through a simulated payment step.',
     output: 'Marks the scan as paid and unlocks file delivery.',
   },
   {
@@ -269,7 +269,7 @@ const productSummary = [
     caption: 'report tabs after email unlock',
   },
   {
-    label: '$99',
+    label: '$35',
     caption: 'single paid conversion package',
   },
   {
@@ -341,7 +341,7 @@ export default function UiUxFlowPage() {
                 <SnapshotRow
                   icon={CreditCard}
                   label="Conversion"
-                  value="Mock $99 checkout into paid package"
+                  value="Mock $35 checkout into paid package"
                 />
                 <SnapshotRow
                   icon={FileCode2}

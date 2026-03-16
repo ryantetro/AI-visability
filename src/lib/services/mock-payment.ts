@@ -1,17 +1,17 @@
-import { PaymentService, CheckoutSession } from '@/types/services';
+import { PaymentService, PaymentPlan, CheckoutSession } from '@/types/services';
 import { randomUUID } from 'node:crypto';
 
 // Track mock checkout sessions
-const sessions = new Map<string, { scanId: string; paid: boolean }>();
+const sessions = new Map<string, { scanId: string; paid: boolean; plan: string }>();
 
 export const mockPayment: PaymentService = {
-  async createCheckout(scanId: string): Promise<CheckoutSession> {
+  async createCheckout(scanId: string, plan: PaymentPlan = 'lifetime'): Promise<CheckoutSession> {
     const sessionId = randomUUID();
-    sessions.set(sessionId, { scanId, paid: false });
+    sessions.set(sessionId, { scanId, paid: false, plan });
     return {
       id: sessionId,
       scanId,
-      amount: 9900, // $99.00
+      amount: plan === 'monthly' ? 500 : 3500,
       currency: 'usd',
       url: `/checkout/${sessionId}`,
     };
@@ -24,6 +24,6 @@ export const mockPayment: PaymentService = {
     }
     // In mock mode, mark as paid on verify
     session.paid = true;
-    return { paid: true, scanId: session.scanId };
+    return { paid: true, scanId: session.scanId, plan: session.plan };
   },
 };

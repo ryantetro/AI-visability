@@ -3,6 +3,7 @@ require('../scripts/register-ts.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { strFromU8, unzipSync } = require('fflate');
+const { NextRequest } = require('next/server');
 
 const { fetchRobotsTxt } = require('../src/lib/crawler/robots-parser.ts');
 const { fetchSitemap } = require('../src/lib/crawler/sitemap-parser.ts');
@@ -34,6 +35,11 @@ const {
 const archiveRoute = require('../src/app/api/scan/[id]/files/archive/route.ts');
 const reportRoute = require('../src/app/api/scan/[id]/report/route.ts');
 const publicScorePage = require('../src/app/score/[id]/page.tsx');
+const {
+  AUTH_COOKIE_NAME,
+  createGoogleDemoUser,
+  createSession,
+} = require('../src/lib/auth.ts');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -51,6 +57,16 @@ function withMockFetch(implementation, run) {
     .finally(() => {
       global.fetch = originalFetch;
     });
+}
+
+function createAuthedRequest(url, email = 'owner@example.com') {
+  const user = createGoogleDemoUser(email);
+  const token = createSession(user);
+  return new NextRequest(url, {
+    headers: {
+      cookie: `${AUTH_COOKIE_NAME}=${token}`,
+    },
+  });
 }
 
 function createCrawlData(overrides = {}) {
@@ -215,6 +231,9 @@ function createCrawlData(overrides = {}) {
       ],
       urlCount: 3,
       referencedInRobots: true,
+      accessStatus: 'ok',
+      format: 'xml',
+      sourceUrl: 'https://example.com/sitemap.xml',
     },
     llmsTxt: {
       exists: true,
@@ -256,7 +275,7 @@ async function saveCompletedScan(id, overrides = {}) {
     crawlData,
     scoreResult,
     paid: overrides.paid || false,
-    email: overrides.email,
+    email: overrides.email || 'owner@example.com',
     generatedFiles: overrides.generatedFiles,
   };
 
@@ -291,6 +310,26 @@ Sitemap: https://example.com/sitemap.xml`,
   );
 });
 
+test('fetchRobotsTxt does not treat path-specific disallows as a site-wide block', async () => {
+  await withMockFetch(
+    async () => ({
+      ok: true,
+      text: async () => `User-agent: GPTBot
+Disallow: /private
+
+User-agent: *
+Disallow:
+`,
+    }),
+    async () => {
+      const data = await fetchRobotsTxt('https://example.com');
+
+      assert.equal(data.allowsGPTBot, true);
+      assert.equal(data.allowsPerplexityBot, true);
+    }
+  );
+});
+
 test('fetchSitemap parses XML URLs and tracks robots references', async () => {
   await withMockFetch(
     async () => ({
@@ -310,6 +349,8 @@ test('fetchSitemap parses XML URLs and tracks robots references', async () => {
       assert.equal(data.exists, true);
       assert.equal(data.urlCount, 2);
       assert.equal(data.referencedInRobots, true);
+      assert.equal(data.accessStatus, 'ok');
+      assert.equal(data.format, 'xml');
       assert.deepEqual(data.urls, [
         'https://example.com/',
         'https://example.com/about',
@@ -351,6 +392,43 @@ test('fetchSitemap follows sitemap indexes to actual page URLs', async () => {
         'https://example.com/',
         'https://example.com/about',
       ]);
+    }
+  );
+});
+
+test('fetchSitemap parses JSON API-style sitemap payloads', async () => {
+  await withMockFetch(
+    async () => ({
+      ok: true,
+      text: async () => JSON.stringify({
+        sitemap: {
+          urls: ['https://example.com/', 'https://example.com/docs'],
+        },
+      }),
+    }),
+    async () => {
+      const data = await fetchSitemap('https://example.com', ['https://example.com/sitemap-api']);
+
+      assert.equal(data.exists, true);
+      assert.equal(data.format, 'json');
+      assert.deepEqual(data.urls, ['https://example.com/', 'https://example.com/docs']);
+    }
+  );
+});
+
+test('fetchSitemap returns blocked status for bot-protected sitemap endpoints', async () => {
+  await withMockFetch(
+    async () => ({
+      ok: false,
+      status: 403,
+      text: async () => 'forbidden',
+    }),
+    async () => {
+      const data = await fetchSitemap('https://example.com', ['https://example.com/w/rest.php/site/v1/sitemap/0']);
+
+      assert.equal(data.exists, false);
+      assert.equal(data.accessStatus, 'blocked');
+      assert.equal(data.referencedInRobots, true);
     }
   );
 });
@@ -415,6 +493,34 @@ test('extractFallbackPageData parses useful crawl signals from raw HTML', () => 
   assert.equal(page.classification, 'about');
 });
 
+test('extractFallbackPageData extracts JSON-LD entries from @graph blocks', () => {
+  const page = extractFallbackPageData({
+    url: 'https://example.com',
+    startTime: Date.now() - 10,
+    html: `<!doctype html>
+      <html lang="en">
+        <head>
+          <title>Example</title>
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org",
+              "@graph": [
+                { "@type": "Organization", "name": "Example Co", "url": "https://example.com" },
+                { "@type": "FAQPage", "name": "FAQ" }
+              ]
+            }
+          </script>
+        </head>
+        <body><h1>Example</h1></body>
+      </html>`,
+  });
+
+  assert.deepEqual(
+    page.schemaObjects.map((item) => item.type),
+    ['Organization', 'FAQPage']
+  );
+});
+
 test('detectPlatform identifies WordPress, Squarespace, Webflow, and custom sites', () => {
   assert.equal(detectPlatform({ metaGenerator: 'WordPress 6.5.2' }), 'wordpress');
   assert.equal(
@@ -465,6 +571,72 @@ test('scoreCrawlData returns a strong score and prioritized fixes', () => {
   assert.ok(score.percentage >= 80);
   assert.equal(score.dimensions.length, 6);
   assert.ok(Array.isArray(score.fixes));
+});
+
+test('scoreCrawlData fails schema validity when malformed JSON-LD is present', () => {
+  const crawlData = createCrawlData();
+  crawlData.homepage.schemaParseErrors = 1;
+  crawlData.pages[0].schemaParseErrors = 1;
+
+  const score = scoreCrawlData(crawlData);
+  const dimension = score.dimensions.find((item) => item.key === 'structured-data');
+  const validity = dimension.checks.find((item) => item.id === 'sd-validation');
+
+  assert.equal(validity.verdict, 'fail');
+  assert.match(validity.detail, /malformed JSON-LD/i);
+});
+
+test('scoreCrawlData excludes unknown checks from the denominator for portal-like crawls', () => {
+  const crawlData = createCrawlData({
+    homepage: {
+      ...createCrawlData().homepage,
+      title: 'Developer Docs',
+      metaDescription: 'Documentation and API reference for a developer platform.',
+    },
+  });
+
+  crawlData.pages = [
+    {
+      ...crawlData.homepage,
+      url: 'https://example.com/docs',
+      title: 'API Reference',
+      classification: 'other',
+      internalLinks: ['/guides', '/reference'],
+      textContent: 'API reference content for multiple features and endpoints.',
+      wordCount: 180,
+    },
+    {
+      ...crawlData.homepage,
+      url: 'https://example.com/guides',
+      title: 'Guides',
+      classification: 'other',
+      internalLinks: ['/docs', '/reference'],
+      textContent: 'Guides and setup docs for the developer platform.',
+      wordCount: 220,
+    },
+    {
+      ...crawlData.homepage,
+      url: 'https://example.com/reference',
+      title: 'Reference',
+      classification: 'other',
+      internalLinks: ['/docs', '/guides'],
+      textContent: 'Reference pages for many APIs and concepts.',
+      wordCount: 190,
+    },
+  ];
+  crawlData.homepage = crawlData.pages[0];
+  crawlData.sitemap.exists = false;
+  crawlData.sitemap.accessStatus = 'blocked';
+  crawlData.sitemap.urlCount = 0;
+
+  const score = scoreCrawlData(crawlData);
+  const contentSignals = score.dimensions.find((item) => item.key === 'content-signals');
+  const aboutCheck = contentSignals.checks.find((item) => item.id === 'cs-about');
+  const contactCheck = contentSignals.checks.find((item) => item.id === 'cs-contact');
+
+  assert.equal(aboutCheck.verdict, 'unknown');
+  assert.equal(contactCheck.verdict, 'unknown');
+  assert.ok(contentSignals.maxScore < contentSignals.checks.reduce((sum, item) => sum + item.maxPoints, 0));
 });
 
 test('runWebHealthEnrichment returns quality, performance, and security pillars', async () => {
@@ -576,23 +748,23 @@ test(
     const now = 1_000_000;
 
     const first = await startScan(
-      { url: 'https://example.com', ip: '1.2.3.4' },
+      { url: 'https://example.com', ip: '1.2.3.4', userEmail: 'owner@example.com' },
       { db: mockDb, now }
     );
     const second = await startScan(
-      { url: 'https://example.org', ip: '1.2.3.4' },
+      { url: 'https://example.org', ip: '1.2.3.4', userEmail: 'owner@example.com' },
       { db: mockDb, now }
     );
     const third = await startScan(
-      { url: 'https://example.net', ip: '1.2.3.4' },
+      { url: 'https://example.net', ip: '1.2.3.4', userEmail: 'owner@example.com' },
       { db: mockDb, now }
     );
     const fourth = await startScan(
-      { url: 'https://example.dev', ip: '1.2.3.4' },
+      { url: 'https://example.dev', ip: '1.2.3.4', userEmail: 'owner@example.com' },
       { db: mockDb, now }
     );
     const nextDay = await startScan(
-      { url: 'https://example.dev', ip: '1.2.3.4' },
+      { url: 'https://example.dev', ip: '1.2.3.4', userEmail: 'owner@example.com' },
       { db: mockDb, now: now + DAY_MS + 1_000 }
     );
 
@@ -615,11 +787,11 @@ test(
     });
 
     const cached = await startScan(
-      { url: 'https://example.com', ip: '5.6.7.8' },
+      { url: 'https://example.com', ip: '5.6.7.8', userEmail: 'owner@example.com' },
       { db: mockDb, now: Date.now() }
     );
     const forced = await startScan(
-      { url: 'https://example.com', force: true, ip: '5.6.7.8' },
+      { url: 'https://example.com', force: true, ip: '5.6.7.8', userEmail: 'owner@example.com' },
       { db: mockDb, now: Date.now() + 1 }
     );
     const forcedScan = await mockDb.getScan(forced.body.id);
@@ -656,7 +828,7 @@ test('archive route returns a downloadable ZIP for paid scans', async () => {
   });
 
   const response = await archiveRoute.GET(
-    new Request('http://localhost/api/scan/paid-scan/files/archive'),
+    createAuthedRequest('http://localhost/api/scan/paid-scan/files/archive'),
     {
       params: Promise.resolve({ id: 'paid-scan' }),
     }
@@ -685,7 +857,7 @@ test('report route includes web-health summary and copy-to-LLM payloads', async 
   });
 
   const response = await reportRoute.GET(
-    new Request('http://localhost/api/scan/report-payload/report'),
+    createAuthedRequest('http://localhost/api/scan/report-payload/report'),
     {
       params: Promise.resolve({ id: 'report-payload' }),
     }

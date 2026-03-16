@@ -1,0 +1,146 @@
+[
+  {
+    "name": "Stripe Docs",
+    "url": "https://docs.stripe.com",
+    "category": "developer-docs",
+    "why": "Strong llms.txt coverage and large XML sitemap.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "present",
+      "minPages": 3
+    }
+  },
+  {
+    "name": "GitHub Docs",
+    "url": "https://docs.github.com",
+    "category": "developer-docs",
+    "why": "Good llms.txt signal with a docs-heavy portal shape.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "optional",
+      "llms": "present",
+      "minPages": 3
+    }
+  },
+  {
+    "name": "Vercel",
+    "url": "https://vercel.com",
+    "category": "marketing-site",
+    "why": "Modern JS-heavy SaaS marketing site.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "Notion",
+    "url": "https://www.notion.com",
+    "category": "marketing-site",
+    "why": "Brand-heavy SaaS homepage with many subpaths.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "HubSpot",
+    "url": "https://www.hubspot.com",
+    "category": "marketing-site",
+    "why": "Classic B2B SaaS site with deep marketing architecture.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "Figma",
+    "url": "https://www.figma.com",
+    "category": "marketing-site",
+    "why": "Design SaaS with heavy client rendering.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "Slack",
+    "url": "https://slack.com",
+    "category": "marketing-site",
+    "why": "Large public SaaS homepage with many entry points.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "Atlassian",
+    "url": "https://www.atlassian.com",
+    "category": "marketing-site",
+    "why": "Enterprise SaaS portfolio site with many product sections.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "Zapier",
+    "url": "https://zapier.com",
+    "category": "marketing-site",
+    "why": "Automation SaaS with dense linking and many templates.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "Cloudflare",
+    "url": "https://www.cloudflare.com",
+    "category": "marketing-site",
+    "why": "Infrastructure SaaS with a large public web footprint.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "Shopify",
+    "url": "https://www.shopify.com",
+    "category": "commerce-saas",
+    "why": "Large commerce SaaS site with broad content coverage.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  },
+  {
+    "name": "Linear",
+    "url": "https://linear.app",
+    "category": "product-site",
+    "why": "Modern product-led SaaS site with concise copy and fast pages.",
+    "expect": {
+      "robots": "present",
+      "sitemap": "present-or-referenced",
+      "llms": "optional",
+      "minPages": 2
+    }
+  }
+]

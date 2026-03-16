@@ -207,7 +207,7 @@ export default function LandingC() {
           </h2>
           <div className="space-y-6">
             {[
-              { q: 'Is it free?', a: 'The full audit is free. Fix files are $99 one-time.' },
+              { q: 'Is it free?', a: 'The full audit is free. Fix files are $35 one-time.' },
               { q: 'How long does it take?', a: 'About 30 seconds. We crawl up to 10 pages with real browser rendering.' },
               { q: 'What is llms.txt?', a: 'A proposed standard file (like robots.txt) that describes your site for AI models. We generate it from your actual content.' },
               { q: 'Is my data safe?', a: 'Crawl data is cached 24 hours then deleted. We never share your content.' },

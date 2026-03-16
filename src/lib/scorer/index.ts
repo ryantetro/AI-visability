@@ -43,7 +43,7 @@ export function scoreCrawlData(data: CrawlData, webHealth?: WebHealthSummary): S
   const dimensions: DimensionScore[] = dimensionKeys.map((key) => {
     const checks = allChecks.filter((c) => c.dimension === key);
     const score = checks.reduce((sum, c) => sum + c.points, 0);
-    const maxScore = checks.reduce((sum, c) => sum + c.maxPoints, 0);
+    const maxScore = checks.reduce((sum, c) => sum + (c.verdict === 'unknown' ? 0 : c.maxPoints), 0);
     return {
       key,
       label: dimensionLabels[key],

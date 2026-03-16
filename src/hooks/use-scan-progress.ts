@@ -77,6 +77,17 @@ interface ScanData {
   }>;
   band?: string;
   bandInfo?: { band: string; label: string; color: string; min: number; max: number };
+  assetPreview?: {
+    faviconUrl?: string | null;
+    ogTitle?: string | null;
+    ogDescription?: string | null;
+    ogImageUrl?: string | null;
+    ogUrl?: string | null;
+    twitterCard?: string | null;
+    twitterTitle?: string | null;
+    twitterDescription?: string | null;
+    twitterImageUrl?: string | null;
+  };
   hasEmail: boolean;
   hasPaid: boolean;
   createdAt: number;
@@ -93,12 +104,19 @@ export function useScanProgress(scanId: string | null) {
     if (!scanId) return;
     try {
       const res = await fetch(`/api/scan/${scanId}`);
-      if (!res.ok) throw new Error('Failed to fetch scan');
+      if (res.status === 401) {
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error || 'Failed to fetch scan');
+      }
       const json = await res.json();
       setData(json);
       setError(null);
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : 'Failed to fetch scan');
     } finally {
       setLoading(false);
     }

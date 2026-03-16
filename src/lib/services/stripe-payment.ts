@@ -1,4 +1,4 @@
-import { CheckoutSession, PaymentService } from '@/types/services';
+import { CheckoutSession, PaymentPlan, PaymentService } from '@/types/services';
 
 const STRIPE_URL = 'https://api.stripe.com/v1/checkout/sessions';
 
@@ -24,26 +24,31 @@ async function parseStripeResponse<T>(response: Response): Promise<T> {
 }
 
 export const stripePayment: PaymentService = {
-  async createCheckout(scanId: string): Promise<CheckoutSession> {
+  async createCheckout(scanId: string, plan: PaymentPlan = 'lifetime'): Promise<CheckoutSession> {
     if (!hasStripeConfig()) {
       throw new Error('STRIPE_SECRET_KEY is not configured.');
     }
 
+    const isMonthly = plan === 'monthly';
     const appUrl = getAppUrl();
     const body = new URLSearchParams();
-    body.set('mode', 'payment');
-    body.set('success_url', `${appUrl}/checkout/success?scanId=${encodeURIComponent(scanId)}&session_id={CHECKOUT_SESSION_ID}`);
-    body.set('cancel_url', `${appUrl}/analysis?report=${encodeURIComponent(scanId)}#share`);
+    body.set('mode', isMonthly ? 'subscription' : 'payment');
+    body.set('success_url', `${appUrl}/advanced?report=${encodeURIComponent(scanId)}&checkout=success&session_id={CHECKOUT_SESSION_ID}`);
+    body.set('cancel_url', `${appUrl}/analysis?report=${encodeURIComponent(scanId)}#overview`);
     body.set('metadata[scanId]', scanId);
+    body.set('metadata[plan]', plan);
 
     if (process.env.STRIPE_IMPLEMENTATION_PRICE_ID) {
       body.set('line_items[0][price]', process.env.STRIPE_IMPLEMENTATION_PRICE_ID);
       body.set('line_items[0][quantity]', '1');
     } else {
       body.set('line_items[0][price_data][currency]', 'usd');
-      body.set('line_items[0][price_data][unit_amount]', process.env.STRIPE_IMPLEMENTATION_AMOUNT_CENTS || '9900');
-      body.set('line_items[0][price_data][product_data][name]', 'AISO Implementation Package');
+      body.set('line_items[0][price_data][unit_amount]', isMonthly ? '500' : '3500');
+      body.set('line_items[0][price_data][product_data][name]', isMonthly ? 'AISO Monthly Plan' : 'AISO Lifetime Access');
       body.set('line_items[0][price_data][product_data][description]', 'Generated AI visibility files, implementation prompts, and advanced deployment tools access.');
+      if (isMonthly) {
+        body.set('line_items[0][price_data][recurring][interval]', 'month');
+      }
       body.set('line_items[0][quantity]', '1');
     }
 
@@ -66,7 +71,7 @@ export const stripePayment: PaymentService = {
     return {
       id: payload.id,
       scanId,
-      amount: payload.amount_total ?? Number(process.env.STRIPE_IMPLEMENTATION_AMOUNT_CENTS || 9900),
+      amount: payload.amount_total ?? (plan === 'monthly' ? 500 : 3500),
       currency: payload.currency || 'usd',
       url: payload.url,
     };
@@ -83,6 +88,7 @@ export const stripePayment: PaymentService = {
       status?: string;
       metadata?: {
         scanId?: string;
+        plan?: string;
       };
     }>(
       await fetch(`${STRIPE_URL}/${encodeURIComponent(sessionId)}`, {
@@ -95,6 +101,7 @@ export const stripePayment: PaymentService = {
     return {
       paid: payload.payment_status === 'paid' || payload.status === 'complete',
       scanId: payload.metadata?.scanId || '',
+      plan: payload.metadata?.plan,
     };
   },
 };

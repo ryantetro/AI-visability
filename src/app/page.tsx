@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { UrlInput } from '@/components/ui/url-input';
+import { useAuth } from '@/hooks/use-auth';
 import { FlickeringGrid } from '@/components/ui/flickering-grid';
 import { AnimatedStat } from '@/components/ui/animated-stat';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/radix-accordion';
@@ -13,10 +14,15 @@ import { colors } from '@/styles/tokens';
 
 export default function Home() {
   const router = useRouter();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (url: string) => {
+    if (!user) {
+      router.push(`/login?next=/analysis&scanUrl=${encodeURIComponent(url)}`);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -123,7 +129,7 @@ export default function Home() {
             Three steps to AI visibility
           </h2>
           <p className="mx-auto mt-3 max-w-md text-center" style={{ color: 'var(--text-tertiary)' }}>
-            No signup, no credit card. See your score in seconds.
+            Sign in once, then scan and reopen your reports whenever you need them.
           </p>
           <div className="mt-12 grid gap-8 sm:grid-cols-3 stagger-children">
             {[
@@ -273,7 +279,7 @@ export default function Home() {
           Ready to check your AI visibility?
         </h2>
         <p className="mx-auto mt-3 max-w-md" style={{ color: 'var(--text-tertiary)' }}>
-          Free audit. Real crawling. Actionable fixes. No signup required.
+          Free audit. Real crawling. Actionable fixes. One login, then you&apos;re set.
         </p>
         <div className="mt-8 flex justify-center">
           <UrlInput onSubmit={handleSubmit} loading={loading} variant="elevated" />

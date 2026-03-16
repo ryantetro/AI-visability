@@ -451,7 +451,7 @@ function MockupB() {
                 className="px-4 py-2 text-sm font-semibold text-white"
                 style={{ backgroundColor: colors.primary[600], borderRadius: 'var(--radius-md)' }}
               >
-                Fix Everything — $99
+                Fix Everything — $35
               </span>
             </div>
           </div>

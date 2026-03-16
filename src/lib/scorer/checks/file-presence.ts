@@ -32,11 +32,13 @@ export function runFilePresenceChecks(data: CrawlData): CheckResult[] {
       dimension: 'file-presence',
       category: 'ai',
       label: 'sitemap.xml exists',
-      verdict: data.sitemap.exists ? 'pass' : 'fail',
+      verdict: data.sitemap.exists ? 'pass' : data.sitemap.accessStatus === 'blocked' ? 'unknown' : 'fail',
       points: data.sitemap.exists ? 4 : 0,
       maxPoints: 4,
       detail: data.sitemap.exists
-        ? `Sitemap found with ${data.sitemap.urlCount} URLs.`
+        ? `Sitemap found with ${data.sitemap.urlCount} URLs via ${data.sitemap.format}.`
+        : data.sitemap.accessStatus === 'blocked'
+        ? 'A sitemap endpoint is referenced but blocked or rate-limited for this scan, so it was not scored as missing.'
         : 'No sitemap.xml found. A sitemap helps AI crawlers discover your content.',
     },
     {

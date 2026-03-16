@@ -35,4 +35,5 @@ export interface ScanJob {
   crawlData?: unknown; // CrawlData stored loosely to avoid circular deps at this level
   scoreResult?: unknown; // ScoreResult
   generatedFiles?: unknown; // GeneratedFiles
+  mentionSummary?: unknown; // MentionSummary
 }

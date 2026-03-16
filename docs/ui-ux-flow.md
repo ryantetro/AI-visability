@@ -35,7 +35,7 @@ flowchart LR
   R --> H["Share tab"]
 
   H --> PS["/score/[id]<br/>Public score card"]
-  R --> C1["$99 CTA<br/>POST /api/checkout"]
+  R --> C1["$35 CTA<br/>POST /api/checkout"]
   H --> C1
 
   C1 --> C2["/checkout/[sessionId]<br/>Mock checkout"]

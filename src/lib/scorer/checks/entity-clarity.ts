@@ -1,7 +1,9 @@
 import { CheckResult } from '@/types/score';
 import { CrawlData } from '@/types/crawler';
+import { inferSiteContext } from '../site-context';
 
 export function runEntityClarityChecks(data: CrawlData): CheckResult[] {
+  const siteContext = inferSiteContext(data);
   const pages = data.pages;
   const homepage = data.homepage;
 
@@ -33,11 +35,15 @@ export function runEntityClarityChecks(data: CrawlData): CheckResult[] {
       dimension: 'entity-clarity',
       category: 'ai',
       label: 'Name consistency across pages',
-      verdict: hasNameConsistency ? 'pass' : siteTitle ? 'fail' : 'unknown',
+      verdict: hasNameConsistency ? 'pass' : !siteTitle || siteContext.portalLike ? 'unknown' : 'fail',
       points: hasNameConsistency ? 4 : 0,
       maxPoints: 4,
       detail: hasNameConsistency
         ? `"${siteTitle}" appears consistently across ${nameAppearances} pages.`
+        : !siteTitle
+        ? 'Could not determine site name from homepage title.'
+        : siteContext.portalLike
+        ? 'Skipped because portal-style sites often organize many brands, sections, or references under one umbrella title.'
         : siteTitle
         ? `"${siteTitle}" not consistently used across pages.`
         : 'Could not determine site name from homepage title.',
@@ -47,11 +53,13 @@ export function runEntityClarityChecks(data: CrawlData): CheckResult[] {
       dimension: 'entity-clarity',
       category: 'ai',
       label: 'Social media presence linked',
-      verdict: hasSocial ? 'pass' : 'fail',
+      verdict: hasSocial ? 'pass' : siteContext.avoidBusinessSpecificFailures ? 'unknown' : 'fail',
       points: hasSocial ? 3 : 0,
       maxPoints: 3,
       detail: hasSocial
         ? `${socialLinks.length} social media links found.`
+        : siteContext.avoidBusinessSpecificFailures
+        ? 'Skipped because social-profile linking is not a reliable requirement for portal-style or limited-coverage crawls.'
         : 'Fewer than 2 social media links found. Link your social profiles.',
     },
     {
@@ -59,11 +67,13 @@ export function runEntityClarityChecks(data: CrawlData): CheckResult[] {
       dimension: 'entity-clarity',
       category: 'ai',
       label: 'Authority signals',
-      verdict: hasAuthority ? 'pass' : 'fail',
+      verdict: hasAuthority ? 'pass' : siteContext.avoidBusinessSpecificFailures ? 'unknown' : 'fail',
       points: hasAuthority ? 3 : 0,
       maxPoints: 3,
       detail: hasAuthority
         ? 'Strong entity authority signals detected.'
+        : siteContext.avoidBusinessSpecificFailures
+        ? 'Skipped because business-style authority signals were not a reliable fit for this crawl.'
         : 'Weak authority signals. Add sameAs links in schema and link social profiles.',
     },
   ];

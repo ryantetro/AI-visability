@@ -3,11 +3,17 @@ import { getDatabase } from '@/lib/services/registry';
 import { buildReportPromptBundle } from '@/lib/llm-prompts';
 import { buildSharePayload, serializeScoreResult } from '@/lib/report-serializer';
 import { ScoreResult } from '@/types/score';
+import { getAuthUserFromRequest } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await getAuthUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   const { id } = await params;
   const db = getDatabase();
   const scan = await db.getScan(id);
@@ -16,8 +22,8 @@ export async function GET(
     return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
   }
 
-  if (!scan.email) {
-    return NextResponse.json({ error: 'Email required to view report' }, { status: 403 });
+  if (!scan.email || scan.email.toLowerCase() !== user.email.toLowerCase()) {
+    return NextResponse.json({ error: 'This report belongs to another account.' }, { status: 403 });
   }
 
   if (scan.status !== 'complete') {
@@ -38,6 +44,7 @@ export async function GET(
     copyToLlm,
     share: buildSharePayload(scan.id),
     enrichments: scan.enrichments,
+    mentionSummary: scan.mentionSummary ?? null,
     hasPaid: !!scan.paid,
   });
 }

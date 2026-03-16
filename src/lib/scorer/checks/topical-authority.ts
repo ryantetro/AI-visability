@@ -1,7 +1,9 @@
 import { CheckResult } from '@/types/score';
 import { CrawlData } from '@/types/crawler';
+import { inferSiteContext } from '../site-context';
 
 export function runTopicalAuthorityChecks(data: CrawlData): CheckResult[] {
+  const siteContext = inferSiteContext(data);
   const pages = data.pages;
   const titles = pages.map((p) => p.title.toLowerCase());
 
@@ -37,11 +39,13 @@ export function runTopicalAuthorityChecks(data: CrawlData): CheckResult[] {
       dimension: 'topical-authority',
       category: 'ai',
       label: 'Topical focus consistency',
-      verdict: hasTopicalFocus ? 'pass' : 'fail',
+      verdict: hasTopicalFocus ? 'pass' : siteContext.portalLike ? 'unknown' : 'fail',
       points: hasTopicalFocus ? 7 : 0,
       maxPoints: 7,
       detail: hasTopicalFocus
         ? `Strong topical focus detected around: ${topWords.map(([w]) => w).join(', ')}.`
+        : siteContext.portalLike
+        ? 'Skipped because the site appears to be a multi-topic portal or documentation hub rather than a single-topic business site.'
         : 'No clear topical focus detected across pages.',
     },
     {
@@ -61,11 +65,13 @@ export function runTopicalAuthorityChecks(data: CrawlData): CheckResult[] {
       dimension: 'topical-authority',
       category: 'ai',
       label: 'Internal linking structure',
-      verdict: goodLinking ? 'pass' : 'fail',
+      verdict: goodLinking ? 'pass' : siteContext.limitedCoverage ? 'unknown' : 'fail',
       points: goodLinking ? 4 : 0,
       maxPoints: 4,
       detail: goodLinking
         ? `Good internal linking (avg ${avgInternalLinks.toFixed(1)} links per page).`
+        : siteContext.limitedCoverage
+        ? 'Skipped because the crawl did not cover enough pages to judge internal linking structure confidently.'
         : `Weak internal linking (avg ${avgInternalLinks.toFixed(1)} links per page). Aim for 3+.`,
     },
     {
@@ -73,11 +79,13 @@ export function runTopicalAuthorityChecks(data: CrawlData): CheckResult[] {
       dimension: 'topical-authority',
       category: 'ai',
       label: 'Content depth',
-      verdict: hasDepth ? 'pass' : 'fail',
+      verdict: hasDepth ? 'pass' : siteContext.limitedCoverage ? 'unknown' : 'fail',
       points: hasDepth ? 3 : 0,
       maxPoints: 3,
       detail: hasDepth
         ? `Good content depth (avg ${Math.round(avgWordCount)} words per page).`
+        : siteContext.limitedCoverage
+        ? 'Skipped because the crawl did not cover enough pages to judge overall content depth confidently.'
         : `Low content depth (avg ${Math.round(avgWordCount)} words). Aim for 300+ words per page.`,
     },
   ];

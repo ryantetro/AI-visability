@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Copy, HelpCircle, Info, Lock, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { CheckFixContent } from '@/lib/analysis-fix-content';
 
 export interface CheckItem {
   label: string;
@@ -10,6 +11,7 @@ export interface CheckItem {
   verdict?: 'pass' | 'fail' | 'unknown';
   points?: number;
   maxPoints?: number;
+  fixContent?: CheckFixContent;
 }
 
 export interface SubSection {
@@ -64,10 +66,18 @@ export function YwsBreakdownSection({
         </div>
       )}
 
-      <section className="rounded-xl border border-white/[0.06] bg-[#0f0f0f] overflow-hidden">
-        <button
-          type="button"
+      <section className="overflow-hidden rounded-xl border border-white/[0.06] bg-[#0f0f0f]">
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setExpanded(!expanded);
+            }
+          }}
           className="flex w-full items-center justify-between gap-6 px-6 py-5 text-left transition-colors hover:bg-white/[0.02] sm:gap-8"
         >
           {/* Left: Title + Score */}
@@ -118,7 +128,7 @@ export function YwsBreakdownSection({
               <ChevronDown className="h-5 w-5 text-zinc-500" />
             )}
           </div>
-        </button>
+        </div>
 
         {expanded && (
           <div className="border-t border-white/[0.06] px-6 py-5">
@@ -128,8 +138,12 @@ export function YwsBreakdownSection({
                   <h4 className="mb-3 text-[13px] font-semibold text-white">{section.label}</h4>
                 )}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {section.checks.map((check) => (
-                    <CheckCard key={check.label} check={check} locked={!hasPaid} />
+                  {section.checks.map((check, index) => (
+                    <CheckCard
+                      key={`${section.label || 'main'}-${check.label}-${index}`}
+                      check={check}
+                      locked={!hasPaid}
+                    />
                   ))}
                 </div>
               </div>
@@ -153,36 +167,101 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
     const style = verdictStyles[check.verdict!];
     const Icon = style.Icon;
 
+    const fixContent = check.fixContent;
+
     return (
       <div
         className={cn(
-          'flex items-start justify-between gap-3 rounded-lg border p-4',
+          'rounded-lg border p-4',
           style.border,
           style.bg,
           'bg-white/[0.02]'
         )}
       >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <Icon className={cn('h-4 w-4 shrink-0', style.text)} />
-            <p className="font-medium text-white">{check.label}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <Icon className={cn('h-4 w-4 shrink-0', style.text)} />
+              <p className="font-medium text-white">{check.label}</p>
+            </div>
+            <p className="mt-1 text-xs leading-6 text-zinc-400">{check.detail}</p>
+            {check.points !== undefined && check.maxPoints !== undefined && (
+              <p className="mt-1 text-[11px] text-zinc-500">
+                {check.points}/{check.maxPoints} pts
+              </p>
+            )}
           </div>
-          <p className="mt-1 text-xs text-zinc-400">{check.detail}</p>
-          {check.points !== undefined && check.maxPoints !== undefined && (
-            <p className="mt-1 text-[11px] text-zinc-500">
-              {check.points}/{check.maxPoints} pts
-            </p>
-          )}
+          <span
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase',
+              style.text,
+              style.bg
+            )}
+          >
+            {check.verdict}
+          </span>
         </div>
-        <span
-          className={cn(
-            'inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase',
-            style.text,
-            style.bg
-          )}
-        >
-          {check.verdict}
-        </span>
+
+        {fixContent ? (
+          <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+            {(fixContent.currentValue || fixContent.recommendedValue) ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DetailPanel
+                  label="Current"
+                  body={fixContent.currentValue || check.detail || 'Not provided'}
+                />
+                <DetailPanel
+                  label="Recommended"
+                  body={fixContent.recommendedValue || 'Use the recommended configuration for this check.'}
+                />
+              </div>
+            ) : null}
+
+            {fixContent.whyItMatters ? (
+              <DetailPanel label="Why it matters" body={fixContent.whyItMatters} />
+            ) : null}
+
+            {fixContent.media ? <MediaPanel media={fixContent.media} /> : null}
+
+            {fixContent.implementationSteps?.length ? (
+              <div className="rounded-lg border border-white/8 bg-black/20 px-3.5 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                  How to fix it
+                </p>
+                <ol className="mt-2 space-y-2 text-xs leading-6 text-zinc-300">
+                  {fixContent.implementationSteps.map((step, index) => (
+                    <li key={`${check.label}-step-${index}`} className="flex gap-2">
+                      <span className="mt-[3px] text-zinc-500">{index + 1}.</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+
+            {(fixContent.verification || fixContent.ctaLabel) ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                {fixContent.verification ? (
+                  <DetailPanel
+                    label="Verification"
+                    body={fixContent.verification}
+                    className="sm:flex-1"
+                  />
+                ) : <div className="sm:flex-1" />}
+                {fixContent.ctaLabel && fixContent.ctaHref ? (
+                  <a
+                    href={fixContent.ctaHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-200 transition-colors hover:bg-white/[0.07]"
+                  >
+                    {fixContent.ctaLabel}
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -208,4 +287,97 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
       </span>
     </div>
   );
+}
+
+function DetailPanel({
+  label,
+  body,
+  className,
+}: {
+  label: string;
+  body: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn('rounded-lg border border-white/8 bg-black/20 px-3.5 py-3', className)}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">{label}</p>
+      <p className="mt-2 break-words text-xs leading-6 text-zinc-300">{body}</p>
+    </div>
+  );
+}
+
+function MediaPanel({
+  media,
+}: {
+  media: CheckFixContent['media'];
+}) {
+  if (!media) return null;
+
+  if (media.kind === 'code' && media.code) {
+    return (
+      <div className="rounded-lg border border-white/8 bg-black/30">
+        <div className="border-b border-white/8 px-3.5 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+          {media.caption || 'Example'}
+        </div>
+        <pre className="overflow-x-auto p-3.5 text-[11px] leading-6 text-zinc-300">
+          <code>{media.code}</code>
+        </pre>
+      </div>
+    );
+  }
+
+  if (media.kind === 'image' && media.src) {
+    if (media.presentation === 'icon') {
+      return (
+        <div className="rounded-xl border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.012)_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          <a
+            href={media.src}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-4 rounded-lg border border-white/8 bg-black/25 px-4 py-4 transition-colors hover:bg-white/[0.04]"
+          >
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.1),rgba(255,255,255,0.02)_70%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <img
+                src={media.src}
+                alt={media.alt || ''}
+                className="h-10 w-10 rounded-lg object-contain"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                Asset preview
+              </p>
+              <p className="mt-1 text-sm font-medium text-zinc-100">
+                Favicon detected
+              </p>
+              <p className="mt-1 truncate text-xs text-zinc-500">{media.src}</p>
+            </div>
+          </a>
+          {media.caption ? <p className="mt-3 text-[11px] text-zinc-500">{media.caption}</p> : null}
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-xl border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.012)_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <a
+          href={media.src}
+          target="_blank"
+          rel="noreferrer"
+          className="block overflow-hidden rounded-lg border border-white/8 bg-[#09090a] transition-transform duration-200 hover:scale-[1.01]"
+        >
+          <div className="bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_55%)] p-2">
+            <img
+              src={media.src}
+              alt={media.alt || ''}
+              className="max-h-[240px] w-full rounded-md object-cover"
+            />
+          </div>
+        </a>
+        {media.caption ? <p className="mt-2 text-[11px] text-zinc-500">{media.caption}</p> : null}
+      </div>
+    );
+  }
+
+  return null;
 }

@@ -8,12 +8,12 @@ import {
   ExternalLink,
   LayoutGrid,
   List,
-  MessageCircle,
   Rocket,
   Settings,
   X,
 } from 'lucide-react';
-import { AppShellNav } from '@/components/app/app-shell-nav';
+
+import { FloatingFeedback } from '@/components/ui/floating-feedback';
 import { Sheet, SheetClose, SheetContent } from '@/components/ui/sheet';
 import { getRecentScanEntries } from '@/lib/recent-scans';
 import { getDomain, ensureProtocol, getFaviconUrl } from '@/lib/url-utils';
@@ -45,6 +45,7 @@ interface RecentScanData {
   webHealth?: {
     pillars?: WebHealthPillar[];
   } | null;
+  mentionScore?: number | null;
   createdAt: number;
   completedAt?: number;
   hasEmail: boolean;
@@ -136,7 +137,7 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen bg-[var(--surface-page)]">
-      <AppShellNav active="history" />
+
       <div className="relative mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
         <section className="mt-6">
           <h1 className="text-[2rem] font-bold tracking-tight text-[var(--text-primary)]">
@@ -280,6 +281,14 @@ export default function HistoryPage() {
                                 </span>
                                 <span className="ml-1 text-[var(--text-muted)]">Best</span>
                               </div>
+                              {latest.mentionScore != null && (
+                                <div>
+                                  <span className={cn('font-semibold', scoreColor(latest.mentionScore))}>
+                                    {latest.mentionScore}
+                                  </span>
+                                  <span className="ml-1 text-[var(--text-muted)]">AI Mentions</span>
+                                </div>
+                              )}
                             </div>
                             <button
                               type="button"
@@ -473,13 +482,7 @@ export default function HistoryPage() {
           )}
         </section>
 
-        <button
-          type="button"
-          className="fixed right-6 bottom-6 z-20 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#202020] px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Feedback
-        </button>
+        <FloatingFeedback />
 
         <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
           <SheetContent

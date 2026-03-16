@@ -61,10 +61,10 @@ export async function extractPageData(
     document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => {
       try {
         const parsed = JSON.parse(el.textContent || '');
-        const items = Array.isArray(parsed) ? parsed : [parsed];
+        const items = collectSchemaItems(parsed);
         for (const item of items) {
           schemaObjects.push({
-            type: item['@type'] || 'Unknown',
+            type: schemaTypeLabel(item),
             raw: item,
           });
         }
@@ -166,4 +166,30 @@ export async function extractPageData(
     classification,
     detectedPlatform,
   };
+}
+
+function collectSchemaItems(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectSchemaItems(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record['@graph'])) {
+    return collectSchemaItems(record['@graph']);
+  }
+
+  return [record];
+}
+
+function schemaTypeLabel(value: Record<string, unknown>): string {
+  const type = value['@type'];
+  if (Array.isArray(type)) {
+    return type.map(String).join(', ');
+  }
+
+  return String(type || 'Unknown');
 }

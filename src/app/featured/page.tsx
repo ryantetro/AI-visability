@@ -5,10 +5,10 @@ import {
   FileText,
   Image,
   Link2,
-  MessageCircle,
   Type,
 } from 'lucide-react';
-import { AppShellNav } from '@/components/app/app-shell-nav';
+
+import { FloatingFeedback } from '@/components/ui/floating-feedback';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { Input } from '@/components/ui/input';
 import { useImageUpload } from '@/hooks/use-image-upload';
@@ -26,7 +26,7 @@ export default function FeaturedPage() {
 
   return (
     <div className="min-h-screen bg-[var(--surface-page)]">
-      <AppShellNav active="leaderboard" actionHref="/analysis" actionLabel="New scan" />
+
       <div className="mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
         <section className="mx-auto max-w-xl">
           <h1 className="text-center text-[2rem] font-bold tracking-tight text-[var(--text-primary)]">
@@ -58,7 +58,7 @@ export default function FeaturedPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value.slice(0, TITLE_MAX))}
                   placeholder="e.g. YourWebsiteScore"
-                  className="mt-2 border-white/10 bg-white/[0.03] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:ring-white/20"
+                  className="mt-2 border-white/10 bg-white/[0.03] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:ring-white/10 focus-visible:ring-1"
                 />
                 <div className="mt-1 flex justify-between text-[12px] text-[var(--text-muted)]">
                   <span>Keep it short and catchy</span>
@@ -77,7 +77,7 @@ export default function FeaturedPage() {
                   onChange={(e) => setDescription(e.target.value.slice(0, DESC_MAX))}
                   placeholder="A short pitch that will appear next to your logo."
                   rows={3}
-                  className="mt-2 w-full resize-none rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                  className="mt-2 w-full resize-none rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/10"
                 />
                 <div className="mt-1 flex justify-between text-[12px] text-[var(--text-muted)]">
                   <span>Brief description of your offering</span>
@@ -96,7 +96,7 @@ export default function FeaturedPage() {
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://example.com"
                   type="url"
-                  className="mt-2 border-white/10 bg-white/[0.03] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:ring-white/20"
+                  className="mt-2 border-white/10 bg-white/[0.03] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:ring-white/10 focus-visible:ring-1"
                 />
                 <p className="mt-1 text-[12px] text-[var(--text-muted)]">
                   Where your featured spot should link to
@@ -161,13 +161,7 @@ export default function FeaturedPage() {
           </div>
         </section>
 
-        <button
-          type="button"
-          className="fixed right-6 bottom-6 z-20 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#202020] px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Feedback
-        </button>
+        <FloatingFeedback />
       </div>
     </div>
   );

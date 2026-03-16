@@ -7,7 +7,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   ArrowUpRight,
-  BarChart3,
   Bot,
   CheckCircle2,
   ChevronDown,
@@ -18,10 +17,7 @@ import {
   Globe2,
   HelpCircle,
   Info,
-  LayoutDashboard,
   Linkedin,
-  ListChecks,
-  MessageCircle,
   RefreshCw,
   Share2,
   ShieldCheck,
@@ -53,8 +49,8 @@ import { cn } from '@/lib/utils';
 import { getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { useScanProgress } from '@/hooks/use-scan-progress';
 import { ProgressChecklist } from '@/components/ui/progress-checklist';
-import { ScoreRing } from '@/components/ui/score-ring';
 import { UnlockFeaturesModal } from '@/components/ui/unlock-features-modal';
+import { FloatingFeedback } from '@/components/ui/floating-feedback';
 import { ImpactBadge } from '@/components/ui/impact-badge';
 import { EffortBadge } from '@/components/ui/effort-badge';
 import { PromptCopyPanel } from '@/components/ui/prompt-copy-panel';
@@ -62,12 +58,18 @@ import { CheckRow } from '@/components/ui/check-row';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { RangeBar } from '@/components/ui/range-bar';
 import { Sheet, SheetClose, SheetContent } from '@/components/ui/sheet';
-import { AppShellNav } from '@/components/app/app-shell-nav';
+
 import { ScoreSummaryHero } from '@/components/app/score-summary-hero';
 import { UrlInput } from '@/components/ui/url-input';
 import { YwsBreakdownSection, type CheckItem } from '@/components/ui/yws-breakdown-section';
+import { EngineMentionCard } from '@/components/ui/engine-mention-card';
+import { MentionPromptCheck } from '@/components/ui/mention-prompt-check';
+import type { MentionSummary, AIEngine } from '@/types/ai-mentions';
 import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
+import { analysisExampleReport, analysisExampleScan } from '@/lib/analysis-example-report';
+import { getCheckFixContent } from '@/lib/analysis-fix-content';
 import { EffortBand } from '@/types/score';
+import { useAuth } from '@/hooks/use-auth';
 
 interface ReportData {
   id: string;
@@ -214,33 +216,34 @@ interface RecentScanCardData {
   completedAt?: number;
 }
 
+interface ExampleCheckSource {
+  id?: string;
+  label: string;
+  verdict: string;
+  detail: string;
+  points: number;
+  maxPoints: number;
+}
+
+interface ScanAssetPreview {
+  faviconUrl?: string | null;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImageUrl?: string | null;
+  ogUrl?: string | null;
+  twitterCard?: string | null;
+  twitterTitle?: string | null;
+  twitterDescription?: string | null;
+  twitterImageUrl?: string | null;
+}
+
 const premiumPanelClass =
   'rounded-[1.5rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(10,10,12,0.94)_0%,rgba(5,6,7,0.98)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.024),0_10px_22px_rgba(0,0,0,0.16)]';
 
 const premiumInsetClass =
   'rounded-[1.25rem] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.022)_0%,rgba(255,255,255,0.012)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
 
-const fullReportTabMeta: Record<
-  'overview' | 'repair-queue' | 'dimensions' | 'share',
-  { title: string; description: string }
-> = {
-  overview: {
-    title: 'Report overview',
-    description: 'Scores, quick wins, and the implementation brief in one place.',
-  },
-  'repair-queue': {
-    title: 'Repair queue',
-    description: 'Start with the highest-impact fixes first.',
-  },
-  dimensions: {
-    title: 'Breakdown',
-    description: 'See exactly how AI Visibility and Web Health were scored.',
-  },
-  share: {
-    title: 'Share report',
-    description: 'Public link, verification, and badge setup.',
-  },
-};
+/* Tab meta removed — now using single scrollable layout */
 
 function statusTheme(status: 'running' | 'complete' | 'failed' | 'queued') {
   if (status === 'failed') return { bg: 'bg-[color:rgba(255,82,82,0.10)]', text: 'text-[var(--color-error)]', dot: 'bg-[var(--color-error)]' };
@@ -296,7 +299,7 @@ function openXShareIntent(text: string) {
   );
 }
 
-type CheckSource = { id?: string; label: string; verdict: string; detail: string; points: number; maxPoints: number };
+type CheckSource = ExampleCheckSource;
 
 function toCheckItems(checks: CheckSource[]): CheckItem[] {
   return checks.map((c) => ({
@@ -305,12 +308,122 @@ function toCheckItems(checks: CheckSource[]): CheckItem[] {
     verdict: c.verdict as 'pass' | 'fail' | 'unknown',
     points: c.points,
     maxPoints: c.maxPoints,
+    fixContent: getCheckFixContent(c.label),
   }));
+}
+
+function mergePreviewSummary(parts: Array<string | undefined>) {
+  return parts.map((part) => part?.trim()).filter(Boolean).join('\n');
+}
+
+function toRichCheckItem(check: CheckSource, assetPreview?: ScanAssetPreview): CheckItem {
+  const baseFixContent = getCheckFixContent(check.label);
+  const normalizedLabel = check.label.trim().toLowerCase();
+
+  if ((normalizedLabel === 'favicon present' || normalizedLabel === 'favicon') && assetPreview?.faviconUrl) {
+    return {
+      label: check.label,
+      detail: check.detail,
+      verdict: check.verdict as 'pass' | 'fail' | 'unknown',
+      points: check.points,
+      maxPoints: check.maxPoints,
+        fixContent: {
+          ...baseFixContent,
+          currentValue: `Detected asset: ${assetPreview.faviconUrl}`,
+          recommendedValue:
+            baseFixContent?.recommendedValue ||
+            'Serve a square favicon at a stable public URL and link it from the page head.',
+          media: {
+            kind: 'image',
+            presentation: 'icon',
+            src: assetPreview.faviconUrl,
+            alt: 'Detected favicon preview',
+            caption: 'Detected favicon asset',
+          },
+        ctaLabel: 'Open asset',
+        ctaHref: assetPreview.faviconUrl,
+      },
+    };
+  }
+
+  if ((normalizedLabel === 'open graph coverage' || normalizedLabel === 'open graph') &&
+    (assetPreview?.ogImageUrl || assetPreview?.ogTitle || assetPreview?.ogDescription || assetPreview?.ogUrl)) {
+    return {
+      label: check.label,
+      detail: check.detail,
+      verdict: check.verdict as 'pass' | 'fail' | 'unknown',
+      points: check.points,
+      maxPoints: check.maxPoints,
+      fixContent: {
+        ...baseFixContent,
+        currentValue:
+          mergePreviewSummary([
+            assetPreview.ogTitle ? `Title: ${assetPreview.ogTitle}` : undefined,
+            assetPreview.ogDescription ? `Description: ${assetPreview.ogDescription}` : undefined,
+            assetPreview.ogUrl ? `URL: ${assetPreview.ogUrl}` : undefined,
+          ]) || baseFixContent?.currentValue,
+        recommendedValue:
+          'Ship a complete og:title, og:description, og:image, og:url, and og:type set that all point at the live page.',
+        media: assetPreview.ogImageUrl
+          ? {
+              kind: 'image',
+              src: assetPreview.ogImageUrl,
+              alt: 'Detected Open Graph image preview',
+              caption: 'Detected Open Graph image',
+            }
+          : baseFixContent?.media,
+        ctaLabel: assetPreview.ogImageUrl ? 'Open OG image' : undefined,
+        ctaHref: assetPreview.ogImageUrl || undefined,
+      },
+    };
+  }
+
+  if ((normalizedLabel === 'twitter card coverage' || normalizedLabel === 'twitter cards') &&
+    (assetPreview?.twitterImageUrl || assetPreview?.twitterCard || assetPreview?.twitterTitle || assetPreview?.twitterDescription)) {
+    return {
+      label: check.label,
+      detail: check.detail,
+      verdict: check.verdict as 'pass' | 'fail' | 'unknown',
+      points: check.points,
+      maxPoints: check.maxPoints,
+      fixContent: {
+        ...baseFixContent,
+        currentValue:
+          mergePreviewSummary([
+            assetPreview.twitterCard ? `Card: ${assetPreview.twitterCard}` : undefined,
+            assetPreview.twitterTitle ? `Title: ${assetPreview.twitterTitle}` : undefined,
+            assetPreview.twitterDescription ? `Description: ${assetPreview.twitterDescription}` : undefined,
+          ]) || baseFixContent?.currentValue,
+        recommendedValue:
+          'Use a summary_large_image card with a matching title, description, and a reachable image asset.',
+        media: assetPreview.twitterImageUrl
+          ? {
+              kind: 'image',
+              src: assetPreview.twitterImageUrl,
+              alt: 'Detected Twitter card image preview',
+              caption: 'Detected Twitter card image',
+            }
+          : baseFixContent?.media,
+        ctaLabel: assetPreview.twitterImageUrl ? 'Open card image' : undefined,
+        ctaHref: assetPreview.twitterImageUrl || undefined,
+      },
+    };
+  }
+
+  return {
+    label: check.label,
+    detail: check.detail,
+    verdict: check.verdict as 'pass' | 'fail' | 'unknown',
+    points: check.points,
+    maxPoints: check.maxPoints,
+    fixContent: baseFixContent,
+  };
 }
 
 function buildWebsiteQualityChecks(
   webHealth: { pillars: Array<{ key: string; checks: CheckSource[] }> } | null | undefined,
-  dimensions: Array<{ key: string; checks: CheckSource[] }> | null | undefined
+  dimensions: Array<{ key: string; checks: CheckSource[] }> | null | undefined,
+  assetPreview?: ScanAssetPreview
 ): CheckItem[] {
   const qualityChecks =
     webHealth?.pillars
@@ -338,7 +451,7 @@ function buildWebsiteQualityChecks(
     ...c,
     label: labelMap[c.label] ?? c.label,
   }));
-  return toCheckItems(all);
+  return all.map((check) => toRichCheckItem(check, assetPreview));
 }
 
 function buildSecurityChecks(
@@ -365,16 +478,23 @@ function buildPerformanceChecks(
 export default function AnalysisPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefillUrl = searchParams.get('prefill');
+  const { user, loading: authLoading } = useAuth();
   const scanId = searchParams.get('scan');
   const reportId = searchParams.get('report');
-  const id = reportId || scanId || '';
-  const { data, loading, error } = useScanProgress(id || null);
+  const exampleMode = searchParams.get('example') === '1';
+  const id = reportId || scanId || (exampleMode ? analysisExampleReport.id : '');
+  const scanProgress = useScanProgress(exampleMode ? null : (id || null));
+  const data = exampleMode ? (analysisExampleScan as unknown as typeof scanProgress.data) : scanProgress.data;
+  const loading = exampleMode ? false : scanProgress.loading;
+  const error = exampleMode ? null : scanProgress.error;
   const revealRingTargetRef = useRef<HTMLDivElement | null>(null);
 
   const [emailSubmitted, setEmailSubmitted] = useState(Boolean(reportId));
   const [report, setReport] = useState<ReportData | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [unlockingCheckout, setUnlockingCheckout] = useState(false);
   const [reauditLoading, setReauditLoading] = useState(false);
   const [actionError, setActionError] = useState('');
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
@@ -384,28 +504,56 @@ export default function AnalysisPage() {
   const [copiedFixId, setCopiedFixId] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState('');
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [usageData, setUsageData] = useState<{ used: number; limit: number; remaining: number; isPaid: boolean; plan: string } | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [verificationInstructions, setVerificationInstructions] = useState<VerificationInstructionsData | null>(null);
   const [verificationMessage, setVerificationMessage] = useState('');
   const [recentScans, setRecentScans] = useState<RecentScanCardData[]>([]);
 
-  const emptyState = !scanId && !reportId;
+  const emptyState = !scanId && !reportId && !exampleMode;
 
   useEffect(() => {
     if (typeof window !== 'undefined' && id) {
+      if (exampleMode) {
+        setShareUrl(`${window.location.origin}/analysis?example=1`);
+        return;
+      }
       setShareUrl(`${window.location.origin}/score/${id}`);
     }
-  }, [id]);
+  }, [exampleMode, id]);
 
   useEffect(() => {
     setReport(null);
-    setEmailSubmitted(Boolean(reportId));
-  }, [id]);
+    setLoadingReport(false);
+  }, [exampleMode, id]);
 
   useEffect(() => {
-    if (!id) return;
+    setEmailSubmitted(Boolean(reportId || report));
+  }, [reportId, report]);
+
+  useEffect(() => {
+    if (!id || exampleMode) return;
     rememberRecentScan(id);
-  }, [id]);
+  }, [exampleMode, id]);
+
+  // Fetch per-account usage data
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    async function fetchUsage() {
+      try {
+        const res = await fetch('/api/auth/usage');
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setUsageData(data);
+        }
+      } catch {
+        // Silently fail — will show default UI
+      }
+    }
+    fetchUsage();
+    return () => { active = false; };
+  }, [user]);
 
   useEffect(() => {
     if (!emptyState) return;
@@ -446,35 +594,9 @@ export default function AnalysisPage() {
     };
   }, [emptyState]);
 
-  type TabId = 'overview' | 'repair-queue' | 'dimensions' | 'share';
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'ai' | 'web'>('all');
   const [effortFilter, setEffortFilter] = useState<'all' | EffortBand>('all');
   const [impactFilter, setImpactFilter] = useState<'all' | 'high' | 'quick-wins'>('all');
-  const [activeTab, setActiveTab] = useState<TabId>(() => {
-    if (typeof window === 'undefined') return 'overview';
-    const hash = window.location.hash.slice(1);
-    return (hash === 'repair-queue' || hash === 'dimensions' || hash === 'share' || hash === 'overview')
-      ? hash
-      : 'overview';
-  });
-
-  useEffect(() => {
-    const onHashChange = () => {
-      const hash = window.location.hash.slice(1);
-      if (hash === 'repair-queue' || hash === 'dimensions' || hash === 'share' || hash === 'overview') {
-        setActiveTab(hash);
-      }
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-
-  const setTab = (tab: TabId) => {
-    setActiveTab(tab);
-    if (typeof window !== 'undefined') {
-      window.history.replaceState(null, '', `#${tab}`);
-    }
-  };
 
   const isScanning =
     data?.status === 'crawling' ||
@@ -522,12 +644,14 @@ export default function AnalysisPage() {
     progressChecks.find((item) => item.status === 'running')?.label ??
     (progressChecks.length > 0 ? progressChecks[progressChecks.length - 1]?.label : 'Initializing');
 
+  const revealDimensions = data?.dimensions ?? [];
   const reportDimensions = report?.score.dimensions ?? [];
   const reportFixes = report?.fixes ?? report?.score.fixes ?? [];
   const webHealth = report?.webHealth ?? report?.score.webHealth ?? null;
   const scoreSnapshot = report?.scores ?? report?.score.scores ?? null;
   const webChecks = webHealth?.pillars.flatMap((pillar) => pillar.checks) ?? [];
   const webHealthStatus = report?.enrichments?.webHealth?.status ?? webHealth?.status ?? 'pending';
+  const canPreviewGatedChecks = exampleMode || Boolean(report?.hasPaid) || unlockingCheckout;
 
   const allChecks = [...reportDimensions.flatMap((dimension) => dimension.checks), ...webChecks];
   const failedCount = allChecks.filter((item) => item.verdict === 'fail').length;
@@ -586,7 +710,7 @@ export default function AnalysisPage() {
       misses: dimension.checks.filter((check) => check.verdict === 'fail').length,
     }));
 
-  const domain = data?.url ? getDomain(data.url) : 'Unknown domain';
+  const domain = getDomain(report?.url ?? data?.url ?? 'https://example.com');
   const shareScore = scoreSnapshot?.overall ?? report?.score?.percentage ?? 0;
   const sharePostText = buildSharePostText(domain, shareScore, shareUrl);
   const filteredFixes = reportFixes.filter((fix) => {
@@ -599,25 +723,25 @@ export default function AnalysisPage() {
 
 
   useEffect(() => {
+    if (exampleMode) return;
     if (!id) return;
-    if (!reportId && !data?.hasEmail) return;
-    if (report || loadingReport) return;
+    if (!user) return;
+    if (!reportId && !isComplete) return;
+    if (report) return;
 
     let active = true;
+    setLoadingReport(true);
 
-    async function loadReport() {
-      setEmailSubmitted(true);
-      setLoadingReport(true);
-
+    async function doLoadReport() {
       try {
         const res = await fetch(`/api/scan/${id}/report`);
-        if (!res.ok) return;
+        if (!res.ok || !active) return;
         const payload = await res.json();
         if (!active) return;
         setReport(payload);
 
         if (!reportId && typeof window !== 'undefined') {
-          const hash = window.location.hash || '#overview';
+          const hash = window.location.hash || '';
           router.replace(`/analysis?report=${id}${hash}`);
         }
       } catch {
@@ -629,19 +753,20 @@ export default function AnalysisPage() {
       }
     }
 
-    void loadReport();
+    void doLoadReport();
 
     return () => {
       active = false;
     };
-  }, [id, reportId, data?.hasEmail, report, loadingReport, router]);
+  }, [exampleMode, id, isComplete, reportId, user, report, router, data]);
 
   useEffect(() => {
+    if (exampleMode) return;
     if (report?.share?.publicUrl) {
       setShareUrl(report.share.publicUrl);
       return;
     }
-    if (!id || !emailSubmitted || report?.enrichments?.webHealth?.status !== 'running') {
+    if (!id || !report || report.enrichments?.webHealth?.status !== 'running') {
       return;
     }
 
@@ -657,31 +782,13 @@ export default function AnalysisPage() {
     }, 3000);
 
     return () => window.clearInterval(interval);
-  }, [id, emailSubmitted, report?.enrichments?.webHealth?.status, report?.share?.publicUrl]);
-
-  const handleEmailSubmit = async (email: string) => {
-    void email;
-    setActionError('');
-    setUnlockModalOpen(false);
-    setEmailSubmitted(true);
-    setLoadingReport(true);
-
-    try {
-      const res = await fetch(`/api/scan/${id}/report`);
-      if (res.ok) {
-        const payload = await res.json();
-        setReport(payload);
-        if (typeof window !== 'undefined') {
-          const hash = window.location.hash || '#overview';
-          router.replace(`/analysis?report=${id}${hash}`);
-        }
-      }
-    } catch {
-      // User can refresh and retry.
-    } finally {
-      setLoadingReport(false);
-    }
-  };
+  }, [
+    exampleMode,
+    id,
+    report,
+    report?.enrichments?.webHealth?.status ?? null,
+    report?.share?.publicUrl ?? null,
+  ]);
 
   const handleReaudit = async () => {
     if (!data?.url) return;
@@ -711,15 +818,16 @@ export default function AnalysisPage() {
     }
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (plan?: 'lifetime' | 'monthly') => {
     setActionError('');
+    setUnlockModalOpen(false);
     setCheckoutLoading(true);
 
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scanId: id }),
+        body: JSON.stringify({ scanId: id, plan: plan || 'lifetime' }),
       });
 
       if (!res.ok) {
@@ -736,6 +844,17 @@ export default function AnalysisPage() {
   };
 
   const handleStartAnalysis = async (url: string) => {
+    if (!user) {
+      router.push(`/login?next=/analysis&scanUrl=${encodeURIComponent(url)}`);
+      return;
+    }
+
+    // Block scan attempt if at limit
+    if (usageData && usageData.remaining === 0 && !usageData.isPaid) {
+      setUnlockModalOpen(true);
+      return;
+    }
+
     setActionError('');
 
     try {
@@ -746,9 +865,19 @@ export default function AnalysisPage() {
       });
 
       const payload = await res.json();
+
+      if (res.status === 403 && payload.upgradeRequired) {
+        setUsageData((prev) => prev ? { ...prev, used: payload.used, remaining: 0 } : prev);
+        setUnlockModalOpen(true);
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(payload.error || 'Failed to start scan');
       }
+
+      // Update local usage after successful scan
+      setUsageData((prev) => prev && !prev.isPaid ? { ...prev, used: prev.used + 1, remaining: Math.max(0, prev.remaining - 1) } : prev);
 
       router.push(`/analysis?scan=${payload.id}`);
     } catch (err) {
@@ -770,6 +899,63 @@ export default function AnalysisPage() {
       setActionError('Copy failed. Your browser blocked clipboard access.');
     }
   };
+
+  useEffect(() => {
+    if (exampleMode || !user || !id) return;
+    if (searchParams.get('checkout') !== 'success') return;
+    const sessionId = searchParams.get('session_id');
+    if (!sessionId) return;
+
+    let active = true;
+
+    async function verifyCheckout() {
+      setUnlockingCheckout(true);
+      setLoadingReport(true);
+      try {
+        const verifyRes = await fetch('/api/checkout/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        });
+        if (!verifyRes.ok) {
+          const payload = await verifyRes.json().catch(() => ({}));
+          throw new Error(payload.error || 'Failed to verify checkout.');
+        }
+
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          const reportRes = await fetch(`/api/scan/${id}/report`);
+          if (reportRes.ok) {
+            const payload = await reportRes.json();
+            if (!active) return;
+            setReport(payload);
+            setUnlockModalOpen(false);
+            // Refresh usage data after upgrade
+            fetch('/api/auth/usage').then((r) => r.ok ? r.json() : null).then((d) => { if (d && active) setUsageData(d); }).catch(() => {});
+            const hash = window.location.hash || '';
+            router.replace(`/analysis?report=${id}${hash}`);
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        throw new Error('Your payment cleared, but the paid report is still warming up. Please refresh in a moment.');
+      } catch (err) {
+        if (!active) return;
+        setActionError(err instanceof Error ? err.message : 'Failed to unlock your paid report.');
+      } finally {
+        if (active) {
+          setUnlockingCheckout(false);
+          setLoadingReport(false);
+        }
+      }
+    }
+
+    void verifyCheckout();
+
+    return () => {
+      active = false;
+    };
+  }, [exampleMode, id, router, searchParams, user]);
 
   const handleCopyRemainingFixes = async () => {
     if (!report?.copyToLlm?.remainingFixesPrompt) return;
@@ -862,24 +1048,14 @@ export default function AnalysisPage() {
         <div className="absolute inset-x-0 top-0 h-44 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]" />
       </div>
 
-      <AppShellNav
-        active="analysis"
-        showShare={Boolean(report)}
-        onShare={() => {
-          if (shareUrl) {
-            openXShareIntent(sharePostText);
-          }
-        }}
-        onClearView={() => router.push('/analysis')}
-      />
+
       <div className="relative mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
         {/* ─── Unlock / Upgrade modal (always available) ──────────── */}
         <UnlockFeaturesModal
           open={unlockModalOpen}
           onOpenChange={setUnlockModalOpen}
-          scanId={id || undefined}
-          onEmailSubmit={handleEmailSubmit}
-          loading={loadingReport}
+          onUnlock={(plan) => void handleCheckout(plan)}
+          loading={checkoutLoading}
         />
 
         {/* ─── Analysis Section (always visible) ─────────────────── */}
@@ -890,49 +1066,67 @@ export default function AnalysisPage() {
           </p>
 
           <div className="mx-auto mt-10 max-w-xl space-y-4">
-            {/* Analysis Limit: dark gray bg, thin orange border, progress line */}
-            <div className="flex min-h-[60px] flex-col gap-3 rounded-xl border border-amber-500/40 bg-white/[0.03] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Analysis Limit</p>
-                <div className="mt-1.5 h-1 w-20 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full w-1/3 rounded-full bg-amber-500/80" />
+            {/* Analysis Limit: dynamic per-account usage */}
+            {usageData?.isPaid ? (
+              <div className="flex min-h-[60px] items-center gap-3 rounded-xl border border-emerald-500/40 bg-white/[0.03] px-5 py-4">
+                <Crown className="h-4 w-4 text-emerald-400" />
+                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Unlimited Analyses</p>
+                <span className="ml-auto rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-medium text-emerald-400">{usageData.plan}</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex min-h-[60px] flex-col gap-3 rounded-xl border border-amber-500/40 bg-white/[0.03] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-[var(--text-primary)]">Analysis Limit</p>
+                    <div className="mt-1.5 h-1 w-20 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-amber-500/80 transition-all"
+                        style={{ width: usageData ? `${(usageData.used / usageData.limit) * 100}%` : '0%' }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[12px] text-[var(--text-muted)]">
+                      {usageData ? `${usageData.remaining} analyses left · ${usageData.used}/${usageData.limit} used` : 'Loading...'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUnlockModalOpen(true)}
+                    className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-zinc-700/90 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-zinc-600/90"
+                  >
+                    <Crown className="h-3.5 w-3.5 text-amber-400" />
+                    Unlock All Features
+                  </button>
                 </div>
-                <p className="mt-1.5 text-[12px] text-[var(--text-muted)]">2 analyses left · 1/3 used</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setUnlockModalOpen(true)}
-                className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-zinc-700/90 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-zinc-600/90"
-              >
-                <Crown className="h-3.5 w-3.5 text-amber-400" />
-                Unlock All Features
-              </button>
-            </div>
 
-            {/* Upgrade: muted orange accent */}
-            <div className="flex min-h-[60px] flex-col gap-3 rounded-xl border border-orange-600/40 bg-orange-900/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div className="flex min-w-0 gap-3">
-                <Info className="h-4 w-4 shrink-0 text-orange-500/80" />
-                <p className="text-[13px] text-[var(--text-secondary)]">
-                  Upgrade to run website analyses. You can view an example report to see what you&apos;ll get.
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-lg bg-zinc-700/90 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-zinc-600/90"
-                >
-                  View example
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUnlockModalOpen(true)}
-                  className="rounded-lg bg-orange-700 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-orange-600"
-                >
-                  Upgrade
-                </button>
-              </div>
-            </div>
+                {/* Upgrade: muted orange accent — only show when at limit */}
+                {usageData && usageData.remaining === 0 && (
+                  <div className="flex min-h-[60px] flex-col gap-3 rounded-xl border border-orange-600/40 bg-orange-900/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div className="flex min-w-0 gap-3">
+                      <Info className="h-4 w-4 shrink-0 text-orange-500/80" />
+                      <p className="text-[13px] text-[var(--text-secondary)]">
+                        Upgrade to run website analyses. You can view an example report to see what you&apos;ll get.
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push('/analysis?example=1')}
+                        className="rounded-lg bg-zinc-700/90 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-zinc-600/90"
+                      >
+                        View example
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUnlockModalOpen(true)}
+                        className="rounded-lg bg-orange-700 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-orange-600"
+                      >
+                        Upgrade
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* URL Input: dark gray bg, thin light gray border */}
             <UrlInput
@@ -943,7 +1137,35 @@ export default function AnalysisPage() {
               submitLabel="Analyze"
               loadingLabel="Analyzing..."
               showGlobeIcon
+              initialValue={prefillUrl ?? undefined}
+              autoFocus={Boolean(prefillUrl)}
             />
+
+            {/* Example report card — only in empty state */}
+            {emptyState && (
+              <button
+                type="button"
+                onClick={() => router.push('/analysis?example=1')}
+                className="group flex w-full items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.025] px-5 py-4 text-left transition-colors hover:border-white/10 hover:bg-white/[0.04]"
+              >
+                {/* Favicon */}
+                <img
+                  src={getFaviconUrl('stripe.com', 64)}
+                  alt=""
+                  className="h-8 w-8 shrink-0 rounded-lg"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-white">stripe.com</p>
+                  <p className="mt-0.5 text-[12px] text-zinc-500">See what a full report looks like</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[12px] font-semibold text-emerald-400">
+                    78
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-zinc-600 transition-colors group-hover:text-zinc-400" />
+                </div>
+              </button>
+            )}
 
             {/* Share / Clear view (only when viewing a report) */}
             {!emptyState && (
@@ -976,7 +1198,7 @@ export default function AnalysisPage() {
         )}
 
         {/* ─── Loading state (when we have id but no data yet) ─────── */}
-        {id && loading && !data && (
+        {id && (loading || authLoading) && !data && (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-primary-200)] border-t-[var(--color-primary-600)]" />
             <p className="mt-4 text-sm text-zinc-400">Loading audit...</p>
@@ -984,7 +1206,7 @@ export default function AnalysisPage() {
         )}
 
         {/* ─── Error state (when we have id but fetch failed) ─────── */}
-        {id && !loading && error && !data && (
+        {id && !loading && !authLoading && error && !data && (
           <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-center">
             <TriangleAlert className="mx-auto h-12 w-12 text-red-500" />
             <h2 className="mt-4 text-lg font-semibold text-white">Unable to load audit</h2>
@@ -1005,76 +1227,19 @@ export default function AnalysisPage() {
         {data && !emptyState && (
           <>
         {/* ─── Header ───────────────────────────────────────────── */}
-        {/* Hide header when showing YourWebsiteScore layout (pre-email complete or report) */}
-        {!(isComplete && !emailSubmitted) && !report && (
-          <header className="mb-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
-                    statusStyles.bg,
-                    statusStyles.text
-                  )}
-                >
-                  <span className={cn('h-1 w-1 rounded-full', statusStyles.dot)} />
-                  {statusLabel}
-                </span>
-                <span className="text-[13px] text-zinc-500">{domain}</span>
-                {data?.createdAt && (
-                  <span className="text-[13px] text-zinc-500">{formatDate(data.createdAt)}</span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {data?.url && (
-                  <a
-                    href={data.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[12px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-                  >
-                    Visit site
-                    <ArrowUpRight className="h-3 w-3" />
-                  </a>
-                )}
-                {data?.url && (
-                  <button
-                    type="button"
-                    onClick={handleReaudit}
-                    disabled={reauditLoading}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[12px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
-                  >
-                    <RefreshCw className={cn('h-3 w-3', reauditLoading && 'animate-spin')} />
-                    {reauditLoading ? 'Re-running...' : 'Re-audit'}
-                  </button>
-                )}
-              </div>
-            </div>
-            <h1 className="mt-3 text-[1.75rem] font-semibold tracking-tight text-white sm:text-[2rem]">
-              {isScanning
-                ? 'Building your AI visibility map'
-                : isFailed
-                  ? 'Audit stopped'
-                  : 'Preparing audit'}
-            </h1>
-            <p className="mt-1.5 max-w-2xl text-[13px] leading-6 text-zinc-400">
-              {isScanning
-                ? 'Analyzing crawl, structure, and entity signals in real time.'
-                : isFailed
-                  ? 'Something went wrong before we could finish.'
-                  : 'Your audit will start shortly.'}
-            </p>
-          </header>
+        {/* Scan header — only when still scanning (not when complete or report loaded) */}
+        {!(isComplete && !report) && !report && (
+          <div className="mb-6" />
         )}
         {report && (
           <header className="mb-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                  {fullReportTabMeta[activeTab].title}
+                  Full report
                 </p>
                 <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                  {fullReportTabMeta[activeTab].description}
+                  Scores, AI mentions, repairs, and detailed breakdowns in one scrollable view.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1113,109 +1278,57 @@ export default function AnalysisPage() {
 
         {/* ─── Scanning State ─────────────────────────────────────── */}
         {isScanning && data?.progress && (
-          <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500">Pipeline</p>
-                  <h2 className="mt-2 text-[1.25rem] font-semibold tracking-tight text-white">
-                    Building your audit in real time
-                  </h2>
-                </div>
-                <div className="rounded-full border border-white/15 bg-[rgba(13,148,136,0.12)] px-3 py-1.5 text-[13px] font-semibold text-[#2dd4bf]">
-                  {progressPercent}%
-                </div>
+          <section className="mx-auto max-w-xl">
+            {/* Domain + status */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-sm font-medium text-white">{domain}</span>
+                <span className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                  statusStyles.bg,
+                  statusStyles.text
+                )}>
+                  <span className={cn('h-1 w-1 rounded-full', statusStyles.dot)} />
+                  {statusLabel}
+                </span>
               </div>
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                <div
-                  className="h-full rounded-full bg-[#0d9488] transition-[width] duration-500"
-                  style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
-                />
-              </div>
-              <div className="mt-5 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="rounded-lg border border-white/8 bg-[#161616] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.014)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                    Current step
-                  </p>
-                  <p className="mt-2 text-[15px] font-semibold text-white">{currentStep}</p>
-                  <p className="mt-3 text-[13px] leading-6 text-zinc-400">
-                    We keep the AI score path moving first, then fold in Web Health enrichments without blocking the route transition.
-                  </p>
-                </div>
-                <div className="relative pl-0 lg:pl-4">
-                  <div className="absolute left-1.5 top-2 bottom-2 hidden w-px bg-[linear-gradient(180deg,rgba(13,148,136,0.32),transparent_100%)] lg:block" />
-                  <ProgressChecklist checks={progressChecks} />
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-2.5 text-[11px] uppercase tracking-[0.2em] text-zinc-500">
-                <span>Done {doneChecks}</span>
-                <span>Running {runningChecks}</span>
-                {errorChecks > 0 ? <span>Errors {errorChecks}</span> : null}
-              </div>
+              <span className="text-xs tabular-nums text-zinc-500">{progressPercent}%</span>
             </div>
-            <div className="rounded-xl border border-white/10 bg-[#101010] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.016)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500">Live Preview</p>
-              <div className="mt-4 flex justify-center">
-                <ScoreRing
-                  score={data?.scores?.aiVisibility ?? null}
-                  color="#0d9488"
-                  size={160}
-                  emphasis="hero"
-                  label="AI Visibility"
-                  loading={data?.scores?.aiVisibility == null}
-                  loadingText="Live"
-                  caption={
-                    data?.scores?.aiVisibility == null
-                      ? 'Score appears once the AI audit has enough signal'
-                      : 'AI score locked from the completed audit'
-                  }
-                />
-              </div>
-              <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
-                <div className="rounded-lg border border-white/8 bg-[#161616] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.014)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Robots + Sitemap</p>
-                  <p className="mt-1.5 text-[13px] text-zinc-400">
-                    {progressChecks[0]?.status === 'done' ? 'Mapped' : 'Inspecting crawler access'}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-white/8 bg-[#161616] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.014)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Web Health</p>
-                  <p className="mt-1.5 text-[13px] text-zinc-400">
-                    {data?.enrichments?.webHealth?.status === 'running' ? 'Measuring performance' : 'Queued behind core audit'}
-                  </p>
-                </div>
-              </div>
+
+            {/* Progress bar */}
+            <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className="h-full rounded-full bg-white/40 transition-[width] duration-500"
+                style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
+              />
+            </div>
+
+            {/* Checklist */}
+            <div className="mt-5">
+              <ProgressChecklist checks={progressChecks} />
             </div>
           </section>
         )}
 
         {/* ─── Failed State ─────────────────────────────────────── */}
         {isFailed && (
-          <section>
-            <div className="flex gap-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/10">
-                <TriangleAlert className="h-4 w-4 text-red-500" />
-              </div>
+          <section className="mx-auto max-w-xl">
+            <div className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
               <div className="min-w-0 flex-1">
-                <h2 className="text-[1.1rem] font-semibold text-white">Audit halted</h2>
-                <p className="mt-1 text-[13px] text-zinc-400">
-                  {data?.progress?.error || 'An error occurred while scanning the site.'}
+                <p className="text-sm font-medium text-white">Scan failed</p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {data?.progress?.error || 'Something went wrong. Try again.'}
                 </p>
-                <div className="mt-4 flex flex-wrap gap-2.5">
+                <div className="mt-3 flex gap-2">
                   <button
                     type="button"
                     onClick={handleReaudit}
                     disabled={reauditLoading}
-                    className="rounded-lg bg-[#0d9488] px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#14b8a6] disabled:opacity-50"
+                    className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-white/[0.07] disabled:opacity-50"
                   >
-                    {reauditLoading ? 'Restarting...' : 'Run scan again'}
+                    {reauditLoading ? 'Retrying...' : 'Try again'}
                   </button>
-                  <Link
-                    href="/"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2 text-[13px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-                  >
-                    Back home
-                  </Link>
                 </div>
               </div>
             </div>
@@ -1257,6 +1370,12 @@ export default function AnalysisPage() {
                       color: scoreColor(data?.webHealth?.pillars?.find((p) => p.key === 'performance')?.percentage ?? null),
                       caption: undefined,
                     },
+                    {
+                      label: 'AI Mentions',
+                      score: (data as Record<string, unknown>)?.mentionSummary ? ((data as Record<string, unknown>).mentionSummary as MentionSummary).overallScore : null,
+                      color: scoreColor((data as Record<string, unknown>)?.mentionSummary ? ((data as Record<string, unknown>).mentionSummary as MentionSummary).overallScore : null),
+                      caption: undefined,
+                    },
                   ]}
                   actions={
                     <button
@@ -1272,37 +1391,73 @@ export default function AnalysisPage() {
               </div>
 
               <div className="space-y-4">
-                {/* AI Visibility dimensions */}
-                {(data?.dimensions ?? data?.score?.dimensions ?? []).map((dimension, i) => (
-                  <YwsBreakdownSection
-                    key={dimension.key}
-                    title={dimension.label}
-                    score={dimension.percentage}
-                    scoreColor={scoreColor(dimension.percentage)}
-                    onCopyToLlm={handleCopyReportPrompt}
-                    copied={reportPromptCopied}
-                    passCount={dimension.checks.filter((c) => c.verdict === 'pass').length}
-                    failCount={dimension.checks.filter((c) => c.verdict === 'fail').length}
-                    unknownCount={dimension.checks.filter((c) => c.verdict === 'unknown').length}
-                    checks={dimension.checks.map((c) => ({
-                      label: c.label,
-                      detail: c.detail,
-                      verdict: c.verdict,
-                      points: c.points,
-                      maxPoints: c.maxPoints,
-                    }))}
-                    defaultExpanded={false}
-                    showClickHint={i === 0}
-                    hasPaid={report?.hasPaid ?? false}
-                  />
-                ))}
-                {/* Web Health sections */}
+                {/* ─── AI Readiness (File Presence + Structured Data + AI Registration) ─── */}
+                {(() => {
+                  const readinessKeys = ['file-presence', 'structured-data', 'ai-registration'];
+                  const readinessDims = revealDimensions.filter((d) => readinessKeys.includes(d.key));
+                  if (readinessDims.length === 0) return null;
+                  const allChecks = readinessDims.flatMap((d) => d.checks);
+                  const avgScore = Math.round(readinessDims.reduce((s, d) => s + d.percentage, 0) / readinessDims.length);
+                  return (
+                    <YwsBreakdownSection
+                      title="AI Readiness"
+                      score={avgScore}
+                      scoreColor={scoreColor(avgScore)}
+                      onCopyToLlm={handleCopyReportPrompt}
+                      copied={reportPromptCopied}
+                      passCount={allChecks.filter((c) => c.verdict === 'pass').length}
+                      failCount={allChecks.filter((c) => c.verdict === 'fail').length}
+                      unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
+                      checks={[]}
+                      subSections={readinessDims.map((d) => ({
+                        label: d.label,
+                        checks: d.checks.map((check) => toRichCheckItem(check, data?.assetPreview)),
+                      }))}
+                      defaultExpanded={false}
+                      showClickHint={true}
+                      hasPaid={canPreviewGatedChecks}
+                    />
+                  );
+                })()}
+
+                {/* ─── Content & Authority (Content Signals + Topical Authority + Entity Clarity) ─── */}
+                {(() => {
+                  const contentKeys = ['content-signals', 'topical-authority', 'entity-clarity'];
+                  const contentDims = revealDimensions.filter((d) => contentKeys.includes(d.key));
+                  if (contentDims.length === 0) return null;
+                  const allChecks = contentDims.flatMap((d) => d.checks);
+                  const avgScore = Math.round(contentDims.reduce((s, d) => s + d.percentage, 0) / contentDims.length);
+                  return (
+                    <YwsBreakdownSection
+                      title="Content & Authority"
+                      score={avgScore}
+                      scoreColor={scoreColor(avgScore)}
+                      onCopyToLlm={handleCopyReportPrompt}
+                      copied={reportPromptCopied}
+                      passCount={allChecks.filter((c) => c.verdict === 'pass').length}
+                      failCount={allChecks.filter((c) => c.verdict === 'fail').length}
+                      unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
+                      checks={[]}
+                      subSections={contentDims.map((d) => ({
+                        label: d.label,
+                        checks: d.checks.map((check) => toRichCheckItem(check, data?.assetPreview)),
+                      }))}
+                      defaultExpanded={false}
+                      hasPaid={canPreviewGatedChecks}
+                    />
+                  );
+                })()}
+
+                {/* ─── Website Quality (Site Quality + Open Graph + Twitter Cards) ─── */}
                 {(() => {
                   const qualityPillar = data?.webHealth?.pillars?.find((p) => p.key === 'quality');
-                  const qualityChecks = buildWebsiteQualityChecks(data?.webHealth, data?.dimensions);
+                  const qualityChecks = buildWebsiteQualityChecks(data?.webHealth, revealDimensions, data?.assetPreview);
                   const ogCheck = data?.webHealth?.pillars
                     ?.find((p) => p.key === 'quality')
                     ?.checks?.find((c) => c.label === 'Open Graph coverage' || c.id === 'whq-open-graph');
+                  const twitterCheck = data?.webHealth?.pillars
+                    ?.find((p) => p.key === 'quality')
+                    ?.checks?.find((c) => c.label === 'Twitter card coverage' || c.id === 'whq-twitter');
                   const siteQualityChecks =
                     qualityChecks.length > 0
                       ? qualityChecks
@@ -1321,15 +1476,23 @@ export default function AnalysisPage() {
                           { label: 'Character encoding' },
                         ];
                   const openGraphChecks = ogCheck
-                    ? [{ label: 'Open Graph coverage', detail: ogCheck.detail, verdict: ogCheck.verdict as 'pass' | 'fail' | 'unknown', points: ogCheck.points, maxPoints: ogCheck.maxPoints }]
-                    : [{ label: 'Title' }, { label: 'Description' }];
-                  const qualityPass = qualityPillar?.checks?.filter((c) => c.verdict === 'pass').length ?? 0;
-                  const qualityFail = qualityPillar?.checks?.filter((c) => c.verdict === 'fail').length ?? 0;
-                  const qualityUnknown = qualityPillar?.checks?.filter((c) => c.verdict === 'unknown').length ?? 0;
-                  const ogPass = ogCheck?.verdict === 'pass' ? 1 : 0;
-                  const ogFail = ogCheck?.verdict === 'fail' ? 1 : 0;
-                  const ogUnknown = ogCheck?.verdict === 'unknown' ? 1 : 0;
-                  const dimensions = data?.dimensions ?? data?.score?.dimensions ?? [];
+                    ? [toRichCheckItem({ label: 'Open Graph coverage', detail: ogCheck.detail, verdict: ogCheck.verdict, points: ogCheck.points, maxPoints: ogCheck.maxPoints }, data?.assetPreview)]
+                    : [
+                        { label: 'Title', fixContent: getCheckFixContent('Title') },
+                        { label: 'Description', fixContent: getCheckFixContent('Meta Description') },
+                      ];
+                  const twitterChecks = twitterCheck
+                    ? [toRichCheckItem({ label: 'Twitter card coverage', detail: twitterCheck.detail, verdict: twitterCheck.verdict, points: twitterCheck.points, maxPoints: twitterCheck.maxPoints }, data?.assetPreview)]
+                    : [
+                        { label: 'Card Type', fixContent: getCheckFixContent('Twitter card coverage') },
+                        { label: 'Description', fixContent: getCheckFixContent('Meta Description') },
+                        { label: 'Title', fixContent: getCheckFixContent('Title') },
+                        { label: 'Image', fixContent: getCheckFixContent('Open Graph coverage') },
+                      ];
+                  const allQualityChecks = [...(qualityPillar?.checks ?? [])];
+                  const qualityPass = allQualityChecks.filter((c) => c.verdict === 'pass').length;
+                  const qualityFail = allQualityChecks.filter((c) => c.verdict === 'fail').length;
+                  const qualityUnknown = allQualityChecks.filter((c) => c.verdict === 'unknown').length;
                   return (
                     <YwsBreakdownSection
                       title="Website Quality"
@@ -1337,98 +1500,71 @@ export default function AnalysisPage() {
                       scoreColor={scoreColor(qualityPillar?.percentage ?? data?.scores?.webHealth ?? null)}
                       onCopyToLlm={handleCopyReportPrompt}
                       copied={reportPromptCopied}
-                      passCount={qualityPass + ogPass}
-                      failCount={qualityFail + ogFail}
-                      unknownCount={qualityUnknown + ogUnknown}
+                      passCount={qualityPass}
+                      failCount={qualityFail}
+                      unknownCount={qualityUnknown}
                       checks={[]}
                       subSections={[
                         { label: 'Site Quality', checks: siteQualityChecks },
                         { label: 'Open Graph', checks: openGraphChecks },
+                        { label: 'Twitter Cards', checks: twitterChecks },
                       ]}
                       defaultExpanded={false}
-                      showClickHint={dimensions.length === 0}
-                      hasPaid={report?.hasPaid ?? false}
+                      showClickHint={revealDimensions.length === 0}
+                      hasPaid={canPreviewGatedChecks}
                     />
                   );
                 })()}
-                {(() => {
-                  const twitterCheck = data?.webHealth?.pillars
-                    ?.find((p) => p.key === 'quality')
-                    ?.checks?.find((c) => c.label === 'Twitter card coverage' || c.id === 'whq-twitter');
-                  return (
-                    <YwsBreakdownSection
-                      title="Twitter Cards"
-                      score={twitterCheck ? (twitterCheck.verdict === 'pass' ? 100 : 0) : null}
-                      scoreColor={twitterCheck ? scoreColor(twitterCheck.verdict === 'pass' ? 100 : 0) : 'var(--color-warning)'}
-                      onCopyToLlm={handleCopyReportPrompt}
-                      copied={reportPromptCopied}
-                      passCount={twitterCheck?.verdict === 'pass' ? 1 : 0}
-                      failCount={twitterCheck?.verdict === 'fail' ? 1 : 0}
-                      unknownCount={twitterCheck?.verdict === 'unknown' ? 1 : 0}
-                      checks={
-                        twitterCheck
-                          ? [{ label: 'Twitter card coverage', detail: twitterCheck.detail, verdict: twitterCheck.verdict as 'pass' | 'fail' | 'unknown', points: twitterCheck.points, maxPoints: twitterCheck.maxPoints }]
-                          : [{ label: 'Card Type' }, { label: 'Description' }, { label: 'Title' }, { label: 'Image' }]
-                      }
-                      defaultExpanded={false}
-                      hasPaid={report?.hasPaid ?? false}
-                    />
-                  );
-                })()}
+
+                {/* ─── Performance & Security (Trust & Security + PageSpeed) ─── */}
                 {(() => {
                   const securityPillar = data?.webHealth?.pillars?.find((p) => p.key === 'security');
-                  const securityChecks = buildSecurityChecks(data?.webHealth);
-                  return (
-                    <YwsBreakdownSection
-                      title="Trust & Security"
-                      score={securityPillar?.percentage ?? null}
-                      scoreColor={scoreColor(securityPillar?.percentage ?? null)}
-                      onCopyToLlm={handleCopyReportPrompt}
-                      copied={reportPromptCopied}
-                      passCount={securityPillar?.checks?.filter((c) => c.verdict === 'pass').length ?? 0}
-                      failCount={securityPillar?.checks?.filter((c) => c.verdict === 'fail').length ?? 0}
-                      unknownCount={securityPillar?.checks?.filter((c) => c.verdict === 'unknown').length ?? 0}
-                      checks={
-                        securityChecks.length > 0
-                          ? securityChecks
-                          : [
-                              { label: 'HTTPS' },
-                              { label: 'HTTP Strict Transport Security' },
-                              { label: 'Content Security Policy' },
-                              { label: 'Frame Protection' },
-                              { label: 'MIME Type Protection' },
-                            ]
-                      }
-                      defaultExpanded={false}
-                      hasPaid={report?.hasPaid ?? false}
-                    />
-                  );
-                })()}
-                {(() => {
                   const perfPillar = data?.webHealth?.pillars?.find((p) => p.key === 'performance');
+                  const securityChecks = buildSecurityChecks(data?.webHealth);
                   const perfChecks = buildPerformanceChecks(data?.webHealth);
+                  const secChecksArr = securityChecks.length > 0
+                    ? securityChecks
+                    : [
+                        { label: 'HTTPS' },
+                        { label: 'HTTP Strict Transport Security' },
+                        { label: 'Content Security Policy' },
+                        { label: 'Frame Protection' },
+                        { label: 'MIME Type Protection' },
+                      ];
+                  const perfChecksArr = perfChecks.length > 0
+                    ? perfChecks
+                    : [
+                        { label: 'Performance score' },
+                        { label: 'Largest Contentful Paint' },
+                        { label: 'Cumulative Layout Shift' },
+                        { label: 'Total Blocking Time' },
+                      ];
+                  const allPillarChecks = [...(securityPillar?.checks ?? []), ...(perfPillar?.checks ?? [])];
+                  const totalPass = allPillarChecks.filter((c) => c.verdict === 'pass').length;
+                  const totalFail = allPillarChecks.filter((c) => c.verdict === 'fail').length;
+                  const totalUnknown = allPillarChecks.filter((c) => c.verdict === 'unknown').length;
+                  const secScore = securityPillar?.percentage ?? null;
+                  const perfScore = perfPillar?.percentage ?? null;
+                  const avgScore = secScore !== null && perfScore !== null
+                    ? Math.round((secScore + perfScore) / 2)
+                    : secScore ?? perfScore;
                   return (
                     <YwsBreakdownSection
-                      title="PageSpeed"
-                      score={perfPillar?.percentage ?? null}
-                      scoreColor={scoreColor(perfPillar?.percentage ?? null)}
+                      title="Performance & Security"
+                      score={avgScore}
+                      scoreColor={scoreColor(avgScore)}
                       onCopyToLlm={handleCopyReportPrompt}
                       copied={reportPromptCopied}
-                      passCount={perfPillar?.checks?.filter((c) => c.verdict === 'pass').length ?? 0}
-                      failCount={perfPillar?.checks?.filter((c) => c.verdict === 'fail').length ?? 0}
-                      unknownCount={perfPillar?.checks?.filter((c) => c.verdict === 'unknown').length ?? 0}
-                      checks={
-                        perfChecks.length > 0
-                          ? perfChecks
-                          : [
-                              { label: 'Performance score' },
-                              { label: 'Largest Contentful Paint' },
-                              { label: 'Cumulative Layout Shift' },
-                              { label: 'Total Blocking Time' },
-                            ]
-                      }
+                      passCount={totalPass}
+                      failCount={totalFail}
+                      unknownCount={totalUnknown}
+                      checks={[]}
+                      subSections={[
+                        { label: 'Trust & Security', checks: secChecksArr },
+                        { label: 'PageSpeed', checks: perfChecksArr },
+                      ]}
                       defaultExpanded={false}
-                      hasPaid={report?.hasPaid ?? false}
+                      hasPaid={canPreviewGatedChecks}
                     />
                   );
                 })()}
@@ -1439,16 +1575,16 @@ export default function AnalysisPage() {
         )}
 
         {/* ─── Loading Report ────────────────────────────────────── */}
-        {emailSubmitted && !report && loadingReport && (
+        {reportId && !report && loadingReport && (
           <div className="aiso-card flex items-center justify-center py-16">
             <div className="flex flex-col items-center gap-4">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-primary-200)] border-t-[var(--color-primary-600)]" />
-              <p className="text-sm text-[var(--text-secondary)]">Loading your intelligence report...</p>
+              <p className="text-sm text-[var(--text-secondary)]">{unlockingCheckout ? 'Unlocking your paid report...' : 'Loading your intelligence report...'}</p>
             </div>
           </div>
         )}
 
-        {emailSubmitted && !report && !loadingReport && (
+        {reportId && !report && !loadingReport && (
           <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
             We couldn&apos;t load your report yet. Please refresh and retry.
           </div>
@@ -1487,6 +1623,12 @@ export default function AnalysisPage() {
                     color: scoreColor(webHealth?.pillars?.find((p) => p.key === 'performance')?.percentage ?? null),
                     caption: undefined,
                   },
+                  {
+                    label: 'AI Mentions',
+                    score: (report as ReportData & { mentionSummary?: MentionSummary }).mentionSummary?.overallScore ?? null,
+                    color: scoreColor((report as ReportData & { mentionSummary?: MentionSummary }).mentionSummary?.overallScore ?? null),
+                    caption: undefined,
+                  },
                 ]}
                 actions={
                   <>
@@ -1518,58 +1660,171 @@ export default function AnalysisPage() {
               />
             </div>
 
-            {/* Tab bar */}
-            <div className="mb-5 flex justify-center">
-              <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-1 rounded-[1.05rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.018)_0%,rgba(255,255,255,0.008)_100%)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-                <TabButton active={activeTab === 'overview'} onClick={() => setTab('overview')} icon={LayoutDashboard}>
-                  Overview
-                </TabButton>
-                <TabButton active={activeTab === 'repair-queue'} onClick={() => setTab('repair-queue')} icon={ListChecks}>
-                  Repair Queue
-                </TabButton>
-                <TabButton active={activeTab === 'dimensions'} onClick={() => setTab('dimensions')} icon={BarChart3}>
-                  Breakdown
-                </TabButton>
-                <TabButton active={activeTab === 'share'} onClick={() => setTab('share')} icon={Share2}>
-                  Share
-                </TabButton>
-              </div>
+            {/* Share + Copy buttons row */}
+            <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
+              {report.copyToLlm?.fullPrompt && (
+                <button type="button" onClick={handleCopyReportPrompt} className="aiso-button aiso-button-secondary px-4 py-2.5 text-sm">
+                  <Copy className="h-4 w-4" />
+                  {reportPromptCopied ? 'Copied full prompt' : 'Copy to LLM'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => shareUrl && openXShareIntent(sharePostText)}
+                className="aiso-button aiso-button-secondary px-4 py-2.5 text-sm"
+              >
+                <Share2 className="h-4 w-4" />
+                Share
+              </button>
             </div>
 
-            {/* Tab content — only active tab shown */}
-            {activeTab === 'overview' && (
-              <div className="space-y-4">
-                {/* AI Visibility dimensions */}
-                {reportDimensions.map((dimension, i) => (
+            {/* Click to open/close hint */}
+            <div className="mb-2 flex items-center justify-end gap-1.5 text-[11px] text-zinc-400">
+              <span className="animate-bounce">👇</span>
+              Click to open / close
+            </div>
+
+            {/* Scrollable sections */}
+            <div className="space-y-4">
+              {/* ─── AI Mentions Section (first, most prominent) ─── */}
+              {(() => {
+                const mentionData = (report as ReportData & { mentionSummary?: MentionSummary }).mentionSummary ?? (data as Record<string, unknown>)?.mentionSummary as MentionSummary | undefined;
+                if (!mentionData) return null;
+                const engines: AIEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude'];
+                const mentionPass = engines.filter((e) => mentionData.engineBreakdown[e]?.mentioned > 0).length;
+                const mentionFail = engines.filter((e) => mentionData.engineBreakdown[e]?.mentioned === 0 && mentionData.engineBreakdown[e]?.total > 0).length;
+                return (
                   <YwsBreakdownSection
-                    key={dimension.key}
-                    title={dimension.label}
-                    score={dimension.percentage}
-                    scoreColor={scoreColor(dimension.percentage)}
-                    onCopyToLlm={handleCopyReportPrompt}
-                    copied={reportPromptCopied}
-                    passCount={dimension.checks.filter((c) => c.verdict === 'pass').length}
-                    failCount={dimension.checks.filter((c) => c.verdict === 'fail').length}
-                    unknownCount={dimension.checks.filter((c) => c.verdict === 'unknown').length}
-                    checks={dimension.checks.map((c) => ({
-                      label: c.label,
-                      detail: c.detail,
-                      verdict: c.verdict,
-                      points: c.points,
-                      maxPoints: c.maxPoints,
-                    }))}
+                    title="AI Mentions"
+                    score={mentionData.overallScore}
+                    scoreColor={scoreColor(mentionData.overallScore)}
+                    passCount={mentionPass}
+                    failCount={mentionFail}
+                    unknownCount={engines.length - mentionPass - mentionFail}
+                    checks={[]}
+                    subSections={[
+                      {
+                        label: 'Engine Breakdown',
+                        checks: engines.map((engine) => ({
+                          label: engine.charAt(0).toUpperCase() + engine.slice(1),
+                          detail: `${mentionData.engineBreakdown[engine]?.mentioned ?? 0}/${mentionData.engineBreakdown[engine]?.total ?? 0} prompts mentioned · ${mentionData.engineBreakdown[engine]?.sentiment ?? 'not-found'}`,
+                          verdict: (mentionData.engineBreakdown[engine]?.mentioned ?? 0) > 0 ? 'pass' as const : 'fail' as const,
+                        })),
+                      },
+                      {
+                        label: 'Prompt Results',
+                        checks: mentionData.promptsUsed.map((prompt) => {
+                          const promptResults = mentionData.results.filter((r) => r.prompt.id === prompt.id);
+                          const mentionedCount = promptResults.filter((r) => r.mentioned).length;
+                          return {
+                            label: `"${prompt.text}"`,
+                            detail: `Mentioned by ${mentionedCount}/${promptResults.length} engines`,
+                            verdict: mentionedCount > promptResults.length / 2 ? 'pass' as const : 'fail' as const,
+                          };
+                        }),
+                      },
+                      ...(mentionData.competitorsMentioned.length > 0
+                        ? [{
+                            label: 'Top Competitors',
+                            checks: mentionData.competitorsMentioned.slice(0, 5).map((c) => ({
+                              label: c.name,
+                              detail: `Mentioned ${c.count} times across AI engines`,
+                              verdict: 'unknown' as const,
+                            })),
+                          }]
+                        : []),
+                    ]}
                     defaultExpanded={false}
-                    showClickHint={i === 0}
-                    hasPaid={report?.hasPaid ?? false}
+                    showClickHint={false}
+                    hasPaid={canPreviewGatedChecks}
                   />
-                ))}
-                {/* Web Health sections */}
+                );
+              })()}
+
+              {/* ─── Repair Queue Section (collapsible) ─── */}
+              <YwsBreakdownSection
+                title="Repair Queue"
+                score={null}
+                maxScore={reportFixes.length}
+                scoreColor={scoreColor(null)}
+                passCount={reportFixes.filter((f) => f.category === 'ai').length}
+                failCount={reportFixes.filter((f) => f.category === 'web').length}
+                unknownCount={0}
+                checks={reportFixes.slice(0, 10).map((fix) => ({
+                  label: fix.label,
+                  detail: `${fix.instruction} (+${fix.estimatedLift} pts, ${fix.effortBand} effort)`,
+                  verdict: 'fail' as const,
+                }))}
+                defaultExpanded={false}
+                hasPaid={canPreviewGatedChecks}
+              />
+                {/* ─── AI Readiness (File Presence + Structured Data + AI Registration) ─── */}
+                {(() => {
+                  const readinessKeys = ['file-presence', 'structured-data', 'ai-registration'];
+                  const readinessDims = reportDimensions.filter((d) => readinessKeys.includes(d.key));
+                  if (readinessDims.length === 0) return null;
+                  const allChecks = readinessDims.flatMap((d) => d.checks);
+                  const avgScore = Math.round(readinessDims.reduce((s, d) => s + d.percentage, 0) / readinessDims.length);
+                  return (
+                    <YwsBreakdownSection
+                      title="AI Readiness"
+                      score={avgScore}
+                      scoreColor={scoreColor(avgScore)}
+                      onCopyToLlm={handleCopyReportPrompt}
+                      copied={reportPromptCopied}
+                      passCount={allChecks.filter((c) => c.verdict === 'pass').length}
+                      failCount={allChecks.filter((c) => c.verdict === 'fail').length}
+                      unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
+                      checks={[]}
+                      subSections={readinessDims.map((d) => ({
+                        label: d.label,
+                        checks: d.checks.map((check) => toRichCheckItem(check, data?.assetPreview)),
+                      }))}
+                      defaultExpanded={false}
+                      showClickHint={true}
+                      hasPaid={canPreviewGatedChecks}
+                    />
+                  );
+                })()}
+
+                {/* ─── Content & Authority (Content Signals + Topical Authority + Entity Clarity) ─── */}
+                {(() => {
+                  const contentKeys = ['content-signals', 'topical-authority', 'entity-clarity'];
+                  const contentDims = reportDimensions.filter((d) => contentKeys.includes(d.key));
+                  if (contentDims.length === 0) return null;
+                  const allChecks = contentDims.flatMap((d) => d.checks);
+                  const avgScore = Math.round(contentDims.reduce((s, d) => s + d.percentage, 0) / contentDims.length);
+                  return (
+                    <YwsBreakdownSection
+                      title="Content & Authority"
+                      score={avgScore}
+                      scoreColor={scoreColor(avgScore)}
+                      onCopyToLlm={handleCopyReportPrompt}
+                      copied={reportPromptCopied}
+                      passCount={allChecks.filter((c) => c.verdict === 'pass').length}
+                      failCount={allChecks.filter((c) => c.verdict === 'fail').length}
+                      unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
+                      checks={[]}
+                      subSections={contentDims.map((d) => ({
+                        label: d.label,
+                        checks: d.checks.map((check) => toRichCheckItem(check, data?.assetPreview)),
+                      }))}
+                      defaultExpanded={false}
+                      hasPaid={canPreviewGatedChecks}
+                    />
+                  );
+                })()}
+
+                {/* ─── Website Quality (Site Quality + Open Graph + Twitter Cards) ─── */}
                 {(() => {
                   const qualityPillar = webHealth?.pillars?.find((p) => p.key === 'quality');
-                  const qualityChecks = buildWebsiteQualityChecks(webHealth, reportDimensions);
+                  const qualityChecks = buildWebsiteQualityChecks(webHealth, reportDimensions, data?.assetPreview);
                   const ogCheck = webHealth?.pillars
                     ?.find((p) => p.key === 'quality')
                     ?.checks?.find((c) => c.label === 'Open Graph coverage' || c.id === 'whq-open-graph');
+                  const twitterCheck = webHealth?.pillars
+                    ?.find((p) => p.key === 'quality')
+                    ?.checks?.find((c) => c.label === 'Twitter card coverage' || c.id === 'whq-twitter');
                   const siteQualityChecks =
                     qualityChecks.length > 0
                       ? qualityChecks
@@ -1588,14 +1843,23 @@ export default function AnalysisPage() {
                           { label: 'Character encoding' },
                         ];
                   const openGraphChecks = ogCheck
-                    ? [{ label: 'Open Graph coverage', detail: ogCheck.detail, verdict: ogCheck.verdict as 'pass' | 'fail' | 'unknown', points: ogCheck.points, maxPoints: ogCheck.maxPoints }]
-                    : [{ label: 'Title' }, { label: 'Description' }];
-                  const qualityPass = qualityPillar?.checks?.filter((c) => c.verdict === 'pass').length ?? 0;
-                  const qualityFail = qualityPillar?.checks?.filter((c) => c.verdict === 'fail').length ?? 0;
-                  const qualityUnknown = qualityPillar?.checks?.filter((c) => c.verdict === 'unknown').length ?? 0;
-                  const ogPass = ogCheck?.verdict === 'pass' ? 1 : 0;
-                  const ogFail = ogCheck?.verdict === 'fail' ? 1 : 0;
-                  const ogUnknown = ogCheck?.verdict === 'unknown' ? 1 : 0;
+                    ? [toRichCheckItem({ label: 'Open Graph coverage', detail: ogCheck.detail, verdict: ogCheck.verdict, points: ogCheck.points, maxPoints: ogCheck.maxPoints }, data?.assetPreview)]
+                    : [
+                        { label: 'Title', fixContent: getCheckFixContent('Title') },
+                        { label: 'Description', fixContent: getCheckFixContent('Meta Description') },
+                      ];
+                  const twitterChecks = twitterCheck
+                    ? [toRichCheckItem({ label: 'Twitter card coverage', detail: twitterCheck.detail, verdict: twitterCheck.verdict, points: twitterCheck.points, maxPoints: twitterCheck.maxPoints }, data?.assetPreview)]
+                    : [
+                        { label: 'Card Type', fixContent: getCheckFixContent('Twitter card coverage') },
+                        { label: 'Description', fixContent: getCheckFixContent('Meta Description') },
+                        { label: 'Title', fixContent: getCheckFixContent('Title') },
+                        { label: 'Image', fixContent: getCheckFixContent('Open Graph coverage') },
+                      ];
+                  const allQualityChecks = [...(qualityPillar?.checks ?? [])];
+                  const qualityPass = allQualityChecks.filter((c) => c.verdict === 'pass').length;
+                  const qualityFail = allQualityChecks.filter((c) => c.verdict === 'fail').length;
+                  const qualityUnknown = allQualityChecks.filter((c) => c.verdict === 'unknown').length;
                   return (
                     <YwsBreakdownSection
                       title="Website Quality"
@@ -1603,663 +1867,76 @@ export default function AnalysisPage() {
                       scoreColor={scoreColor(qualityPillar?.percentage ?? webHealth?.percentage ?? null)}
                       onCopyToLlm={handleCopyReportPrompt}
                       copied={reportPromptCopied}
-                      passCount={qualityPass + ogPass}
-                      failCount={qualityFail + ogFail}
-                      unknownCount={qualityUnknown + ogUnknown}
+                      passCount={qualityPass}
+                      failCount={qualityFail}
+                      unknownCount={qualityUnknown}
                       checks={[]}
                       subSections={[
                         { label: 'Site Quality', checks: siteQualityChecks },
                         { label: 'Open Graph', checks: openGraphChecks },
+                        { label: 'Twitter Cards', checks: twitterChecks },
                       ]}
                       defaultExpanded={false}
                       showClickHint={reportDimensions.length === 0}
-                      hasPaid={report?.hasPaid ?? false}
+                      hasPaid={canPreviewGatedChecks}
                     />
                   );
                 })()}
-                {(() => {
-                  const twitterCheck = webHealth?.pillars
-                    ?.find((p) => p.key === 'quality')
-                    ?.checks?.find((c) => c.label === 'Twitter card coverage' || c.id === 'whq-twitter');
-                  return (
-                    <YwsBreakdownSection
-                      title="Twitter Cards"
-                      score={twitterCheck ? (twitterCheck.verdict === 'pass' ? 100 : 0) : null}
-                      scoreColor={twitterCheck ? scoreColor(twitterCheck.verdict === 'pass' ? 100 : 0) : 'var(--color-warning)'}
-                      onCopyToLlm={handleCopyReportPrompt}
-                      copied={reportPromptCopied}
-                      passCount={twitterCheck?.verdict === 'pass' ? 1 : 0}
-                      failCount={twitterCheck?.verdict === 'fail' ? 1 : 0}
-                      unknownCount={twitterCheck?.verdict === 'unknown' ? 1 : 0}
-                      checks={
-                        twitterCheck
-                          ? [{ label: 'Twitter card coverage', detail: twitterCheck.detail, verdict: twitterCheck.verdict as 'pass' | 'fail' | 'unknown', points: twitterCheck.points, maxPoints: twitterCheck.maxPoints }]
-                          : [{ label: 'Card Type' }, { label: 'Description' }, { label: 'Title' }, { label: 'Image' }]
-                      }
-                      defaultExpanded={false}
-                      hasPaid={report?.hasPaid ?? false}
-                    />
-                  );
-                })()}
+
+                {/* ─── Performance & Security (Trust & Security + PageSpeed) ─── */}
                 {(() => {
                   const securityPillar = webHealth?.pillars?.find((p) => p.key === 'security');
-                  const securityChecks = buildSecurityChecks(webHealth);
-                  return (
-                    <YwsBreakdownSection
-                      title="Trust & Security"
-                      score={securityPillar?.percentage ?? null}
-                      scoreColor={scoreColor(securityPillar?.percentage ?? null)}
-                      onCopyToLlm={handleCopyReportPrompt}
-                      copied={reportPromptCopied}
-                      passCount={securityPillar?.checks?.filter((c) => c.verdict === 'pass').length ?? 0}
-                      failCount={securityPillar?.checks?.filter((c) => c.verdict === 'fail').length ?? 0}
-                      unknownCount={securityPillar?.checks?.filter((c) => c.verdict === 'unknown').length ?? 0}
-                      checks={
-                        securityChecks.length > 0
-                          ? securityChecks
-                          : [
-                              { label: 'HTTPS' },
-                              { label: 'HTTP Strict Transport Security' },
-                              { label: 'Content Security Policy' },
-                              { label: 'Frame Protection' },
-                              { label: 'MIME Type Protection' },
-                            ]
-                      }
-                      defaultExpanded={false}
-                      hasPaid={report?.hasPaid ?? false}
-                    />
-                  );
-                })()}
-                {(() => {
                   const perfPillar = webHealth?.pillars?.find((p) => p.key === 'performance');
+                  const securityChecks = buildSecurityChecks(webHealth);
                   const perfChecks = buildPerformanceChecks(webHealth);
+                  const secChecksArr = securityChecks.length > 0
+                    ? securityChecks
+                    : [
+                        { label: 'HTTPS' },
+                        { label: 'HTTP Strict Transport Security' },
+                        { label: 'Content Security Policy' },
+                        { label: 'Frame Protection' },
+                        { label: 'MIME Type Protection' },
+                      ];
+                  const perfChecksArr = perfChecks.length > 0
+                    ? perfChecks
+                    : [
+                        { label: 'Performance score' },
+                        { label: 'Largest Contentful Paint' },
+                        { label: 'Cumulative Layout Shift' },
+                        { label: 'Total Blocking Time' },
+                      ];
+                  const allPillarChecks = [...(securityPillar?.checks ?? []), ...(perfPillar?.checks ?? [])];
+                  const totalPass = allPillarChecks.filter((c) => c.verdict === 'pass').length;
+                  const totalFail = allPillarChecks.filter((c) => c.verdict === 'fail').length;
+                  const totalUnknown = allPillarChecks.filter((c) => c.verdict === 'unknown').length;
+                  const secScore = securityPillar?.percentage ?? null;
+                  const perfScore = perfPillar?.percentage ?? null;
+                  const avgScore = secScore !== null && perfScore !== null
+                    ? Math.round((secScore + perfScore) / 2)
+                    : secScore ?? perfScore;
                   return (
                     <YwsBreakdownSection
-                      title="PageSpeed"
-                      score={perfPillar?.percentage ?? null}
-                      scoreColor={scoreColor(perfPillar?.percentage ?? null)}
+                      title="Performance & Security"
+                      score={avgScore}
+                      scoreColor={scoreColor(avgScore)}
                       onCopyToLlm={handleCopyReportPrompt}
                       copied={reportPromptCopied}
-                      passCount={perfPillar?.checks?.filter((c) => c.verdict === 'pass').length ?? 0}
-                      failCount={perfPillar?.checks?.filter((c) => c.verdict === 'fail').length ?? 0}
-                      unknownCount={perfPillar?.checks?.filter((c) => c.verdict === 'unknown').length ?? 0}
-                      checks={
-                        perfChecks.length > 0
-                          ? perfChecks
-                          : [
-                              { label: 'Performance score' },
-                              { label: 'Largest Contentful Paint' },
-                              { label: 'Cumulative Layout Shift' },
-                              { label: 'Total Blocking Time' },
-                            ]
-                      }
+                      passCount={totalPass}
+                      failCount={totalFail}
+                      unknownCount={totalUnknown}
+                      checks={[]}
+                      subSections={[
+                        { label: 'Trust & Security', checks: secChecksArr },
+                        { label: 'PageSpeed', checks: perfChecksArr },
+                      ]}
                       defaultExpanded={false}
-                      hasPaid={report?.hasPaid ?? false}
+                      hasPaid={canPreviewGatedChecks}
                     />
                   );
                 })()}
               </div>
-            )}
 
-            {activeTab === 'repair-queue' && (
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                    Highest-impact fixes first
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <FilterBar
-                      label="Category"
-                      value={categoryFilter}
-                      onChange={(value) => setCategoryFilter(value as 'all' | 'ai' | 'web')}
-                      options={[
-                        { value: 'all', label: 'All fixes' },
-                        { value: 'ai', label: 'AI' },
-                        { value: 'web', label: 'Web' },
-                      ]}
-                    />
-                    <FilterBar
-                      label="Effort"
-                      value={effortFilter}
-                      onChange={(value) => setEffortFilter(value as 'all' | EffortBand)}
-                      options={[
-                        { value: 'all', label: 'Any effort' },
-                        { value: 'quick', label: 'Quick wins' },
-                        { value: 'medium', label: 'Medium' },
-                        { value: 'technical', label: 'Technical' },
-                      ]}
-                    />
-                    <FilterBar
-                      label="Impact"
-                      value={impactFilter}
-                      onChange={(value) => setImpactFilter(value as 'all' | 'high' | 'quick-wins')}
-                      options={[
-                        { value: 'all', label: 'All impact' },
-                        { value: 'high', label: 'High impact' },
-                        { value: 'quick-wins', label: 'Fastest wins' },
-                      ]}
-                    />
-                  </div>
-                  {report.copyToLlm?.remainingFixesPrompt ? (
-                    <button
-                      type="button"
-                      onClick={handleCopyRemainingFixes}
-                      className="aiso-button aiso-button-secondary px-4 py-2.5 text-sm"
-                    >
-                      <Copy className="h-4 w-4" />
-                      {remainingFixesCopied ? 'Copied remaining fixes' : 'Copy remaining fixes'}
-                    </button>
-                  ) : null}
-                </div>
-                {filteredFixes.length > 0 ? (
-                  filteredFixes.map((fix, index) => (
-                    <FixCard
-                      key={fix.checkId}
-                      index={index + 1}
-                      checkId={fix.checkId}
-                      label={fix.label}
-                      detail={fix.detail}
-                      category={fix.category}
-                      instruction={fix.instruction}
-                      effort={fix.effort}
-                      effortBand={fix.effortBand}
-                      pointsAvailable={fix.estimatedLift}
-                      roi={fix.roi}
-                      actualValue={fix.actualValue}
-                      expectedValue={fix.expectedValue}
-                      copied={copiedFixId === fix.checkId}
-                      onCopy={() => handleCopyFixPrompt(fix.checkId, fix.copyPrompt)}
-                    />
-                  ))
-                ) : (
-                  <div className="aiso-card-soft p-8 text-center">
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(37,201,114,0.12)]">
-                      <Sparkles className="h-6 w-6 text-[var(--color-success)]" />
-                    </div>
-                    <p className="font-medium text-[var(--text-primary)]">No blocking issues detected</p>
-                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                      Your site is in good shape. Keep monitoring for changes.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'dimensions' && (
-              <div className="space-y-5">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <BreakdownMetricCard
-                    label="Strongest signal"
-                    value={strongestDimension?.label ?? 'Pending'}
-                    caption={strongestDimension ? `${Math.round(strongestDimension.percentage)}% strength` : 'Waiting on scan data'}
-                    tone="success"
-                  />
-                  <BreakdownMetricCard
-                    label="Weakest signal"
-                    value={weakestDimension?.label ?? 'Pending'}
-                    caption={weakestDimension ? `${Math.round(weakestDimension.percentage)}% strength` : 'Waiting on scan data'}
-                    tone="warning"
-                  />
-                  <BreakdownMetricCard
-                    label="Checks failing"
-                    value={String(failedCount)}
-                    caption={`${unknownCount} unknown · ${passedCount} passing`}
-                    tone={failedCount > 0 ? 'danger' : 'neutral'}
-                  />
-                  <BreakdownMetricCard
-                    label="Fix upside"
-                    value={`+${totalLift}`}
-                    caption={`${reportFixes.length} fixes available`}
-                    tone="info"
-                  />
-                </div>
-
-                <div className="grid gap-4 xl:grid-cols-[1.18fr_0.82fr]">
-                  <ChartCard
-                    kicker="AI map"
-                    title="AI Visibility score shape"
-                    description="Outer edge means stronger coverage. Look for the inward dents first."
-                  >
-                    <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                      <div className="h-[290px] min-w-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart data={aiRadarData} outerRadius="72%">
-                            <PolarGrid stroke="rgba(255,255,255,0.08)" />
-                            <PolarAngleAxis
-                              dataKey="label"
-                              tick={{ fill: 'var(--text-muted)', fontSize: 11, letterSpacing: '0.08em' }}
-                            />
-                            <PolarRadiusAxis
-                              angle={90}
-                              domain={[0, 100]}
-                              tickCount={5}
-                              tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
-                              stroke="rgba(255,255,255,0.08)"
-                            />
-                            <Radar
-                              name="AI visibility"
-                              dataKey="score"
-                              stroke="var(--color-band-needs-work)"
-                              fill="rgba(255,138,30,0.18)"
-                              fillOpacity={1}
-                              strokeWidth={2.2}
-                            />
-                            <Tooltip content={<ChartTooltip suffix="%" />} />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="space-y-2">
-                        {dimensionPressureData.map((dimension, index) => (
-                          <div key={dimension.label} className={cn(premiumInsetClass, 'p-3.5')}>
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                                  Pressure {index + 1}
-                                </p>
-                                <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
-                                  {dimension.label}
-                                </p>
-                              </div>
-                              <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
-                                {dimension.score}%
-                              </span>
-                            </div>
-                            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.05)]">
-                              <div
-                                className="h-full rounded-full bg-[var(--color-band-needs-work)]"
-                                style={{ width: `${Math.max(8, dimension.score)}%` }}
-                              />
-                            </div>
-                            <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                              {dimension.misses} failing checks are pulling this area down.
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </ChartCard>
-
-                  <div className="grid gap-4">
-                    <ChartCard
-                      kicker="Web"
-                      title="Web Health pillars"
-                      description="Performance, site quality, and trust in one quick glance."
-                    >
-                      {webPillarChartData.length > 0 ? (
-                        <div className="h-[220px] min-w-0">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={webPillarChartData} margin={{ top: 10, right: 0, left: -18, bottom: 0 }}>
-                              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
-                              <XAxis
-                                dataKey="label"
-                                tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
-                                axisLine={false}
-                                tickLine={false}
-                              />
-                              <YAxis
-                                domain={[0, 100]}
-                                tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
-                                axisLine={false}
-                                tickLine={false}
-                              />
-                              <Tooltip content={<ChartTooltip suffix="%" />} />
-                              <Bar dataKey="score" radius={[8, 8, 0, 0]} fill="rgba(255,255,255,0.18)">
-                                {webPillarChartData.map((entry) => (
-                                  <Cell
-                                    key={entry.label}
-                                    fill={
-                                      entry.score >= 80
-                                        ? 'rgba(37,201,114,0.85)'
-                                        : entry.score >= 60
-                                          ? 'rgba(255,138,30,0.9)'
-                                          : 'rgba(255,82,82,0.9)'
-                                    }
-                                  />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      ) : (
-                        <div className={cn(premiumInsetClass, 'p-4 text-sm text-[var(--text-secondary)]')}>
-                          Web Health is still being enriched.
-                        </div>
-                      )}
-                    </ChartCard>
-
-                    <ChartCard
-                      kicker="Checks"
-                      title="Pass / fail mix"
-                      description="How the audit checks are resolving overall."
-                    >
-                      <div className="grid items-center gap-3 sm:grid-cols-[0.8fr_1fr]">
-                        <div className="h-[180px] min-w-0">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={issueMixData}
-                                dataKey="value"
-                                nameKey="name"
-                                innerRadius={48}
-                                outerRadius={72}
-                                paddingAngle={4}
-                                stroke="rgba(255,255,255,0.04)"
-                              >
-                                {issueMixData.map((entry) => (
-                                  <Cell key={entry.name} fill={entry.color} />
-                                ))}
-                              </Pie>
-                              <Tooltip content={<ChartTooltip />} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="space-y-2">
-                          {issueMixData.map((item) => (
-                            <div key={item.name} className={cn(premiumInsetClass, 'flex items-center justify-between p-3')}>
-                              <div className="flex items-center gap-3">
-                                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                                <span className="text-sm text-[var(--text-secondary)]">{item.name}</span>
-                              </div>
-                              <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
-                                {item.value}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </ChartCard>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-                  <ChartCard
-                    kicker="Check map"
-                    title="Dimension check balance"
-                    description="Each bar shows how many checks pass, fail, or remain unknown for every AI dimension."
-                  >
-                    <div className="h-[260px] min-w-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={aiStatusChartData} layout="vertical" margin={{ top: 8, right: 0, left: 10, bottom: 8 }}>
-                          <CartesianGrid horizontal={false} stroke="rgba(255,255,255,0.05)" />
-                          <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                          <YAxis
-                            type="category"
-                            dataKey="label"
-                            tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
-                            axisLine={false}
-                            tickLine={false}
-                            width={84}
-                          />
-                          <Tooltip content={<StackedChartTooltip />} />
-                          <Bar dataKey="pass" stackId="checks" fill="rgba(37,201,114,0.9)" radius={[4, 0, 0, 4]} />
-                          <Bar dataKey="unknown" stackId="checks" fill="rgba(255,138,30,0.85)" />
-                          <Bar dataKey="fail" stackId="checks" fill="rgba(255,82,82,0.9)" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </ChartCard>
-
-                  <ChartCard
-                    kicker="Read first"
-                    title="What to act on"
-                    description="Use this as your quick interpretation before drilling into the detailed checks below."
-                  >
-                    <div className="space-y-3">
-                      <ActionInsightCard
-                        label="Start here"
-                        title={weakestDimension?.label ?? 'Waiting on signal'}
-                        detail={
-                          weakestDimension
-                            ? `This is the weakest AI area right now at ${Math.round(weakestDimension.percentage)}%.`
-                            : 'The weakest area will appear once the scan data is ready.'
-                        }
-                        tone="warning"
-                      />
-                      <ActionInsightCard
-                        label="Best upside"
-                        title={reportFixes[0]?.label ?? 'No priority fix yet'}
-                        detail={
-                          reportFixes[0]
-                            ? `Top available lift is about +${reportFixes[0].estimatedLift} points.`
-                            : 'Priority fixes will appear here when available.'
-                        }
-                        tone="info"
-                      />
-                      <ActionInsightCard
-                        label="Web watch"
-                        title={
-                          webHealth?.pillars?.slice().sort((a, b) => (a.percentage ?? 0) - (b.percentage ?? 0))[0]?.label ??
-                          'Web Health pending'
-                        }
-                        detail={
-                          webHealth?.pillars?.length
-                            ? 'This is the weakest supporting pillar inside Web Health.'
-                            : 'Web Health is still processing in the background.'
-                        }
-                        tone="neutral"
-                      />
-                    </div>
-                  </ChartCard>
-                </div>
-
-                <div className="space-y-8 pt-1">
-                  <section>
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary-500)]/10">
-                        <Target className="h-5 w-5 text-[var(--color-primary-600)]" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-[var(--text-primary)]">AI Visibility details</h3>
-                        <p className="text-sm text-[var(--text-secondary)]">
-                          Drill into the six dimensions behind the AI score.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      {reportDimensions.map((dimension) => {
-                        const failed = dimension.checks.filter((c) => c.verdict === 'fail').length;
-                        const passed = dimension.checks.filter((c) => c.verdict === 'pass').length;
-                        const unknown = dimension.checks.filter((c) => c.verdict === 'unknown').length;
-
-                        return (
-                          <DimensionCard
-                            key={dimension.key}
-                            dimension={dimension}
-                            passed={passed}
-                            failed={failed}
-                            unknown={unknown}
-                          />
-                        );
-                      })}
-                    </div>
-                  </section>
-
-                  <section>
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[rgba(255,255,255,0.05)]">
-                        <Gauge className="h-5 w-5 text-[var(--text-primary)]" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-[var(--text-primary)]">Web Health details</h3>
-                        <p className="text-sm text-[var(--text-secondary)]">
-                          Performance, quality, and trust checks behind the support score.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      {webHealth?.pillars?.map((pillar) => (
-                        <WebHealthPillarCard key={pillar.key} pillar={pillar} />
-                      ))}
-                      {!webHealth && (
-                        <div className="rounded-2xl border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.016)] p-6 text-sm text-[var(--text-secondary)]">
-                          Web Health is still processing in the background.
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'share' && (
-              <div className="mx-auto max-w-4xl space-y-4">
-                <section className={cn(premiumPanelClass, 'overflow-hidden p-5 sm:p-6')}>
-                  <div className="grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
-                    <div className="space-y-4">
-                      <div>
-                        <p className="inline-flex rounded-full border border-[rgba(53,109,244,0.24)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--color-primary-300)]">
-                          Share
-                        </p>
-                        <h2 className="mt-3 font-display text-[clamp(1.55rem,3vw,2.3rem)] font-semibold leading-[0.98] tracking-[-0.05em] text-[var(--text-primary)]">
-                          Post your score
-                        </h2>
-                        <p className="mt-2 text-[12px] leading-6 text-[var(--text-secondary)]">
-                          Open X with the score and preview ready to go.
-                        </p>
-                      </div>
-
-                      <div className={cn(premiumInsetClass, 'overflow-hidden p-4')}>
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-sm font-semibold text-[var(--text-primary)]">
-                            A
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-[var(--text-primary)]">AISO</p>
-                              <p className="text-[11px] text-[var(--text-muted)]">@aisoapp</p>
-                            </div>
-                            <p className="mt-2 whitespace-pre-wrap text-[13px] leading-6 text-[var(--text-primary)]">
-                              {sharePostText}
-                            </p>
-                          </div>
-                        </div>
-
-                        {report.share?.opengraphImageUrl && (
-                          <div className="mt-4 overflow-hidden rounded-[1.2rem] border border-[rgba(255,255,255,0.08)] bg-black/20">
-                            <img
-                              src={report.share.opengraphImageUrl}
-                              alt={`${domain} public score preview`}
-                              className="h-auto w-full object-cover"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          window.open(
-                            `https://x.com/intent/post?text=${encodeURIComponent(sharePostText)}`,
-                            '_blank',
-                            'noopener,noreferrer,width=760,height=720'
-                          );
-                        }}
-                        className="inline-flex items-center justify-center gap-2 rounded-[1.1rem] bg-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                      >
-                        <Twitter className="h-4 w-4" />
-                        Post to X
-                      </button>
-
-                      <div className={cn(premiumInsetClass, 'space-y-2.5 p-3.5')}>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await navigator.clipboard.writeText(sharePostText);
-                            setSharePostCopied(true);
-                            setTimeout(() => setSharePostCopied(false), 2000);
-                          }}
-                          className="flex w-full items-center justify-between rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-3 py-2.5 text-left text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[rgba(255,255,255,0.035)]"
-                        >
-                          <span>{sharePostCopied ? 'Copied post text' : 'Copy post text'}</span>
-                          <Copy className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!shareUrl}
-                          onClick={async () => {
-                            if (shareUrl) {
-                              await navigator.clipboard.writeText(shareUrl);
-                              setShareLinkCopied(true);
-                              setTimeout(() => setShareLinkCopied(false), 2000);
-                            }
-                          }}
-                          className="flex w-full items-center justify-between rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-3 py-2.5 text-left text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[rgba(255,255,255,0.035)]"
-                        >
-                          <span>{shareLinkCopied ? 'Copied link' : 'Copy public link'}</span>
-                          <Copy className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                        </button>
-                        <a
-                          href={shareUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-3 py-2.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[rgba(255,255,255,0.035)]"
-                        >
-                          <span>Open public page</span>
-                          <ArrowUpRight className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            window.open(
-                              `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
-                              '_blank',
-                              'noopener,noreferrer,width=760,height=720'
-                            );
-                          }}
-                          className="flex items-center justify-between rounded-xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-3 py-2.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[rgba(255,255,255,0.035)]"
-                        >
-                          <span>Share on LinkedIn</span>
-                          <Linkedin className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Dashboard / CTA card */}
-                {!report.hasPaid ? (
-                  <div className="aiso-card p-6">
-                    <div className="flex items-start gap-4 p-6">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-500)]/10">
-                        <Globe2 className="h-5 w-5 text-[var(--color-primary-600)]" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-[var(--text-primary)]">Done-for-you fixes</h3>
-                        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                          Deploy-ready: llms.txt, robots.txt, schema, sitemap. Ship all fixes in one package.
-                        </p>
-                        <button onClick={handleCheckout} disabled={checkoutLoading} className="aiso-button aiso-button-primary mt-4 px-5 py-3 text-sm">
-                          {checkoutLoading ? 'Loading...' : 'Get package — $99'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="aiso-card p-6">
-                    <div className="flex items-center justify-between gap-4 p-6">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[rgba(37,201,114,0.12)]">
-                          <CheckCircle2 className="h-5 w-5 text-[var(--color-success)]" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-[var(--text-primary)]">Full access unlocked</h3>
-                          <p className="text-sm text-[var(--text-secondary)]">View and deploy your fixes</p>
-                        </div>
-                      </div>
-                      <Link
-                        href={`/advanced?report=${report.id}`}
-                        className="flex shrink-0 items-center gap-2 rounded-lg bg-[var(--color-primary-600)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-700)]"
-                      >
-                        Open advanced tools
-                        <ChevronRight className="h-4 w-4" />
-                      </Link>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
           </>
@@ -2271,10 +1948,10 @@ export default function AnalysisPage() {
         <div className="fixed inset-x-0 bottom-0 z-30 border-t py-4 backdrop-blur-xl" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(6, 6, 7, 0.9)' }}>
           <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
             <p className="text-sm text-[var(--text-secondary)]">
-              Ready to ship fixes for <span className="font-semibold text-[var(--text-primary)]">{getDomain(report.url)}</span>?
+              We found <span className="font-semibold text-[var(--text-primary)]">{failedCount}</span> issue{failedCount !== 1 ? 's' : ''} on <span className="font-semibold text-[var(--text-primary)]">{getDomain(report.url)}</span>. Unlock your fix plan.
             </p>
-            <button onClick={handleCheckout} disabled={checkoutLoading} className="aiso-button aiso-button-primary px-5 py-3 text-sm">
-              {checkoutLoading ? 'Loading...' : 'Fix Everything — $99'}
+            <button onClick={() => setUnlockModalOpen(true)} disabled={checkoutLoading} className="aiso-button aiso-button-primary px-5 py-3 text-sm">
+              {checkoutLoading ? 'Loading...' : 'Unlock Fix Plan — $35'}
             </button>
           </div>
         </div>
@@ -2282,49 +1959,16 @@ export default function AnalysisPage() {
 
       {/* Feedback button - YourWebsiteScore style */}
       {(report || (isComplete && data?.score !== undefined)) && (
-        <button
-          type="button"
-          className={cn(
-            'fixed right-6 z-20 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#202020] px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white',
-            report?.hasPaid ? 'bottom-6' : report ? 'bottom-24' : 'bottom-6'
-          )}
-        >
-          <MessageCircle className="h-4 w-4" />
-          Feedback
-        </button>
+        <FloatingFeedback
+          bottomClassName={report?.hasPaid ? 'bottom-6' : report ? 'bottom-24' : 'bottom-6'}
+        />
       )}
 
     </div>
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  icon: Icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'inline-flex shrink-0 items-center justify-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-medium transition-[background-color,color,border-color,box-shadow]',
-        active
-          ? 'border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.045)] text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
-          : 'border border-transparent text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]'
-      )}
-    >
-      <Icon className="h-4 w-4" />
-      {children}
-    </button>
-  );
-}
+/* TabButton removed — tabs replaced with scrollable layout */
 
 function BreakdownMetricCard({
   label,

@@ -19,6 +19,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run build` | Production build          |
 | `npm run start` | Start production server   |
 | `npm run lint` | Run ESLint                |
+| `npm test` | Run local scan/scoring regression tests |
+| `npm run test:live` | Run curated live-fixture crawl checks |
+| `npm run test:live:saas` | Run the SaaS live-fixture set |
 
 ## Repository structure
 
@@ -47,6 +50,16 @@ Open [http://localhost:3000](http://localhost:3000).
 - **Components**: Put reusable components in `src/components/`, with primitives in `src/components/ui/`. Use the `@/` alias for imports (e.g. `import { Button } from '@/components/ui/Button'`).
 - **Utilities**: Put pure helpers and shared logic in `src/lib/`.
 - **Types**: Shared interfaces and types live in `src/types/`.
+
+## Live fixtures
+
+The live-fixture suite keeps the crawler honest against real public websites.
+
+- Fixture list: `tests/live-fixtures/saas-sites.json`
+- Runner: `scripts/run-live-fixtures.cjs`
+- Default command: `npm run test:live:saas`
+
+The fixture expectations are intentionally loose so normal site changes do not create noisy failures. They check for basics like homepage reachability, robots presence, sitemap availability or reference, optional llms coverage, and minimum crawl depth.
 
 ## Stack
 

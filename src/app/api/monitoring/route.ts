@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addMonitoringDomain, listMonitoringDomains } from '@/lib/monitoring';
+import { getAuthUserFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  const email = request.nextUrl.searchParams.get('email');
-
-  if (!email) {
-    return NextResponse.json({ error: 'email is required.' }, { status: 400 });
+  const user = await getAuthUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  const domains = await listMonitoringDomains(email);
+  const domains = await listMonitoringDomains(user.email);
   return NextResponse.json({ domains });
 }
 
 export async function POST(request: NextRequest) {
+  const user = await getAuthUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+
   const body = await request.json();
   const { scanId, alertThreshold } = body ?? {};
 

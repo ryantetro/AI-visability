@@ -70,9 +70,9 @@
 
   --border-default: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
-  --border-focus: #5f93ff;
-  --border-focus-ring: rgba(53, 109, 244, 0.28);
-  --border-glow: rgba(53, 109, 244, 0.22);
+  --border-focus: rgba(255, 255, 255, 0.22);
+  --border-focus-ring: rgba(255, 255, 255, 0.12);
+  --border-glow: rgba(255, 255, 255, 0.08);
 
   --radius-sm: 6px;
   --radius-md: 12px;
@@ -193,7 +193,24 @@ body::after {
 }
 
 *:focus-visible {
-  outline: 2px solid var(--border-focus);
+  outline: none;
+}
+
+/* Subtle, professional focus for all inputs — overrides browser default blue ring */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.15);
   outline-offset: 2px;
 }
 
@@ -449,8 +466,8 @@ pre,
 }
 
 .aiso-input:focus {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 4px var(--border-focus-ring);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: none;
   outline: none;
 }
 

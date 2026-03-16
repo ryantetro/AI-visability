@@ -77,6 +77,9 @@ export interface SitemapData {
   urls: string[];
   urlCount: number;
   referencedInRobots: boolean;
+  accessStatus: 'ok' | 'blocked' | 'missing';
+  format: 'xml' | 'json' | 'text' | 'unknown';
+  sourceUrl?: string;
 }
 
 export interface LlmsTxtData {

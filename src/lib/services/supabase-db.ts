@@ -16,10 +16,11 @@ interface SupabaseScanRow {
   crawl_data: ScanJob['crawlData'] | null;
   score_result: ScanJob['scoreResult'] | null;
   generated_files: ScanJob['generatedFiles'] | null;
+  mention_summary: ScanJob['mentionSummary'] | null;
 }
 
 function hasSupabaseConfig() {
-  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 export function canUseSupabase() {
@@ -27,7 +28,7 @@ export function canUseSupabase() {
 }
 
 function supabaseUrl(path: string) {
-  return `${process.env.SUPABASE_URL!.replace(/\/$/, '')}/rest/v1/${path}`;
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, '')}/rest/v1/${path}`;
 }
 
 function supabaseHeaders(extra?: HeadersInit): HeadersInit {
@@ -54,6 +55,7 @@ function toRow(scan: ScanJob): SupabaseScanRow {
     crawl_data: scan.crawlData ?? null,
     score_result: scan.scoreResult ?? null,
     generated_files: scan.generatedFiles ?? null,
+    mention_summary: scan.mentionSummary ?? null,
   };
 }
 
@@ -72,6 +74,7 @@ function fromRow(row: SupabaseScanRow): ScanJob {
     crawlData: row.crawl_data ?? undefined,
     scoreResult: row.score_result ?? undefined,
     generatedFiles: row.generated_files ?? undefined,
+    mentionSummary: row.mention_summary ?? undefined,
   };
 }
 

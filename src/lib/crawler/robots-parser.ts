@@ -3,7 +3,11 @@ import { RobotsTxtData } from '@/types/crawler';
 export async function fetchRobotsTxt(baseUrl: string): Promise<RobotsTxtData> {
   const url = new URL('/robots.txt', baseUrl).href;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const res = await fetch(url, {
+      headers: requestHeaders('text/plain,text/*;q=0.9,*/*;q=0.8'),
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000),
+    });
     if (!res.ok) {
       return emptyRobots();
     }
@@ -29,11 +33,12 @@ function emptyRobots(): RobotsTxtData {
 function parseRobotsTxt(raw: string): RobotsTxtData {
   const lines = raw.split('\n');
   const sitemapReferences: string[] = [];
-  let currentAgent = '';
-  const agentRules: Record<string, { allows: boolean; disallows: boolean }> = {};
+  let currentAgents: string[] = [];
+  let seenRuleInGroup = false;
+  const agentRules: Record<string, { allow: string[]; disallow: string[] }> = {};
 
   for (const line of lines) {
-    const trimmed = line.trim();
+    const trimmed = line.replace(/\s+#.*$/, '').trim();
     if (trimmed.startsWith('#') || !trimmed) continue;
 
     const sitemapMatch = trimmed.match(/^sitemap:\s*(.+)/i);
@@ -44,35 +49,83 @@ function parseRobotsTxt(raw: string): RobotsTxtData {
 
     const agentMatch = trimmed.match(/^user-agent:\s*(.+)/i);
     if (agentMatch) {
-      currentAgent = agentMatch[1].trim().toLowerCase();
-      if (!agentRules[currentAgent]) {
-        agentRules[currentAgent] = { allows: false, disallows: false };
+      const agent = agentMatch[1].trim().toLowerCase();
+      if (seenRuleInGroup || currentAgents.length === 0) {
+        currentAgents = [agent];
+        seenRuleInGroup = false;
+      } else {
+        currentAgents.push(agent);
+      }
+      if (!agentRules[agent]) {
+        agentRules[agent] = { allow: [], disallow: [] };
       }
       continue;
     }
 
-    if (trimmed.match(/^allow:\s*/i)) {
-      if (currentAgent) agentRules[currentAgent].allows = true;
+    const allowMatch = trimmed.match(/^allow:\s*(.*)$/i);
+    if (allowMatch) {
+      seenRuleInGroup = true;
+      for (const agent of currentAgents) {
+        agentRules[agent]?.allow.push(allowMatch[1].trim());
+      }
     }
-    if (trimmed.match(/^disallow:\s*\//i)) {
-      if (currentAgent) agentRules[currentAgent].disallows = true;
+
+    const disallowMatch = trimmed.match(/^disallow:\s*(.*)$/i);
+    if (disallowMatch) {
+      seenRuleInGroup = true;
+      for (const agent of currentAgents) {
+        agentRules[agent]?.disallow.push(disallowMatch[1].trim());
+      }
     }
   }
 
-  function isBotAllowed(botName: string): boolean {
-    const bot = botName.toLowerCase();
-    const specific = agentRules[bot];
-    const wildcard = agentRules['*'];
-    // If specifically mentioned with allow and no disallow, or not blocked
-    if (specific) {
-      if (specific.disallows && !specific.allows) return false;
-      if (specific.allows) return true;
+  function pathMatches(rulePath: string, targetPath: string): boolean {
+    if (!rulePath) return false;
+    const normalizedRule = rulePath === '*' ? '/' : rulePath;
+    return targetPath.startsWith(normalizedRule);
+  }
+
+  function evaluateAgent(agentName: string, targetPath: string): boolean | null {
+    const rules = agentRules[agentName];
+    if (!rules) return null;
+
+    const matches = [
+      ...rules.allow
+        .filter((rule) => pathMatches(rule, targetPath))
+        .map((rule) => ({ rule, allow: true })),
+      ...rules.disallow
+        .filter((rule) => pathMatches(rule, targetPath))
+        .map((rule) => ({ rule, allow: false })),
+    ];
+
+    if (matches.length === 0) {
+      return null;
     }
-    // Fall back to wildcard
-    if (wildcard) {
-      if (wildcard.disallows && !wildcard.allows) return false;
+
+    matches.sort((a, b) => {
+      if (b.rule.length !== a.rule.length) {
+        return b.rule.length - a.rule.length;
+      }
+      return Number(b.allow) - Number(a.allow);
+    });
+
+    return matches[0].allow;
+  }
+
+  function isBotAllowed(botNames: string | string[]): boolean {
+    const names = Array.isArray(botNames) ? botNames : [botNames];
+    for (const name of names.map((value) => value.toLowerCase())) {
+      const result = evaluateAgent(name, '/');
+      if (result !== null) {
+        return result;
+      }
     }
-    // No rules = allowed by default
+
+    const wildcardResult = evaluateAgent('*', '/');
+    if (wildcardResult !== null) {
+      return wildcardResult;
+    }
+
     return true;
   }
 
@@ -81,8 +134,16 @@ function parseRobotsTxt(raw: string): RobotsTxtData {
     raw,
     allowsGPTBot: isBotAllowed('GPTBot'),
     allowsPerplexityBot: isBotAllowed('PerplexityBot'),
-    allowsClaudeBot: isBotAllowed('ClaudeBot') || isBotAllowed('Claude-Web') || isBotAllowed('anthropic-ai'),
+    allowsClaudeBot: isBotAllowed(['ClaudeBot', 'Claude-Web', 'anthropic-ai']),
     allowsGoogleBot: isBotAllowed('Googlebot'),
     sitemapReferences,
+  };
+}
+
+function requestHeaders(accept: string): HeadersInit {
+  return {
+    'User-Agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    Accept: accept,
   };
 }

@@ -83,11 +83,11 @@ export function extractFallbackPageData({
   )) {
     try {
       const parsed = JSON.parse(block.trim());
-      const items = Array.isArray(parsed) ? parsed : [parsed];
+      const items = collectSchemaItems(parsed);
       for (const item of items) {
         if (!item || typeof item !== 'object') continue;
         schemaObjects.push({
-          type: String((item as Record<string, unknown>)['@type'] || 'Unknown'),
+          type: schemaTypeLabel(item as Record<string, unknown>),
           raw: item as Record<string, unknown>,
         });
       }
@@ -262,4 +262,30 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&apos;/gi, "'")
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>');
+}
+
+function collectSchemaItems(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectSchemaItems(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record['@graph'])) {
+    return collectSchemaItems(record['@graph']);
+  }
+
+  return [record];
+}
+
+function schemaTypeLabel(value: Record<string, unknown>): string {
+  const type = value['@type'];
+  if (Array.isArray(type)) {
+    return type.map(String).join(', ');
+  }
+
+  return String(type || 'Unknown');
 }

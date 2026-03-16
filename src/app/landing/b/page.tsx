@@ -140,7 +140,7 @@ export default function LandingB() {
             <div className="flex items-center justify-between border-t px-6 py-4" style={{ borderColor: 'var(--border-default)', backgroundColor: 'var(--color-primary-50)' }}>
               <span className="text-sm font-medium" style={{ color: colors.primary[800] }}>12 issues found — 8 high priority</span>
               <span className="px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: colors.primary[600], borderRadius: 'var(--radius-md)' }}>
-                {brand.cta.purchase} — $99
+                {brand.cta.purchase} — $35
               </span>
             </div>
           </div>

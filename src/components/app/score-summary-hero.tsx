@@ -75,7 +75,12 @@ export function ScoreSummaryHero({
           />
         </div>
 
-        <div className="mt-8 grid w-full max-w-[560px] grid-cols-3 gap-4">
+        <div className={cn(
+          'mt-8 grid w-full gap-4',
+          supporting.length <= 3
+            ? 'max-w-[560px] grid-cols-3'
+            : 'max-w-[680px] grid-cols-2 sm:grid-cols-4'
+        )}>
           {supporting.map((item) => (
             <div key={item.label} className="flex flex-col items-center">
               <ScoreRing

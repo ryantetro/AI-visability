@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Globe2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isValidUrl, getDomain, ensureProtocol, getFaviconUrl } from '@/lib/url-utils';
@@ -13,6 +13,8 @@ interface UrlInputProps {
   submitLabel?: string;
   loadingLabel?: string;
   showGlobeIcon?: boolean;
+  initialValue?: string;
+  autoFocus?: boolean;
 }
 
 export function UrlInput({
@@ -23,9 +25,16 @@ export function UrlInput({
   submitLabel = 'Check My AI Score',
   loadingLabel = 'Scanning...',
   showGlobeIcon = false,
+  initialValue,
+  autoFocus = false,
 }: UrlInputProps) {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(initialValue ?? '');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setUrl(initialValue ?? '');
+    setError('');
+  }, [initialValue]);
 
   const faviconUrl = useMemo(() => {
     if (!url.trim()) return null;
@@ -60,7 +69,7 @@ export function UrlInput({
             className={cn(
               'flex min-h-[60px] items-center gap-3 rounded-xl border',
               isMinimal
-                ? 'border-white/20 bg-[#1A1A1A] px-5 py-4'
+                ? 'border-white/10 bg-[#1A1A1A] px-5 py-4 transition-colors focus-within:border-white/20'
                 : 'aiso-card-soft p-1.5 px-4 py-3'
             )}
             style={!isMinimal ? { borderRadius: '1.25rem' } : undefined}
@@ -86,8 +95,9 @@ export function UrlInput({
               value={url}
               onChange={(e) => { setUrl(e.target.value); setError(''); }}
               placeholder={placeholder ?? 'yourbusiness.com'}
+              autoFocus={autoFocus}
               className={cn(
-                'flex-1 border-0 bg-transparent outline-none placeholder:text-[var(--text-muted)]',
+                'flex-1 border-0 bg-transparent outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-muted)]',
                 isMinimal ? 'py-2 text-[13px] text-white' : 'aiso-input px-3 py-3 text-base'
               )}
               style={{ boxShadow: 'none' }}
@@ -121,7 +131,8 @@ export function UrlInput({
             value={url}
             onChange={(e) => { setUrl(e.target.value); setError(''); }}
             placeholder="Enter your website URL"
-            className="aiso-input flex-1 px-4 py-3 text-base outline-none"
+            autoFocus={autoFocus}
+            className="aiso-input flex-1 px-4 py-3 text-base outline-none focus:outline-none"
             disabled={loading}
           />
           <button

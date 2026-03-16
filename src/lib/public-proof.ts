@@ -62,11 +62,11 @@ function getVerificationStore() {
 }
 
 function hasSupabaseConfig() {
-  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 function supabaseUrl(path: string) {
-  return `${process.env.SUPABASE_URL!.replace(/\/$/, '')}/rest/v1/${path}`;
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, '')}/rest/v1/${path}`;
 }
 
 function supabaseHeaders(extra?: HeadersInit): HeadersInit {

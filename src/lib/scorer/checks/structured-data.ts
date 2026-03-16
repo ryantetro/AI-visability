@@ -3,7 +3,9 @@ import { CrawlData } from '@/types/crawler';
 
 export function runStructuredDataChecks(data: CrawlData): CheckResult[] {
   const allSchemas = data.pages.flatMap((p) => p.schemaObjects);
-  const schemaTypes = allSchemas.map((s) => s.type.toLowerCase());
+  const schemaTypes = allSchemas.flatMap((schema) => getSchemaTypes(schema.type));
+  const totalParseErrors = data.pages.reduce((sum, page) => sum + page.schemaParseErrors, 0);
+  const hasAnySchemaMarkup = allSchemas.length > 0 || totalParseErrors > 0;
 
   const hasOrgSchema = schemaTypes.some(
     (t) => t === 'organization' || t === 'localbusiness'
@@ -18,7 +20,10 @@ export function runStructuredDataChecks(data: CrawlData): CheckResult[] {
 
   const hasFaq = schemaTypes.some((t) => t === 'faqpage');
 
-  const allValid = allSchemas.length > 0; // simplified validation
+  const allValid =
+    allSchemas.length > 0 &&
+    totalParseErrors === 0 &&
+    allSchemas.every((schema) => getSchemaTypes(schema.type).length > 0);
 
   return [
     {
@@ -64,12 +69,16 @@ export function runStructuredDataChecks(data: CrawlData): CheckResult[] {
       dimension: 'structured-data',
       category: 'ai',
       label: 'Schema validity',
-      verdict: allSchemas.length === 0 ? 'unknown' : allValid ? 'pass' : 'fail',
+      verdict: !hasAnySchemaMarkup ? 'unknown' : allValid ? 'pass' : 'fail',
       points: allValid && allSchemas.length > 0 ? 3 : 0,
       maxPoints: 3,
-      detail: allSchemas.length === 0
+      detail: !hasAnySchemaMarkup
         ? 'No schema markup to validate.'
-        : 'Schema markup is valid JSON-LD.',
+        : allValid
+        ? 'Schema markup is valid JSON-LD.'
+        : totalParseErrors > 0
+        ? `Detected ${totalParseErrors} malformed JSON-LD block(s).`
+        : 'Schema markup is missing @type values or could not be classified.',
     },
   ];
 }
@@ -80,4 +89,12 @@ function checkOrgCompleteness(raw: Record<string, unknown>): boolean {
   const hasRequired = required.every((key) => raw[key]);
   const optionalCount = optional.filter((key) => raw[key]).length;
   return hasRequired && optionalCount >= 2;
+}
+
+function getSchemaTypes(type: string): string[] {
+  return String(type || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((value) => value !== 'unknown');
 }

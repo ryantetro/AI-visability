@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuthUserFromRequest } from '@/lib/auth';
 import { getDatabase } from '@/lib/services/registry';
 import { generateAllFiles } from '@/lib/generator';
 import { createArchiveFilename, createGeneratedFilesArchive } from '@/lib/files-archive';
@@ -6,15 +7,24 @@ import { CrawlData } from '@/types/crawler';
 import { GeneratedFiles } from '@/types/generated-files';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await getAuthUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   const { id } = await params;
   const db = getDatabase();
   const scan = await db.getScan(id);
 
   if (!scan) {
     return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
+  }
+
+  if (!scan.email || scan.email.toLowerCase() !== user.email.toLowerCase()) {
+    return NextResponse.json({ error: 'This archive belongs to another account.' }, { status: 403 });
   }
 
   if (!scan.paid) {

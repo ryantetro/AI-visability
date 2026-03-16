@@ -202,7 +202,7 @@ AISO helps businesses become visible to AI search.`}
             {brand.cta.scan}
           </button>
           <button className="aiso-button aiso-button-primary px-4 py-2.5 text-sm">
-            {brand.cta.purchase} &mdash; $99
+            {brand.cta.purchase} &mdash; $35
           </button>
           <button className="aiso-button aiso-button-secondary px-4 py-2.5 text-sm">
             Secondary

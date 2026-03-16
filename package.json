@@ -7,17 +7,21 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/scan-core.test.cjs"
+    "test": "node --test tests/scan-core.test.cjs",
+    "test:live": "node scripts/run-live-fixtures.cjs",
+    "test:live:saas": "node scripts/run-live-fixtures.cjs tests/live-fixtures/saas-sites.json"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-slot": "^1.2.4",
+    "@supabase/supabase-js": "^2.99.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fflate": "^0.8.2",
     "framer-motion": "^12.35.2",
+    "jose": "^6.2.1",
     "lucide-react": "^0.577.0",
     "motion": "^12.35.2",
     "next": "16.1.6",

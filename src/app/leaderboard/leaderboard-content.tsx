@@ -14,6 +14,7 @@ interface LeaderboardEntry {
   speed: number;
   quality: number;
   security: number;
+  ai?: number;
   completedAt?: number;
   hasCertified?: boolean;
 }
@@ -162,6 +163,9 @@ export function LeaderboardContent({ entries }: { entries: LeaderboardEntry[] })
                     <span className="text-[#25c972]">•</span> Speed {entry.speed}
                     <span className="mx-1 text-[#25c972]">•</span> Quality {entry.quality}
                     <span className="mx-1 text-[#25c972]">•</span> Sec {entry.security}
+                    {entry.ai != null && (
+                      <><span className="mx-1 text-[#25c972]">•</span> AI {entry.ai}</>
+                    )}
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-2 py-3 text-right text-xs text-[var(--text-muted)] sm:px-4 sm:py-4">

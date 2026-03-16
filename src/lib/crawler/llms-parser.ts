@@ -3,7 +3,15 @@ import { LlmsTxtData, LlmsTxtSection, LlmsTxtLink } from '@/types/crawler';
 export async function fetchLlmsTxt(baseUrl: string): Promise<LlmsTxtData> {
   const url = new URL('/llms.txt', baseUrl).href;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/plain,text/markdown;q=0.9,text/*;q=0.8,*/*;q=0.5',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000),
+    });
     if (!res.ok || !res.headers.get('content-type')?.includes('text')) {
       return emptyLlmsTxt();
     }
