@@ -15,16 +15,14 @@ export default async function AdvancedPage({
   }
 
   return (
-    <div className="min-h-screen bg-[#060606]">
-      <Suspense
-        fallback={
-          <div className="flex min-h-screen items-center justify-center">
-            <div className="text-lg font-medium text-white">Loading...</div>
-          </div>
-        }
-      >
-        <AdvancedPageContent reportId={reportId} />
-      </Suspense>
-    </div>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="text-lg font-medium text-white">Loading...</div>
+        </div>
+      }
+    >
+      <AdvancedPageContent reportId={reportId} />
+    </Suspense>
   );
 }

@@ -113,6 +113,14 @@
   --radius-tremor-small: 0.5rem;
   --radius-tremor-full: 9999px;
   --font-size-tremor-label: 0.75rem;
+
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 0px;
+  --sidebar-bg: rgba(8, 9, 10, 0.98);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-item-height: 44px;
+  --sidebar-accent: #25c972;
+  --header-bar-height: 56px;
 }
 
 @theme inline {

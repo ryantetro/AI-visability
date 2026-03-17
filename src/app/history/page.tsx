@@ -136,8 +136,6 @@ export default function HistoryPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--surface-page)]">
-
       <div className="relative mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
         <section className="mt-6">
           <h1 className="text-[2rem] font-bold tracking-tight text-[var(--text-primary)]">
@@ -542,6 +540,5 @@ export default function HistoryPage() {
           </SheetContent>
         </Sheet>
       </div>
-    </div>
   );
 }
