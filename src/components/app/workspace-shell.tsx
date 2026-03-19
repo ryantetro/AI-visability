@@ -26,6 +26,7 @@ import { UnlockFeaturesModal } from '@/components/ui/unlock-features-modal';
 import { LockedFeatureOverlay } from '@/components/ui/locked-feature-overlay';
 import { cn } from '@/lib/utils';
 import { useDomainContext } from '@/contexts/domain-context';
+import { useAuth } from '@/hooks/use-auth';
 import { usePlan } from '@/hooks/use-plan';
 import { canAccess, NAV_GATES, type PlanTier } from '@/lib/pricing';
 import { formatPlatformLabel } from '@/lib/platform-detection';
@@ -50,7 +51,15 @@ export function WorkspaceShell({
   children: (ctx: WorkspaceContext) => React.ReactNode;
 }) {
   const router = useRouter();
+  const { user: authUser, loading: authLoading } = useAuth();
   const { tier } = usePlan();
+
+  // Client-side auth guard — redirect to login if no authenticated user
+  useEffect(() => {
+    if (!authLoading && !authUser) {
+      router.push('/login');
+    }
+  }, [authLoading, authUser, router]);
 
   const {
     monitoredSites,
@@ -83,6 +92,11 @@ export function WorkspaceShell({
   const isFreeUser = !hasPaidAccess;
   const isMonitoring = selectedDomain ? Boolean(monitoringConnected[selectedDomain]) : false;
   const platformLabel = files ? formatPlatformLabel(files.detectedPlatform) : null;
+
+  // Block rendering until auth check completes — prevents flash of content for unauthenticated users
+  if (authLoading || (!authUser && !authLoading)) {
+    return <CenteredLoading label="Loading workspace..." />;
+  }
 
   if (recentLoading) {
     return <CenteredLoading label="Loading workspace..." />;

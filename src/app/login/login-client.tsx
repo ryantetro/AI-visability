@@ -85,47 +85,66 @@ function PasswordChecklist({ password }: { password: string }) {
   const hasMinLength = password.length >= PASSWORD_MIN_LENGTH;
   const hasLetter = /[A-Za-z]/.test(password);
   const hasNumber = /\d/.test(password);
+  const allPassed = hasMinLength && hasLetter && hasNumber;
+  const started = password.length > 0;
 
   const items = [
     { label: `${PASSWORD_MIN_LENGTH}+ characters`, passed: hasMinLength },
-    { label: 'At least one letter', passed: hasLetter },
-    { label: 'At least one number', passed: hasNumber },
+    { label: 'One letter', passed: hasLetter },
+    { label: 'One number', passed: hasNumber },
   ];
 
   return (
-    <div
-      className="grid gap-2 px-4 py-3"
-      style={{
-        border: '1px solid var(--border-default)',
-        borderRadius: 'var(--radius-lg)',
-        background: 'var(--surface-soft)',
-      }}
-    >
-      <p className="aiso-kicker" style={{ fontSize: '0.65rem', letterSpacing: '0.2em', color: 'var(--text-muted)' }}>
-        Password Requirements
-      </p>
-      <div className="grid gap-1.5 sm:grid-cols-3">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            className="px-3 py-1.5 text-xs font-medium transition-colors"
-            style={{
-              borderRadius: 'var(--radius-full)',
-              border: item.passed
-                ? '1px solid rgba(37, 201, 114, 0.3)'
-                : '1px solid var(--border-default)',
-              background: item.passed
-                ? 'rgba(37, 201, 114, 0.1)'
-                : 'var(--surface-soft)',
-              color: item.passed
-                ? 'var(--color-band-ai-ready)'
-                : 'var(--text-muted)',
-            }}
-          >
-            {item.label}
+    <div className="flex items-center gap-3 px-1">
+      {items.map((item, i) => (
+        <div key={item.label} className="flex items-center gap-2">
+          {i > 0 && (
+            <div
+              className="h-3 w-px"
+              style={{ background: 'var(--border-default)' }}
+            />
+          )}
+          <div className="flex items-center gap-1.5">
+            <div
+              className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full transition-all duration-300"
+              style={{
+                background: item.passed
+                  ? 'rgba(37, 201, 114, 0.15)'
+                  : started && !item.passed
+                    ? 'rgba(255, 82, 82, 0.1)'
+                    : 'var(--surface-contrast)',
+                border: item.passed
+                  ? '1px solid rgba(37, 201, 114, 0.3)'
+                  : '1px solid var(--border-default)',
+              }}
+            >
+              {item.passed && (
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M1.5 4L3.2 5.7L6.5 2.3" stroke="#25c972" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+            <span
+              className="text-[11px] font-medium transition-colors duration-300"
+              style={{
+                color: item.passed
+                  ? 'var(--color-band-ai-ready)'
+                  : 'var(--text-muted)',
+              }}
+            >
+              {item.label}
+            </span>
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
+      {allPassed && (
+        <div className="ml-auto">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="animate-check-done">
+            <circle cx="7" cy="7" r="6" fill="rgba(37, 201, 114, 0.12)" stroke="rgba(37, 201, 114, 0.35)" strokeWidth="1" />
+            <path d="M4 7.2L6 9.2L10 5" stroke="#25c972" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
@@ -251,11 +270,22 @@ export function LoginPageContent() {
         throw new Error(payload.error || 'Failed to create your account.');
       }
 
-      if (payload.requiresEmailVerification) {
-        setEmailHint(email);
-        setCheckEmailKind('signup');
-        switchMode('check-email');
+      // If signup returned a session, cookies are already set — refresh and redirect
+      if (payload.session) {
+        await refresh();
+        await completePostLoginRedirect();
         return;
+      }
+
+      // Otherwise auto-login with the same credentials to establish a session
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!loginRes.ok) {
+        const loginPayload = await loginRes.json();
+        throw new Error(loginPayload.error || 'Account created but automatic sign-in failed. Please sign in manually.');
       }
 
       await refresh();
