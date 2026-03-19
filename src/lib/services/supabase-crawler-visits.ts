@@ -68,7 +68,7 @@ export const supabaseCrawlerVisits: CrawlerVisitService = {
 
     const cutoff = new Date(Date.now() - days * 86400000).toISOString();
     const res = await fetch(
-      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=500&select=*`),
+      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=2000&select=*`),
       { headers: supabaseHeaders(), cache: 'no-store' }
     );
     if (!res.ok) throw new Error(`Failed to list visits: ${res.status}`);

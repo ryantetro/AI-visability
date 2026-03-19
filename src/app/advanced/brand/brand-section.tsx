@@ -7,13 +7,14 @@ import type { PrioritizedFix } from '@/types/score';
 import { cn } from '@/lib/utils';
 import { formatPlatformLabel } from '@/lib/platform-detection';
 import { AiPresenceTab } from '../panels/ai-presence-tab';
+import { AICrawlerPanel } from '../panels/ai-crawler-panel';
 import { CitationTrackingPanel } from '../panels/citation-tracking-panel';
 import { ContentGapsSection } from '../panels/content-gaps-section';
 import { FixCard } from '../panels/fix-card';
 import { getFileMeta, getGroupedFixes, matchFixToFile, verificationPath, downloadTextFile, buildCursorPrompt, buildAllFilesPrompt } from '../lib/utils';
 import type { DashboardReportData, FilesData, GeneratedFile } from '../lib/types';
 
-type BrandTab = 'presence' | 'improve' | 'citations' | 'files';
+type BrandTab = 'presence' | 'improve' | 'citations' | 'files' | 'traffic';
 
 interface BrandSectionProps {
   report: DashboardReportData;
@@ -33,6 +34,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
     { id: 'improve', label: 'Improve' },
     { id: 'citations', label: 'Citations' },
     { id: 'files', label: 'Files' },
+    { id: 'traffic', label: 'Traffic' },
   ];
 
   const fixes = report.score.fixes ?? report.fixes ?? [];
@@ -208,6 +210,8 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
           <p className="text-center text-sm text-zinc-500">No generated files available. Run a scan to generate deployment files.</p>
         </DashboardPanel>
       )}
+
+      {activeTab === 'traffic' && <AICrawlerPanel domain={domain} />}
     </div>
   );
 }

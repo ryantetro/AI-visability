@@ -187,6 +187,13 @@ export interface CrawlerSummary {
   lastSeen: string;
 }
 
+export interface ProviderTrafficSummary {
+  provider: string;
+  visits: number;
+  trend: number;       // % change vs previous equivalent period
+  uniquePaths: number;
+}
+
 export interface ContentGap {
   promptText: string;
   category: string;

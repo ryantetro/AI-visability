@@ -14,6 +14,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [06-api-routes.md](./06-api-routes.md) | All API route reference | `src/app/api/` |
 | [07-env-variables.md](./07-env-variables.md) | Required environment variables | `.env` |
 | [08-competitor-analysis.md](./08-competitor-analysis.md) | Competitor tracking, battle cards, heatmap, SOV | `src/app/competitors/`, `src/app/api/competitors/` |
+| [11-ai-traffic-analysis.md](./11-ai-traffic-analysis.md) | AI crawler traffic by provider — chart + leaderboard | `src/app/advanced/panels/ai-crawler-panel.tsx`, `src/app/api/crawler-visits/route.ts` |
 
 ## Architecture Principles
 

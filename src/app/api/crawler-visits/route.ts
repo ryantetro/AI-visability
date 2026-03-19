@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getCrawlerVisits } from '@/lib/services/registry';
 
+const BOT_TO_PROVIDER: Record<string, string> = {
+  GPTBot: 'chatgpt',
+  'ChatGPT-User': 'chatgpt',
+  PerplexityBot: 'perplexity',
+  ClaudeBot: 'claude',
+  'Claude-Web': 'claude',
+  'anthropic-ai': 'claude',
+  CCBot: 'other',
+  'cohere-ai': 'other',
+  'Google-Extended': 'gemini',
+};
+
+const PROVIDER_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude', 'other'];
+
 /** GET — Authenticated dashboard query for crawler visit summaries. */
 export async function GET(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -18,14 +32,22 @@ export async function GET(request: NextRequest) {
   const cv = getCrawlerVisits();
 
   try {
+    // Fetch double the period for trend comparison
     const [summaries, visits] = await Promise.all([
       cv.listVisitSummaries(domain, days),
-      cv.listVisits(domain, days),
+      cv.listVisits(domain, days * 2),
     ]);
 
-    // Group visits by week for chart data
+    const now = Date.now();
+    const currentCutoff = now - days * 86400000;
+
+    // Split into current and previous periods
+    const currentVisits = visits.filter(v => new Date(v.visitedAt).getTime() >= currentCutoff);
+    const previousVisits = visits.filter(v => new Date(v.visitedAt).getTime() < currentCutoff);
+
+    // --- Legacy weekly timeline (backward compat) ---
     const weekBuckets = new Map<string, Map<string, number>>();
-    for (const v of visits) {
+    for (const v of currentVisits) {
       const date = new Date(v.visitedAt);
       const day = date.getUTCDay();
       const diff = date.getUTCDate() - day + (day === 0 ? -6 : 1);
@@ -44,7 +66,78 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => a.week.localeCompare(b.week));
 
-    return NextResponse.json({ summaries, timeline, totalVisits: visits.length });
+    // --- Provider daily timeline ---
+    const dayBuckets = new Map<string, Map<string, number>>();
+    for (const v of currentVisits) {
+      const dateStr = new Date(v.visitedAt).toISOString().slice(0, 10);
+      const provider = BOT_TO_PROVIDER[v.botName] ?? 'other';
+      if (!dayBuckets.has(dateStr)) dayBuckets.set(dateStr, new Map());
+      const provMap = dayBuckets.get(dateStr)!;
+      provMap.set(provider, (provMap.get(provider) ?? 0) + 1);
+    }
+
+    // Zero-fill every day in the range
+    const allProviders = PROVIDER_ORDER;
+    const startDate = new Date(currentCutoff);
+    startDate.setUTCHours(0, 0, 0, 0);
+    const endDate = new Date(now);
+    endDate.setUTCHours(0, 0, 0, 0);
+
+    const providerTimeline: Array<Record<string, string | number>> = [];
+    for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+      const dateStr = d.toISOString().slice(0, 10);
+      const dayData = dayBuckets.get(dateStr);
+      const row: Record<string, string | number> = { date: dateStr };
+      for (const p of allProviders) {
+        row[p] = dayData?.get(p) ?? 0;
+      }
+      providerTimeline.push(row);
+    }
+
+    // --- Provider summaries with trend ---
+    const currentByProvider = new Map<string, { count: number; paths: Set<string> }>();
+    for (const v of currentVisits) {
+      const provider = BOT_TO_PROVIDER[v.botName] ?? 'other';
+      const existing = currentByProvider.get(provider);
+      if (existing) {
+        existing.count++;
+        existing.paths.add(v.pagePath);
+      } else {
+        currentByProvider.set(provider, { count: 1, paths: new Set([v.pagePath]) });
+      }
+    }
+
+    const previousByProvider = new Map<string, number>();
+    for (const v of previousVisits) {
+      const provider = BOT_TO_PROVIDER[v.botName] ?? 'other';
+      previousByProvider.set(provider, (previousByProvider.get(provider) ?? 0) + 1);
+    }
+
+    const providerSummaries = allProviders
+      .map(provider => {
+        const current = currentByProvider.get(provider);
+        const prevCount = previousByProvider.get(provider) ?? 0;
+        const currentCount = current?.count ?? 0;
+        const trend = prevCount > 0
+          ? Math.round(((currentCount - prevCount) / prevCount) * 100)
+          : currentCount > 0 ? 100 : 0;
+        return {
+          provider,
+          visits: currentCount,
+          trend,
+          uniquePaths: current?.paths.size ?? 0,
+        };
+      })
+      .filter(s => s.visits > 0)
+      .sort((a, b) => b.visits - a.visits);
+
+    return NextResponse.json({
+      summaries,
+      timeline,
+      totalVisits: currentVisits.length,
+      providerTimeline,
+      providerSummaries,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch crawler visits.' },
