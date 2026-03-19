@@ -17,5 +17,5 @@ export default async function LegacyScanPage({
     redirect(`/report?report=${id}`);
   }
 
-  redirect(`/analysis?scan=${id}`);
+  redirect(`/report?report=${id}`);
 }

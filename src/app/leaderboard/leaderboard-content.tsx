@@ -106,7 +106,7 @@ export function LeaderboardContent({ entries: initialEntries }: { entries: Leade
               : 'No scans yet. Be the first to scan your site!'}
           </p>
           <Link
-            href="/analysis"
+            href="/#scan"
             className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#356df4] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
           >
             Run a Free Scan

@@ -54,7 +54,7 @@ const NAV_ITEMS: SidebarItem[] = [
     label: 'Brand',
     href: '/brand',
     icon: Heart,
-    matchFn: (p) => p === '/brand' || p.startsWith('/analysis'),
+    matchFn: (p) => p === '/brand',
   },
   {
     key: 'competitors',

@@ -68,8 +68,7 @@ function formatRelative(timestamp?: number) {
 }
 
 function getAnalysisHref(scan: Pick<RecentScanData, 'id' | 'hasEmail' | 'status'>) {
-  const mode = scan.hasEmail && scan.status === 'complete' ? 'report' : 'scan';
-  return `/analysis?${mode}=${scan.id}`;
+  return `/report?report=${scan.id}`;
 }
 
 function getPillarScore(webHealth: RecentScanData['webHealth'], key: string): number | null {
@@ -365,10 +364,10 @@ export default function HistoryPage() {
               ) : (
                 <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-5 py-8 text-center text-sm text-[var(--text-secondary)]">
                   No saved scans yet. Start one from{' '}
-                  <Link href="/analysis" className="text-white underline underline-offset-4">
-                    Analysis
+                  <Link href="/#scan" className="text-white underline underline-offset-4">
+                    the landing page
                   </Link>{' '}
-                  or the landing page.
+                  or your dashboard.
                 </div>
               )}
             </div>
@@ -484,10 +483,10 @@ export default function HistoryPage() {
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
                         No saved scans yet. Start one from{' '}
-                        <Link href="/analysis" className="text-white underline underline-offset-4">
-                          Analysis
+                        <Link href="/#scan" className="text-white underline underline-offset-4">
+                          the landing page
                         </Link>{' '}
-                        or the landing page.
+                        or your dashboard.
                       </td>
                     </tr>
                   )}

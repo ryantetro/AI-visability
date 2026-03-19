@@ -1,16 +1,20 @@
-import { Suspense } from 'react';
-import { AnalysisPageContent } from './analysis-client';
+import { redirect } from 'next/navigation';
 
-export default function AnalysisPage() {
-    return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <div className="text-lg font-medium text-white">Loading...</div>
-            </div>
-      }
-    >
-      <AnalysisPageContent />
-    </Suspense>
-  );
+export default async function AnalysisPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const reportId = typeof params.report === 'string'
+    ? params.report
+    : typeof params.scan === 'string'
+      ? params.scan
+      : null;
+
+  if (reportId) {
+    redirect(`/report?report=${reportId}`);
+  }
+
+  redirect('/dashboard');
 }

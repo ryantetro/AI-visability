@@ -227,7 +227,7 @@ function FreeDashboard({
               </div>
             </div>
             <div className="mt-4 flex gap-3">
-              <Link href="/analysis" className="inline-flex items-center gap-2 rounded-lg bg-white/[0.06] px-4 py-2 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.1]">
+              <Link href="/#scan" className="inline-flex items-center gap-2 rounded-lg bg-white/[0.06] px-4 py-2 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.1]">
                 <Search className="h-3.5 w-3.5" />
                 Run New Scan
               </Link>
@@ -241,7 +241,7 @@ function FreeDashboard({
             <h3 className="mt-4 text-lg font-semibold text-white">Run your first scan</h3>
             <p className="mt-2 text-[13px] text-zinc-400">See how AI search engines view your website.</p>
             <Link
-              href="/analysis"
+              href="/#scan"
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
             >
               <Search className="h-4 w-4" />

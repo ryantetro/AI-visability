@@ -13,7 +13,7 @@ const LANDING_PATHS = ['/', '/landing/b', '/landing/c'];
 const WORKSPACE_PREFIXES = ['/dashboard', '/report', '/brand', '/competitors', '/settings', '/advanced', '/history'];
 
 /** Routes that need sidebar but NOT domain context */
-const APP_PATH_PREFIXES = ['/analysis', '/leaderboard', '/featured', ...WORKSPACE_PREFIXES];
+const APP_PATH_PREFIXES = ['/leaderboard', '/featured', ...WORKSPACE_PREFIXES];
 
 function WorkspaceDashboardLayout({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();

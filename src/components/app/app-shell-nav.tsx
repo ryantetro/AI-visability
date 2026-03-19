@@ -3,15 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, Clock3, Diamond, Loader2, LogOut, Megaphone, Trophy, Zap } from 'lucide-react';
+import { Clock3, Diamond, Loader2, LogOut, Megaphone, Trophy, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { planStringToTier, PLANS } from '@/lib/pricing';
 
-type AppSection = 'analysis' | 'history' | 'leaderboard' | 'advanced' | 'featured' | 'dashboard';
+type AppSection = 'history' | 'leaderboard' | 'advanced' | 'featured' | 'dashboard';
 
-const navItems: { key: AppSection; label: string; href: string; icon: typeof BarChart3 }[] = [
-  { key: 'analysis', label: 'Analysis', href: '/analysis', icon: BarChart3 },
+const navItems: { key: AppSection; label: string; href: string; icon: typeof Diamond }[] = [
   { key: 'history', label: 'History', href: '/history', icon: Clock3 },
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', icon: Trophy },
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: Diamond },
@@ -51,7 +50,7 @@ function detectActiveSection(pathname: string): AppSection {
   if (pathname.startsWith('/history')) return 'history';
   if (pathname.startsWith('/leaderboard')) return 'leaderboard';
   if (pathname.startsWith('/featured')) return 'featured';
-  return 'analysis';
+  return 'dashboard';
 }
 
 export function AppShellNav() {

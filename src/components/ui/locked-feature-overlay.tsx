@@ -98,7 +98,7 @@ export function LockedFeatureOverlay({
             </Link>
           )}
           <Link
-            href="/analysis"
+            href="/#scan"
             className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-zinc-300"
           >
             Or run a free scan instead
