@@ -1,6 +1,6 @@
 'use client';
 
-import { type ComponentType, useEffect, useMemo, useState } from 'react';
+import { type ComponentType, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LockKeyhole, Mail, UserRound } from 'lucide-react';
@@ -12,8 +12,8 @@ type AuthMode = 'sign-in' | 'sign-up' | 'forgot-password' | 'check-email' | 'res
 type CheckEmailKind = 'signup' | 'recovery';
 
 function normalizeNext(next: string | null) {
-  if (!next || !next.startsWith('/')) return '/analysis';
-  if (next.startsWith('//')) return '/analysis';
+  if (!next || !next.startsWith('/')) return '/dashboard';
+  if (next.startsWith('//')) return '/dashboard';
   return next;
 }
 
@@ -160,9 +160,9 @@ export function LoginPageContent() {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [canSetPassword, setCanSetPassword] = useState(false);
   const [emailHint, setEmailHint] = useState('');
   const [checkEmailKind, setCheckEmailKind] = useState<CheckEmailKind>('signup');
+  const redirectingRef = useRef(false);
 
   const nextPath = normalizeNext(searchParams.get('next'));
   const scanUrl = searchParams.get('scanUrl');
@@ -180,6 +180,9 @@ export function LoginPageContent() {
   const passwordIsValid = password.length >= PASSWORD_MIN_LENGTH && /[A-Za-z]/.test(password) && /\d/.test(password);
 
   async function completePostLoginRedirect() {
+    if (redirectingRef.current) return;
+    redirectingRef.current = true;
+
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         const channel = new BroadcastChannel('aiso_auth');
@@ -189,7 +192,19 @@ export function LoginPageContent() {
     } catch { /* degrade gracefully */ }
 
     if (scanUrl) {
-      router.replace(`/analysis?prefill=${encodeURIComponent(scanUrl)}`);
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: scanUrl }),
+        });
+        if (res.ok) {
+          const { id } = await res.json();
+          router.replace(`/report?report=${id}`);
+          return;
+        }
+      } catch { /* fall through to dashboard */ }
+      router.replace('/dashboard');
       return;
     }
 
@@ -214,7 +229,6 @@ export function LoginPageContent() {
 
   const resetTransientState = () => {
     setError('');
-    setCanSetPassword(false);
     setSubmitting(false);
   };
 
@@ -226,7 +240,6 @@ export function LoginPageContent() {
   const handleSignIn = async () => {
     setSubmitting(true);
     setError('');
-    setCanSetPassword(false);
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -236,9 +249,6 @@ export function LoginPageContent() {
       });
       const payload = await res.json();
       if (!res.ok) {
-        if (payload.code === 'INVALID_CREDENTIALS') {
-          setCanSetPassword(true);
-        }
         throw new Error(payload.error || 'Failed to sign in.');
       }
 
@@ -347,15 +357,6 @@ export function LoginPageContent() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const sendPasswordSetup = async () => {
-    if (!email) {
-      setError('Enter your email address first so we can send your password setup link.');
-      return;
-    }
-
-    await handleForgotPassword();
   };
 
   const titleByMode: Record<AuthMode, string> = {
@@ -581,29 +582,6 @@ export function LoginPageContent() {
                       Create account
                     </button>
                   </div>
-                  {canSetPassword ? (
-                    <div
-                      className="p-4 text-left"
-                      style={{
-                        borderRadius: 'var(--radius-xl)',
-                        border: '1px solid rgba(53, 109, 244, 0.25)',
-                        background: 'rgba(53, 109, 244, 0.08)',
-                      }}
-                    >
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Used the old passwordless flow?</p>
-                      <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
-                        Send yourself a password setup link to switch to the new sign-in flow.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={sendPasswordSetup}
-                        className="aiso-button aiso-button-secondary mt-3"
-                        style={{ height: '40px', borderRadius: 'var(--radius-md)' }}
-                      >
-                        Set your password
-                      </button>
-                    </div>
-                  ) : null}
                 </div>
               ) : null}
 

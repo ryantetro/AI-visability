@@ -272,7 +272,7 @@ export function AppShellNav() {
             </div>
           ) : (
             <Link
-              href="/login?next=/analysis"
+              href="/login?next=/dashboard"
               className="inline-flex items-center justify-center rounded-full border border-white/10 px-5 py-2 text-[13px] font-semibold text-[var(--text-primary)] transition-colors hover:bg-white/[0.04]"
             >
               Sign in

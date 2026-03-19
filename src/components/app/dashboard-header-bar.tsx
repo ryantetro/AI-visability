@@ -195,7 +195,7 @@ export function DashboardHeaderBar() {
           </div>
         ) : (
           <Link
-            href="/login?next=/analysis"
+            href="/login?next=/dashboard"
             className="inline-flex items-center justify-center rounded-full border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-white/[0.04]"
           >
             Sign in

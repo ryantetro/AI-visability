@@ -99,7 +99,7 @@ function isSupportedCallbackType(value: string | null | undefined): value is Aut
 
 function buildAuthCallbackUrl(next?: string | null, scanUrl?: string | null) {
   const url = new URL('/auth/callback', getAppUrl());
-  url.searchParams.set('next', sanitizeRedirectPath(next, '/analysis'));
+  url.searchParams.set('next', sanitizeRedirectPath(next, '/dashboard'));
   if (scanUrl?.trim()) {
     url.searchParams.set('scanUrl', scanUrl.trim());
   }
@@ -128,7 +128,7 @@ function mapSupabaseAuthError(error: { message?: string | null }, fallbackMessag
   }
 
   if (/invalid login credentials/i.test(message)) {
-    return new AuthActionError('INVALID_CREDENTIALS', 'We couldn’t sign you in with that email and password.');
+    return new AuthActionError('INVALID_CREDENTIALS', 'Incorrect email or password.');
   }
 
   if (/password should be at least|weak password/i.test(message)) {
@@ -140,10 +140,14 @@ function mapSupabaseAuthError(error: { message?: string | null }, fallbackMessag
 
 export function buildPostAuthRedirectPath(next: string | null | undefined, scanUrl?: string | null) {
   if (scanUrl?.trim()) {
-    return `/analysis?prefill=${encodeURIComponent(scanUrl.trim())}`;
+    const params = new URLSearchParams({
+      next: sanitizeRedirectPath(next, '/dashboard'),
+      scanUrl: scanUrl.trim(),
+    });
+    return `/login?${params.toString()}`;
   }
 
-  return sanitizeRedirectPath(next, '/analysis');
+  return sanitizeRedirectPath(next, '/dashboard');
 }
 
 export function setSessionCookies(
@@ -535,7 +539,7 @@ export function sanitizeAuthUser(user: AuthUser) {
   };
 }
 
-export function sanitizeRedirectPath(next: string | null | undefined, fallback = '/analysis') {
+export function sanitizeRedirectPath(next: string | null | undefined, fallback = '/dashboard') {
   if (!next || !next.startsWith('/')) return fallback;
   if (next.startsWith('//')) return fallback;
   return next;

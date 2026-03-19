@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const tokenHash = searchParams.get('token_hash');
   const type = searchParams.get('type');
-  const next = sanitizeRedirectPath(searchParams.get('next'), '/analysis');
+  const next = sanitizeRedirectPath(searchParams.get('next'), '/dashboard');
   const scanUrl = searchParams.get('scanUrl');
 
   if (!tokenHash && !code) {

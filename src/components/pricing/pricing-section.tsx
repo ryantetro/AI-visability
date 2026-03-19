@@ -45,7 +45,7 @@ function PricingCard({
     ? Math.round(plan.annualPrice / 12)
     : plan.monthlyPrice;
   const isFree = tier === 'free';
-  const freeHref = context === 'home' ? '/login?next=/analysis' : '/analysis';
+  const freeHref = context === 'home' ? '/login?next=/dashboard' : '/analysis';
   const freeLabel = context === 'home' ? 'Create free account' : 'Start free scan';
 
   return (

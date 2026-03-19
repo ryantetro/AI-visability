@@ -21,7 +21,7 @@ export default function LandingC() {
       return;
     }
     if (!user) {
-      router.push(`/login?next=/analysis&scanUrl=${encodeURIComponent(url)}`);
+      router.push(`/login?scanUrl=${encodeURIComponent(url)}`);
       return;
     }
     setLoading(true);
@@ -37,7 +37,7 @@ export default function LandingC() {
         throw new Error(data.error || 'Failed to start scan');
       }
       const { id } = await res.json();
-      router.push(`/analysis?scan=${id}`);
+      router.push(`/report?report=${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setLoading(false);
