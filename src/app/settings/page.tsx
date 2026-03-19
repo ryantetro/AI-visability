@@ -12,6 +12,7 @@ export default function SettingsPage() {
           monitoringConnected={ctx.monitoringConnected}
           monitoringLoading={ctx.monitoringLoading}
           onEnableMonitoring={ctx.handleEnableMonitoring}
+          onDisableMonitoring={ctx.handleDisableMonitoring}
         />
       )}
     </WorkspaceShell>

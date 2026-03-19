@@ -53,6 +53,7 @@ interface DomainContextValue {
   monitoringConnected: Record<string, boolean>;
   monitoringLoading: boolean;
   handleEnableMonitoring: () => Promise<void>;
+  handleDisableMonitoring: () => Promise<void>;
 
   // Unlock
   unlockModalOpen: boolean;
@@ -152,6 +153,28 @@ export function DomainContextProvider({
       } catch { /* keep localStorage data on network failure */ }
     })();
 
+    return () => { active = false; };
+  }, []);
+
+  // --- Hydrate monitoring status from DB ---
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/monitoring');
+        if (!res.ok) return;
+        const data = await res.json();
+        const domains: Array<{ domain: string; status: string }> = data.domains ?? [];
+        if (!active) return;
+        const connected: Record<string, boolean> = {};
+        for (const d of domains) {
+          if (d.status === 'active') {
+            connected[d.domain] = true;
+          }
+        }
+        setMonitoringConnected(prev => ({ ...prev, ...connected }));
+      } catch { /* keep current state on failure */ }
+    })();
     return () => { active = false; };
   }, []);
 
@@ -513,6 +536,16 @@ export function DomainContextProvider({
     try { const res = await fetch('/api/monitoring', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scanId: expandedSite.latestPaidScan.id, alertThreshold: 5 }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to enable monitoring'); setMonitoringConnected((c) => ({ ...c, [expandedSite.domain]: true })); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to enable monitoring'); } finally { setMonitoringLoading(false); }
   }, [expandedSite]);
 
+  const handleDisableMonitoring = useCallback(async () => {
+    if (!expandedSite?.domain) return;
+    setMonitoringLoading(true); setActionError('');
+    try {
+      const res = await fetch(`/api/monitoring/${encodeURIComponent(expandedSite.domain)}`, { method: 'DELETE' });
+      if (!res.ok) { const payload = await res.json().catch(() => ({})); throw new Error(payload.error || 'Failed to disable monitoring'); }
+      setMonitoringConnected((c) => { const next = { ...c }; delete next[expandedSite.domain]; return next; });
+    } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to disable monitoring'); } finally { setMonitoringLoading(false); }
+  }, [expandedSite]);
+
   const value = useMemo<DomainContextValue>(() => ({
     monitoredSites,
     selectedDomain,
@@ -539,6 +572,7 @@ export function DomainContextProvider({
     monitoringConnected,
     monitoringLoading,
     handleEnableMonitoring,
+    handleDisableMonitoring,
     unlockModalOpen,
     setUnlockModalOpen,
     handleUnlockComplete,
@@ -551,7 +585,7 @@ export function DomainContextProvider({
     monitoredSites, selectedDomain, selectDomain, addDomainInput, handleAddDomain, handleRemoveDomain,
     addError, confirmChecked, hasPaidAccess, report, files, workspaceLoading, loadError, recentScans,
     recentLoading, expandedSite, actionError, reauditLoading, handleReaudit, handleRunFirstScan,
-    monitoringConnected, monitoringLoading, handleEnableMonitoring, unlockModalOpen, handleUnlockComplete,
+    monitoringConnected, monitoringLoading, handleEnableMonitoring, handleDisableMonitoring, unlockModalOpen, handleUnlockComplete,
     pendingDomain, paidOverride, debugPaidPreview, checkoutBanner, inputFaviconUrl,
   ]);
 

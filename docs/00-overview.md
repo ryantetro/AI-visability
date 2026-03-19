@@ -15,6 +15,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [07-env-variables.md](./07-env-variables.md) | Required environment variables | `.env` |
 | [08-competitor-analysis.md](./08-competitor-analysis.md) | Competitor tracking, battle cards, heatmap, SOV | `src/app/competitors/`, `src/app/api/competitors/` |
 | [11-ai-traffic-analysis.md](./11-ai-traffic-analysis.md) | AI crawler traffic by provider — chart + leaderboard | `src/app/advanced/panels/ai-crawler-panel.tsx`, `src/app/api/crawler-visits/route.ts` |
+| [12-monitoring-alerts.md](./12-monitoring-alerts.md) | Monitoring, cron rescans, Resend email alerts | `src/lib/services/resend-alerts.ts`, `src/app/api/cron/monitor/route.ts` |
 
 ## Architecture Principles
 

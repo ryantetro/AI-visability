@@ -8,6 +8,7 @@ import { openAiService, canUseOpenAI } from './openai-ai';
 import { mockMentionTester } from './mention-tester-mock';
 import { realMentionTester, canUseMentionTester } from './mention-tester-real';
 import { mockAlertService } from '@/lib/monitoring-alerts';
+import { resendAlertService, canUseResend } from './resend-alerts';
 import { supabasePromptMonitoring } from './supabase-prompt-monitoring';
 import { mockPromptMonitoring } from './mock-prompt-monitoring';
 import { supabaseCrawlerVisits } from './supabase-crawler-visits';
@@ -41,6 +42,8 @@ export function getMentionTester(): MentionTesterService {
 }
 
 export function getAlertService(): AlertService {
+  if (FORCE_MOCKS) return mockAlertService;
+  if (canUseResend()) return resendAlertService;
   return mockAlertService;
 }
 

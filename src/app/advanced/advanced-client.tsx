@@ -79,6 +79,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
     monitoringConnected,
     monitoringLoading,
     handleEnableMonitoring,
+    handleDisableMonitoring,
     unlockModalOpen,
     setUnlockModalOpen,
     handleUnlockComplete,
@@ -150,6 +151,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
             monitoringConnected={isMonitoring}
             monitoringLoading={monitoringLoading}
             onEnableMonitoring={handleEnableMonitoring}
+            onDisableMonitoring={handleDisableMonitoring}
             onReaudit={handleReaudit}
             onRunFirstScan={handleRunFirstScan}
             platformLabel={platformLabel}
@@ -399,6 +401,7 @@ function DomainWorkspace({
   monitoringConnected,
   monitoringLoading,
   onEnableMonitoring,
+  onDisableMonitoring,
   onReaudit,
   onRunFirstScan,
   platformLabel,
@@ -418,6 +421,7 @@ function DomainWorkspace({
   monitoringConnected: boolean;
   monitoringLoading: boolean;
   onEnableMonitoring: () => void;
+  onDisableMonitoring: () => void;
   onReaudit: () => void;
   onRunFirstScan: (site: SiteSummary) => void;
   platformLabel: string | null;
@@ -515,6 +519,7 @@ function DomainWorkspace({
             monitoringConnected={monitoringConnected}
             monitoringLoading={monitoringLoading}
             onEnableMonitoring={onEnableMonitoring}
+            onDisableMonitoring={onDisableMonitoring}
           />
         ) : (
           <LockedFeatureOverlay featureName="Settings" requiredTier="starter" onUpgrade={onOpenUnlock} />

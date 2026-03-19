@@ -9,6 +9,7 @@ interface PlanState {
   isPaid: boolean;
   maxDomains: number;
   maxPrompts: number;
+  email: string;
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ let cachedPlan: string | null = null;
 let cachedIsPaid: boolean | null = null;
 let cachedMaxDomains: number | null = null;
 let cachedMaxPrompts: number | null = null;
+let cachedEmail: string | null = null;
 
 export function usePlan(): PlanState {
   const [tier, setTier] = useState<PlanTier>(cachedTier ?? 'free');
@@ -25,6 +27,7 @@ export function usePlan(): PlanState {
   const [isPaid, setIsPaid] = useState<boolean>(cachedIsPaid ?? false);
   const [maxDomains, setMaxDomains] = useState<number>(cachedMaxDomains ?? 1);
   const [maxPrompts, setMaxPrompts] = useState<number>(cachedMaxPrompts ?? 5);
+  const [email, setEmail] = useState<string>(cachedEmail ?? '');
   const [loading, setLoading] = useState(cachedTier === null);
 
   const refresh = useCallback(async () => {
@@ -41,15 +44,19 @@ export function usePlan(): PlanState {
       const resolvedMaxDomains: number = data.maxDomains ?? 1;
       const resolvedMaxPrompts: number = data.maxPrompts ?? 5;
 
+      const resolvedEmail: string = data.user?.email ?? '';
+
       cachedIsPaid = resolvedIsPaid;
       cachedMaxDomains = resolvedMaxDomains;
       cachedMaxPrompts = resolvedMaxPrompts;
+      cachedEmail = resolvedEmail;
 
       setTier(resolved);
       setPlan(userPlan);
       setIsPaid(resolvedIsPaid);
       setMaxDomains(resolvedMaxDomains);
       setMaxPrompts(resolvedMaxPrompts);
+      setEmail(resolvedEmail);
     } catch {
       // keep current values
     } finally {
@@ -63,7 +70,7 @@ export function usePlan(): PlanState {
     }
   }, [refresh]);
 
-  return { tier, plan, isPaid, maxDomains, maxPrompts, loading, refresh };
+  return { tier, plan, isPaid, maxDomains, maxPrompts, email, loading, refresh };
 }
 
 /** Invalidate the plan cache (e.g., after a successful upgrade) */
@@ -73,4 +80,5 @@ export function invalidatePlanCache() {
   cachedIsPaid = null;
   cachedMaxDomains = null;
   cachedMaxPrompts = null;
+  cachedEmail = null;
 }

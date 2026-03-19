@@ -104,40 +104,47 @@ export async function GET(request: NextRequest) {
       rescans.push({ domain: '*', status: 'phase0 error' });
     }
 
-    // ── Phase 1: Existing score-check loop ───────────────────────
-    const scans = await db.listCompletedScans(10);
-    const results = [];
+    // ── Phase 1: Score alerts for monitored domains ──────────────
+    const results: Array<{ domain: string; scanId?: string; score?: number; status: string }> = [];
 
-    for (const scan of scans) {
-      try {
-        const domain = new URL(scan.url).hostname;
-        const scoreResult = scan.scoreResult as { percentage?: number } | undefined;
-        const currentScore = scoreResult?.percentage ?? 0;
+    try {
+      const monitoredForAlerts = await listActiveMonitoringDomains();
 
-        results.push({
-          domain,
-          scanId: scan.id,
-          score: currentScore,
-          status: 'checked',
-        });
+      for (const record of monitoredForAlerts) {
+        try {
+          const domain = getDomain(record.url);
+          const latestScan = await db.findLatestScanByDomain(domain);
+          if (!latestScan) {
+            results.push({ domain, status: 'no scan found' });
+            continue;
+          }
 
-        const ALERT_THRESHOLD = 50;
-        if (currentScore < ALERT_THRESHOLD) {
-          await alertService.sendScoreAlert({
+          const scoreResult = latestScan.scoreResult as { percentage?: number } | undefined;
+          const currentScore = scoreResult?.percentage ?? 0;
+          const alertThreshold = record.alertThreshold ?? 50;
+
+          results.push({
             domain,
-            previousScore: currentScore,
-            currentScore,
-            threshold: ALERT_THRESHOLD,
-            recipientEmail: scan.email ?? 'unknown',
+            scanId: latestScan.id,
+            score: currentScore,
+            status: 'checked',
           });
+
+          if (currentScore < alertThreshold) {
+            await alertService.sendScoreAlert({
+              domain,
+              previousScore: currentScore,
+              currentScore,
+              threshold: alertThreshold,
+              recipientEmail: record.email || latestScan.email || 'unknown',
+            });
+          }
+        } catch {
+          results.push({ domain: record.domain, status: 'error' });
         }
-      } catch {
-        results.push({
-          domain: scan.url,
-          scanId: scan.id,
-          status: 'error',
-        });
       }
+    } catch {
+      results.push({ domain: '*', status: 'phase1 error' });
     }
 
     // ── Phase 2: Prompt monitoring loop ──────────────────────────

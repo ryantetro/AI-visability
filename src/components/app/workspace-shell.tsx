@@ -70,6 +70,7 @@ export function WorkspaceShell({
     monitoringConnected,
     monitoringLoading,
     handleEnableMonitoring,
+    handleDisableMonitoring,
     unlockModalOpen,
     setUnlockModalOpen,
     handleUnlockComplete,
@@ -170,6 +171,7 @@ export function WorkspaceShell({
     monitoringConnected: isMonitoring,
     monitoringLoading,
     handleEnableMonitoring,
+    handleDisableMonitoring,
     platformLabel,
     tier,
     onOpenUnlock: () => setUnlockModalOpen(true),
@@ -211,6 +213,7 @@ export interface WorkspaceContext {
   monitoringConnected: boolean;
   monitoringLoading: boolean;
   handleEnableMonitoring: () => Promise<void>;
+  handleDisableMonitoring: () => Promise<void>;
   platformLabel: string | null;
   tier: PlanTier;
   onOpenUnlock: () => void;

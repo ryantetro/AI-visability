@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { motion } from 'framer-motion';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import { EngineIcon, BrandFavicon } from '@/app/advanced/panels/shared';
@@ -114,10 +115,9 @@ export function EngineHeatmap({ data }: { data: CompetitorComparisonData }) {
 
           {/* Data rows */}
           {rows.map((row) => (
-            <>
+            <React.Fragment key={row.name}>
               {/* Row label */}
               <div
-                key={`label-${row.name}`}
                 className={`flex items-center gap-2 rounded-lg px-2 py-2.5 ${
                   row.isUser ? 'border border-white/[0.12] bg-white/[0.04]' : 'bg-white/[0.02]'
                 }`}
@@ -153,7 +153,7 @@ export function EngineHeatmap({ data }: { data: CompetitorComparisonData }) {
                   </motion.div>
                 );
               })}
-            </>
+            </React.Fragment>
           ))}
         </div>
       </div>
