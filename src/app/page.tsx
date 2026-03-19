@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { UrlInput } from '@/components/ui/url-input';
 import { useAuth } from '@/hooks/use-auth';
-import { FlickeringGrid } from '@/components/ui/flickering-grid';
 import { AnimatedStat } from '@/components/ui/animated-stat';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/radix-accordion';
 import { AIBeamVisual } from '@/components/ui/ai-beam-visual';
 import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
-import { colors } from '@/styles/tokens';
+import { PricingSection } from '@/components/pricing/pricing-section';
 
 export default function Home() {
   const router = useRouter();
@@ -50,80 +49,89 @@ export default function Home() {
   return (
     <div>
       {/* Hero */}
-      <section id="scan" className="relative overflow-hidden px-4 pb-20 pt-32 z-0" style={{ backgroundColor: 'var(--surface-page)' }}>
-        {/* Subtle branded glow at the top center */}
+      <section id="scan" className="relative overflow-hidden px-4 pb-24 pt-36 z-0" style={{ backgroundColor: 'var(--surface-page)' }}>
+        {/* Soft ambient glow — very subtle, centered high */}
         <div
-          className="absolute left-1/2 top-0 -z-10 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-20 blur-[120px] pointer-events-none"
-          style={{ backgroundColor: 'var(--color-primary-500)' }}
+          className="absolute left-1/2 top-0 -z-10 h-[700px] w-[900px] -translate-x-1/2 -translate-y-1/3 rounded-full opacity-[0.08] blur-[160px] pointer-events-none"
+          style={{ background: 'radial-gradient(circle, var(--color-primary-400), transparent 70%)' }}
         />
 
-        {/* Neutral flickering grid with radial fade out */}
-        <FlickeringGrid
-          className="absolute inset-0 -z-10 h-full w-full"
-          style={{
-            WebkitMaskImage: 'radial-gradient(ellipse 70% 70% at 50% 50%, #000 0%, transparent 100%)',
-            maskImage: 'radial-gradient(ellipse 70% 70% at 50% 50%, #000 0%, transparent 100%)',
-          }}
-          squareSize={4}
-          gridGap={6}
-          color="#ffffff"
-          maxOpacity={0.15}
-          flickerChance={0.05}
+        {/* Secondary warm accent glow — barely visible */}
+        <div
+          className="absolute left-1/2 top-20 -z-10 h-[400px] w-[600px] -translate-x-1/2 rounded-full opacity-[0.04] blur-[120px] pointer-events-none"
+          style={{ background: 'radial-gradient(circle, var(--color-accent-400), transparent 70%)' }}
         />
 
         <div className="relative z-10 mx-auto max-w-3xl text-center">
+          {/* Kicker pill */}
+          <div className="mb-8 flex justify-center animate-hero-fade" style={{ animationDelay: '0ms' }}>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-1.5 text-[12px] font-medium tracking-wide text-white/40 uppercase">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-primary-400)] animate-pulse" />
+              AI Search Optimization
+            </span>
+          </div>
+
           <h1
-            className="text-5xl font-bold leading-[1.1] tracking-tight animate-fade-in-up sm:text-6xl text-text-primary"
+            className="text-4xl font-bold leading-[1.08] tracking-tight animate-hero-fade sm:text-5xl lg:text-6xl text-text-primary"
+            style={{ animationDelay: '80ms' }}
           >
             Is your business visible
             <br />
-            <span style={{ color: 'var(--color-primary-600)' }}>to AI search?</span>
+            <span className="bg-gradient-to-r from-[var(--color-primary-300)] to-[var(--color-primary-500)] bg-clip-text text-transparent">to AI search?</span>
           </h1>
 
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed animate-fade-in-up text-text-secondary" style={{ animationDelay: '100ms' }}>
+          <p className="mx-auto mt-5 max-w-lg text-[17px] leading-relaxed animate-hero-fade text-white/45" style={{ animationDelay: '160ms' }}>
             ChatGPT, Perplexity, and Gemini are replacing Google for millions of searches.
-            Check if they can find, understand, and recommend your business.
+            See if they can find and recommend your business.
           </p>
 
-          <div className="mt-10 flex justify-center animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+          <div className="mt-10 flex justify-center animate-hero-fade" style={{ animationDelay: '240ms' }}>
             <UrlInput onSubmit={handleSubmit} loading={loading} variant="elevated" />
           </div>
           {error && <p className="mt-3 text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>}
 
-          <div className="mx-auto mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-            <span className="text-xs text-text-tertiary">Checks visibility on:</span>
-            {([
-              { Icon: ChatGPTIcon, color: 'text-white' },
-              { Icon: PerplexityIcon, color: 'text-[#20B8CD]' },
-              { Icon: GeminiIcon, color: 'text-[#8ab4f8]' },
-              { Icon: ClaudeIcon, color: 'text-[#d97757]' },
-            ] as const).map(({ Icon, color }, i) => (
-              <span key={i} className={`flex items-center gap-1.5 ${color}`}>
-                <Icon className="size-3.5" />
-              </span>
-            ))}
+          <div className="mt-5 flex items-center justify-center gap-6 animate-hero-fade" style={{ animationDelay: '320ms' }}>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-white/25 font-medium tracking-wide uppercase">Works with</span>
+              <div className="flex items-center gap-3">
+                {([
+                  { Icon: ChatGPTIcon, color: 'text-[#8fd6c6]' },
+                  { Icon: PerplexityIcon, color: 'text-[#62dbef]' },
+                  { Icon: GeminiIcon, color: 'text-[#7ba9ff]' },
+                  { Icon: ClaudeIcon, color: 'text-[#f1a07b]' },
+                ] as const).map(({ Icon, color }, i) => (
+                  <span key={i} className={`flex items-center justify-center ${color}`}>
+                    <Icon className="size-4.5" />
+                  </span>
+                ))}
+              </div>
+            </div>
+            <span className="text-white/10">|</span>
+            <Link href="/pricing" className="text-[12px] font-medium text-white/30 transition-colors duration-150 hover:text-white/60 tracking-wide uppercase">
+              View Pricing
+            </Link>
           </div>
 
-          {/* Integrated Stats Row */}
-          <div className="relative z-10 mx-auto mt-16 flex w-full max-w-3xl flex-nowrap items-center justify-between animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+          {/* Stats Row */}
+          <div className="relative z-10 mx-auto mt-20 flex w-full max-w-2xl flex-nowrap items-center justify-between animate-hero-fade" style={{ animationDelay: '400ms' }}>
             <AnimatedStat value={19} label="Factors Analyzed" />
-            <div className="h-8 w-px bg-gradient-to-b from-transparent via-[rgba(255,255,255,0.1)] to-transparent" />
+            <div className="h-6 w-px bg-white/[0.06]" />
             <AnimatedStat value={6} label="AI Dimensions" />
-            <div className="h-8 w-px bg-gradient-to-b from-transparent via-[rgba(255,255,255,0.1)] to-transparent" />
+            <div className="h-6 w-px bg-white/[0.06]" />
             <AnimatedStat value={30} suffix="s" label="Scan Time" />
-            <div className="h-8 w-px bg-gradient-to-b from-transparent via-[rgba(255,255,255,0.1)] to-transparent" />
+            <div className="h-6 w-px bg-white/[0.06]" />
             <AnimatedStat value={100} suffix="%" label="Free Audit" />
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,rgba(6,6,6,0)_0%,rgba(6,6,6,0.72)_58%,rgba(6,6,6,1)_100%)]" />
+        {/* Soft bottom fade */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[var(--surface-page)] via-[var(--surface-page)]/80 to-transparent" />
       </section>
 
       <div className="relative overflow-hidden" style={{ backgroundColor: 'var(--surface-page)' }}>
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[linear-gradient(180deg,rgba(255,255,255,0.02)_0%,rgba(255,255,255,0.008)_18%,rgba(6,6,6,0)_62%)]" />
 
       {/* How it works */}
-      <section id="how-it-works" className="relative px-4 py-20">
+      <section id="how-it-works" className="relative px-4 py-24">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Three steps to AI visibility
@@ -131,7 +139,7 @@ export default function Home() {
           <p className="mx-auto mt-3 max-w-md text-center" style={{ color: 'var(--text-tertiary)' }}>
             Sign in once, then scan and reopen your reports whenever you need them.
           </p>
-          <div className="mt-12 grid gap-8 sm:grid-cols-3 stagger-children">
+          <div className="mt-14 grid gap-8 sm:grid-cols-3 stagger-children">
             {[
               { step: '1', title: 'Enter your URL', desc: 'We crawl your site with real browser rendering — checking 19 factors across files, schema, content, and AI bot access.' },
               { step: '2', title: 'See your score', desc: 'Get a 0-100 AI visibility score across 6 dimensions with a prioritized list of what to fix, sorted by ROI.' },
@@ -139,12 +147,12 @@ export default function Home() {
             ].map((item) => (
               <div key={item.step} className="text-center">
                 <div
-                  className="mx-auto flex h-14 w-14 items-center justify-center text-lg font-bold"
+                  className="mx-auto flex h-12 w-12 items-center justify-center text-sm font-semibold"
                   style={{
-                    backgroundColor: 'var(--color-primary-50)',
-                    color: 'var(--color-primary-600)',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid var(--color-primary-200)',
+                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    color: 'var(--color-primary-400)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
                   {item.step}
@@ -158,7 +166,7 @@ export default function Home() {
       </section>
 
       {/* AI Search Engines Interstitial */}
-      <section className="relative px-4 py-8 pb-20 text-center">
+      <section className="relative px-4 py-8 pb-24 text-center">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             We scan everywhere your customers are searching
@@ -173,7 +181,7 @@ export default function Home() {
       </section>
 
       {/* 6 Dimensions */}
-      <section className="relative px-4 pb-20">
+      <section className="relative px-4 pb-24">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             What we check
@@ -205,46 +213,16 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Score bands */}
-      <section id="pricing" className="relative px-4 py-20">
-        <div className="mx-auto max-w-3xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            What your score means
-          </h2>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2">
-            {[
-              { band: 'AI Ready', range: '80-100', color: colors.band.aiReady, bg: colors.bandBg.aiReady, desc: 'AI search engines can find and accurately describe your business. Keep it up.' },
-              { band: 'Needs Work', range: '60-79', color: colors.band.needsWork, bg: colors.bandBg.needsWork, desc: 'Your site is partially visible but missing key signals. A few fixes make a big difference.' },
-              { band: 'At Risk', range: '40-59', color: colors.band.atRisk, bg: colors.bandBg.atRisk, desc: 'AI search is unlikely to recommend your business accurately. Action needed.' },
-              { band: 'Not Visible', range: '0-39', color: colors.band.notVisible, bg: colors.bandBg.notVisible, desc: 'AI search engines can\'t find or understand your site. Your competitors are getting your traffic.' },
-            ].map((item) => (
-              <div
-                key={item.band}
-                className="aiso-card flex items-start gap-5 p-6"
-                style={{
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-20" style={{ backgroundColor: item.color, transform: 'translate(30%, -30%)' }} />
-                <span
-                  className="mt-1 shrink-0 px-3 py-1 text-xs font-bold text-white uppercase tracking-wider shadow-sm"
-                  style={{ backgroundColor: item.color, borderRadius: 'var(--radius-md)' }}
-                >
-                  {item.range}
-                </span>
-                <div>
-                  <h3 className="text-xl font-bold tracking-tight" style={{ color: item.color }}>{item.band}</h3>
-                  <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PricingSection
+        id="pricing"
+        title="Choose the plan that matches your AI visibility workflow"
+        description="Start with a free account, then upgrade when you need monitoring, multi-domain tracking, and a full implementation workspace."
+        context="home"
+        showFaq={false}
+      />
 
       {/* FAQ */}
-      <section id="resources" className="relative px-4 py-20">
+      <section id="resources" className="relative px-4 py-24">
         <div className="mx-auto max-w-2xl">
           <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Frequently asked questions
@@ -274,28 +252,14 @@ export default function Home() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="relative px-4 py-20 text-center">
+      <section className="relative px-4 py-24 text-center">
         <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
           Ready to check your AI visibility?
         </h2>
-        <p className="mx-auto mt-3 max-w-md" style={{ color: 'var(--text-tertiary)' }}>
+        <p className="mx-auto mt-3 max-w-md text-white/40">
           Free audit. Real crawling. Actionable fixes. One login, then you&apos;re set.
         </p>
-        <div className="mt-8 flex justify-center">
-          <UrlInput onSubmit={handleSubmit} loading={loading} variant="elevated" />
-        </div>
-      </section>
-
-      {/* Landing page variants nav */}
-      <section className="relative border-t px-4 py-6 text-center" style={{ borderColor: 'var(--border-default)' }}>
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Landing page variants:{' '}
-          <span className="font-semibold" style={{ color: 'var(--color-primary-600)' }}>A (current)</span>
-          {' '}&middot;{' '}
-          <Link href="/landing/b" className="underline" style={{ color: 'var(--text-tertiary)' }}>B — Dark/Tool</Link>
-          {' '}&middot;{' '}
-          <Link href="/landing/c" className="underline" style={{ color: 'var(--text-tertiary)' }}>C — Minimal</Link>
-        </p>
+        <UrlInput onSubmit={handleSubmit} loading={loading} variant="elevated" className="mx-auto mt-8" />
       </section>
       </div>
     </div>

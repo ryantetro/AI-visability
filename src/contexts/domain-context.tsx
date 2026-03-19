@@ -4,14 +4,13 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ensureProtocol, getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
-import { ADVANCED_PAID_PREVIEW_KEY } from '@/app/advanced/lib/constants';
+import { planStringToTier, PLANS } from '@/lib/pricing';
+import { usePlan } from '@/hooks/use-plan';
 import {
   loadStoredDomains,
   saveStoredDomains,
   loadHiddenDomains,
   saveHiddenDomains,
-  loadStoredBoolean,
-  saveStoredBoolean,
 } from '@/app/advanced/lib/storage';
 import {
   normalizeDomainInput,
@@ -58,7 +57,7 @@ interface DomainContextValue {
   // Unlock
   unlockModalOpen: boolean;
   setUnlockModalOpen: (v: boolean) => void;
-  handleUnlockComplete: () => void;
+  handleUnlockComplete: (plan?: string) => void;
   pendingDomain: string | null;
   paidOverride: boolean;
   debugPaidPreview: boolean;
@@ -84,7 +83,8 @@ export function DomainContextProvider({
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialReportId = reportId ?? '';
-  const debugPaidPreview = searchParams.get('debugPaid') === '1';
+  const debugPaidPreview = process.env.NODE_ENV === 'development' && searchParams.get('debugPaid') === '1';
+  const { tier: planTier, isPaid: planIsPaid } = usePlan();
 
   const [recentScans, setRecentScans] = useState<RecentScanData[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
@@ -110,32 +110,112 @@ export function DomainContextProvider({
   // Caches for instant domain switching
   const [reportCache, setReportCache] = useState<Record<string, DashboardReportData>>({});
   const [filesCache, setFilesCache] = useState<Record<string, FilesData>>({});
+  const dbMigrationDone = useRef(false);
 
-  // --- Load initial data ---
+  // --- Load initial data: localStorage first (fast), then reconcile with DB ---
   useEffect(() => {
+    // Load localStorage immediately for instant display
     setManualDomains(loadStoredDomains());
     setHiddenDomains(loadHiddenDomains());
-    setPaidOverride(loadStoredBoolean(ADVANCED_PAID_PREVIEW_KEY));
+
+    // Then fetch from DB and reconcile
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/user/domains');
+        if (!res.ok) return;
+        const data = await res.json();
+        const dbDomains: string[] = (data.domains ?? []).map((d: { domain: string }) => d.domain);
+        if (!active) return;
+
+        if (dbDomains.length > 0) {
+          // DB wins — update local state and localStorage cache
+          setManualDomains(dbDomains);
+          saveStoredDomains(dbDomains);
+          setHiddenDomains([]);
+          saveHiddenDomains([]);
+        } else if (!dbMigrationDone.current) {
+          // One-time migration: push localStorage domains to DB
+          dbMigrationDone.current = true;
+          const localDomains = loadStoredDomains();
+          for (const domain of localDomains) {
+            try {
+              await fetch('/api/user/domains', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain }),
+              });
+            } catch { /* best-effort migration */ }
+          }
+        }
+      } catch { /* keep localStorage data on network failure */ }
+    })();
+
+    return () => { active = false; };
   }, []);
 
+  // --- Load recent scans from DB API ---
   useEffect(() => {
     let active = true;
     async function loadRecentScans() {
-      const ids = getRecentScanEntries().map((entry) => entry.id);
-      if (ids.length === 0) { if (active) { setRecentScans([]); setRecentLoading(false); } return; }
       try {
+        const res = await fetch('/api/user/scans');
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        const scans = data.scans as RecentScanData[];
+        if (!active) return;
+
+        // If we have an initialReportId not in the list, also fetch it individually
+        if (initialReportId && !scans.some((s) => s.id === initialReportId)) {
+          try {
+            const singleRes = await fetch(`/api/scan/${initialReportId}`);
+            if (singleRes.ok) {
+              const singleData = await singleRes.json() as RecentScanData;
+              scans.unshift(singleData);
+            }
+          } catch { /* skip */ }
+        }
+
+        setRecentScans(
+          scans
+            .filter((entry): entry is RecentScanData => Boolean(entry))
+            .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))
+        );
+      } catch {
+        // Fallback to localStorage method
+        const fromStorage = getRecentScanEntries().map((entry) => entry.id);
+        const ids = [...new Set([...fromStorage, initialReportId].filter(Boolean))];
+        if (ids.length === 0) { if (active) { setRecentScans([]); } return; }
         const results = await Promise.all(ids.map(async (scanId) => {
           try { const response = await fetch(`/api/scan/${scanId}`); if (!response.ok) return null; return (await response.json()) as RecentScanData; } catch { return null; }
         }));
         if (!active) return;
         setRecentScans(results.filter((entry): entry is RecentScanData => Boolean(entry)).sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt)));
-      } finally { if (active) setRecentLoading(false); }
+      } finally {
+        if (active) setRecentLoading(false);
+      }
     }
     void loadRecentScans();
     return () => { active = false; };
-  }, []);
+  }, [initialReportId]);
 
   useEffect(() => { if (initialReportId) rememberRecentScan(initialReportId); }, [initialReportId]);
+
+  // Re-fetch a single scan's metadata and update its entry in recentScans
+  const refreshScanEntry = useCallback(async (scanId: string) => {
+    try {
+      const res = await fetch(`/api/scan/${scanId}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as RecentScanData;
+      setRecentScans(prev => {
+        const exists = prev.some(s => s.id === scanId);
+        const updated = exists
+          ? prev.map(s => s.id === scanId ? data : s)
+          : [data, ...prev];
+        return updated.sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
+      });
+    } catch { /* silently fail */ }
+  }, []);
 
   // Checkout verification
   useEffect(() => {
@@ -174,17 +254,20 @@ export function DomainContextProvider({
     paidDomains.forEach(addDomain);
     manualDomains.forEach(addDomain);
     if (report?.url) addDomain(getDomain(report.url));
+    if (initialReportId) {
+      const match = recentScans.find((s) => s.id === initialReportId);
+      if (match) addDomain(getDomain(match.url));
+    }
     return [...domains].map<SiteSummary>((domain) => {
       const latestScan = getLatestScanByDomain(recentScans, domain);
       const latestPaidScan = getLatestPaidScanByDomain(recentScans, domain);
       return { domain, url: latestPaidScan?.url ?? latestScan?.url ?? `https://${domain}`, latestScan, latestPaidScan, lastTouchedAt: latestPaidScan?.completedAt ?? latestPaidScan?.createdAt ?? latestScan?.completedAt ?? latestScan?.createdAt ?? null, source: paidDomains.includes(domain) ? 'paid' : 'manual' };
     }).sort((a, b) => (b.lastTouchedAt ?? 0) - (a.lastTouchedAt ?? 0));
-  }, [hiddenDomains, manualDomains, paidDomains, recentScans, report?.url]);
+  }, [hiddenDomains, manualDomains, paidDomains, recentScans, report?.url, initialReportId]);
 
   // Auto-select first domain when none selected
   useEffect(() => {
     if (!selectedDomain && monitoredSites.length > 0 && !recentLoading) {
-      // If there's a report matching initialReportId, select that domain
       if (initialReportId && recentScans.length > 0) {
         const matchedScan = recentScans.find((scan) => scan.id === initialReportId);
         if (matchedScan) {
@@ -197,7 +280,13 @@ export function DomainContextProvider({
   }, [selectedDomain, monitoredSites, recentLoading, initialReportId, recentScans]);
 
   const expandedSite = monitoredSites.find((s) => s.domain === selectedDomain) ?? null;
-  const activeWorkspaceReportId = expandedSite?.latestPaidScan?.id ?? expandedSite?.latestScan?.id ?? (initialReportId || '');
+
+  const initialBelongsToSelected = initialReportId && expandedSite
+    ? recentScans.some((s) => s.id === initialReportId && getDomain(s.url) === expandedSite.domain)
+    : false;
+  const activeWorkspaceReportId = initialBelongsToSelected
+    ? initialReportId
+    : expandedSite?.latestScan?.id ?? expandedSite?.latestPaidScan?.id ?? (initialReportId || '');
 
   // --- Fetch workspace data (with caching) ---
   useEffect(() => {
@@ -208,7 +297,6 @@ export function DomainContextProvider({
       return;
     }
 
-    // Check cache first
     const cachedReport = reportCache[activeWorkspaceReportId];
     const cachedFiles = filesCache[activeWorkspaceReportId];
     if (cachedReport) {
@@ -230,6 +318,7 @@ export function DomainContextProvider({
         if (!active) return;
         setReport(reportPayload);
         setReportCache((prev) => ({ ...prev, [activeWorkspaceReportId]: reportPayload }));
+        void refreshScanEntry(activeWorkspaceReportId);
 
         const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`);
         if (!filesRes.ok) { if (filesRes.status === 403) { setFiles(null); return; } const p = (await filesRes.json().catch(() => ({}))) as ApiErrorPayload; throw new Error(p.error || 'Failed to load files'); }
@@ -242,7 +331,37 @@ export function DomainContextProvider({
     return () => { active = false; };
   }, [activeWorkspaceReportId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasPaidAccess = debugPaidPreview || paidOverride || Boolean(report?.hasPaid) || recentScans.some((s) => s.hasPaid);
+  // Poll when report fetch failed with "Scan not complete" (rescan in progress)
+  useEffect(() => {
+    if (loadError !== 'Scan not complete' || !activeWorkspaceReportId) return;
+    const interval = setInterval(async () => {
+      try {
+        const reportRes = await fetch(`/api/scan/${activeWorkspaceReportId}/report`);
+        if (!reportRes.ok) {
+          const p = (await reportRes.json().catch(() => ({}))) as ApiErrorPayload;
+          if (p.error !== 'Scan not complete') setLoadError(p.error || 'Failed to load report');
+          return;
+        }
+        const reportPayload = (await reportRes.json()) as DashboardReportData;
+        setReport(reportPayload);
+        setReportCache((prev) => ({ ...prev, [activeWorkspaceReportId]: reportPayload }));
+        setLoadError('');
+        void refreshScanEntry(activeWorkspaceReportId);
+        const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`);
+        if (filesRes.ok) {
+          const filesPayload = (await filesRes.json()) as FilesData;
+          setFiles(filesPayload);
+          setFilesCache((prev) => ({ ...prev, [activeWorkspaceReportId]: filesPayload }));
+        }
+      } catch {
+        // Keep polling on transient errors
+      }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [loadError, activeWorkspaceReportId]);
+
+  // Use plan tier for paid access instead of scan-level flags
+  const hasPaidAccess = debugPaidPreview || planIsPaid || paidOverride || Boolean(report?.hasPaid) || recentScans.some((s) => s.hasPaid);
   const normalizedDomain = normalizeDomainInput(addDomainInput);
   const inputFaviconUrl = useMemo(() => {
     if (!addDomainInput.trim()) return null;
@@ -259,40 +378,117 @@ export function DomainContextProvider({
     if (!normalizedDomain) { setAddError('Please enter a domain'); return; }
     if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(normalizedDomain)) { setAddError('Please enter a valid domain (e.g. example.com)'); return; }
     if (monitoredSites.some((s) => s.domain === normalizedDomain) || manualDomains.includes(normalizedDomain)) { setAddError('This domain is already being monitored'); return; }
-    if (monitoredSites.length >= 10) { setAddError('Maximum 10 domains allowed'); return; }
     if (!confirmChecked) { setAddError('Please confirm domain ownership'); return; }
-    if (!hasPaidAccess) { setPendingDomain(normalizedDomain); setUnlockModalOpen(true); return; }
+
+    // Write-through to DB first
+    try {
+      const res = await fetch('/api/user/domains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: normalizedDomain }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setAddError(data.error || 'Failed to add domain');
+        if (res.status === 403) setUnlockModalOpen(true);
+        return;
+      }
+    } catch {
+      setAddError('Failed to save domain. Please try again.');
+      return;
+    }
+
+    // Update local state and cache
     const nextManual = [...manualDomains, normalizedDomain]; setManualDomains(nextManual); saveStoredDomains(nextManual);
     const nextHidden = hiddenDomains.filter((d) => d !== normalizedDomain); setHiddenDomains(nextHidden); saveHiddenDomains(nextHidden);
     const matchingPaidScan = getLatestPaidScanByDomain(recentScans, normalizedDomain);
     if (matchingPaidScan) { try { await fetch('/api/monitoring', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scanId: matchingPaidScan.id, alertThreshold: 5 }) }); setMonitoringConnected((c) => ({ ...c, [normalizedDomain]: true })); } catch { /* silently fail */ } }
     setSelectedDomain(normalizedDomain); setAddDomainInput(''); setConfirmChecked(false);
-  }, [normalizedDomain, monitoredSites, manualDomains, confirmChecked, hasPaidAccess, hiddenDomains, recentScans]);
+  }, [normalizedDomain, monitoredSites, manualDomains, confirmChecked, hiddenDomains, recentScans]);
 
   const handleRemoveDomain = useCallback((domain: string) => {
+    // Write-through to DB
+    fetch('/api/user/domains', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain }),
+    }).catch(() => { /* best-effort */ });
+
     const nextManual = manualDomains.filter((e) => e !== domain);
     const nextHidden = hiddenDomains.includes(domain) ? hiddenDomains : [...hiddenDomains, domain];
     setManualDomains(nextManual); saveStoredDomains(nextManual); setHiddenDomains(nextHidden); saveHiddenDomains(nextHidden);
     if (selectedDomain === domain) setSelectedDomain(null);
   }, [manualDomains, hiddenDomains, selectedDomain]);
 
-  const handleUnlockComplete = useCallback(() => {
-    if (!pendingDomain) return;
-    setPaidOverride(true); saveStoredBoolean(ADVANCED_PAID_PREVIEW_KEY, true);
-    if (!manualDomains.includes(pendingDomain)) { const next = [pendingDomain, ...manualDomains]; setManualDomains(next); saveStoredDomains(next); }
-    setSelectedDomain(pendingDomain); setPendingDomain(null); setUnlockModalOpen(false); setAddDomainInput('');
+  const handleUnlockComplete = useCallback((plan?: string) => {
+    const selectedPlan = plan || 'starter_monthly';
+    const scanId = pendingDomain ? `upgrade_${pendingDomain}` : `upgrade_direct`;
+    (async () => {
+      try {
+        const res = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scanId, plan: selectedPlan }),
+        });
+        if (!res.ok) {
+          setPaidOverride(true);
+          if (pendingDomain && !manualDomains.includes(pendingDomain)) { const next = [pendingDomain, ...manualDomains]; setManualDomains(next); saveStoredDomains(next); }
+          if (pendingDomain) setSelectedDomain(pendingDomain);
+          setPendingDomain(null); setUnlockModalOpen(false); setAddDomainInput('');
+          return;
+        }
+        const session = await res.json();
+        if (session.url) {
+          if (session.url.startsWith('/checkout/')) {
+            const verifyRes = await fetch('/api/checkout/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: session.id }) });
+            if (verifyRes.ok) {
+              setPaidOverride(true);
+              if (pendingDomain && !manualDomains.includes(pendingDomain)) { const next = [pendingDomain, ...manualDomains]; setManualDomains(next); saveStoredDomains(next); }
+              if (pendingDomain) setSelectedDomain(pendingDomain);
+              setPendingDomain(null); setUnlockModalOpen(false); setAddDomainInput('');
+              setCheckoutBanner('Payment confirmed! Your plan has been upgraded.');
+            }
+          } else {
+            window.location.href = session.url;
+          }
+        }
+      } catch {
+        setPaidOverride(true);
+        if (pendingDomain && !manualDomains.includes(pendingDomain)) { const next = [pendingDomain, ...manualDomains]; setManualDomains(next); saveStoredDomains(next); }
+        if (pendingDomain) setSelectedDomain(pendingDomain);
+        setPendingDomain(null); setUnlockModalOpen(false); setAddDomainInput('');
+      }
+    })();
   }, [pendingDomain, manualDomains]);
 
   const handleRunFirstScan = useCallback(async (site: SiteSummary) => {
     setActionError('');
-    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: site.url }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); router.push(`/analysis?scan=${payload.id}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); }
+    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: site.url }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); rememberRecentScan(payload.id); router.push(`/report?report=${payload.id}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); }
   }, [router]);
 
   const handleReaudit = useCallback(async () => {
-    if (!files?.url) return;
+    const scanUrl = files?.url ?? report?.url ?? (expandedSite ? expandedSite.url : null);
+    if (!scanUrl) return;
     setActionError(''); setReauditLoading(true);
-    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: files.url, force: true }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); router.push(`/analysis?scan=${payload.id}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); } finally { setReauditLoading(false); }
-  }, [files?.url, router]);
+    try {
+      const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: scanUrl, force: true }) });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Failed to start scan');
+      rememberRecentScan(payload.id);
+      const newScanEntry: RecentScanData = {
+        id: payload.id,
+        url: scanUrl,
+        status: 'pending',
+        hasEmail: true,
+        hasPaid: Boolean(expandedSite?.latestPaidScan),
+        createdAt: Date.now(),
+      };
+      setRecentScans((prev) => [newScanEntry, ...prev]);
+      setReport(null); setFiles(null); setLoadError(''); setWorkspaceLoading(true);
+      setReportCache({}); setFilesCache({});
+      router.push(`/report?report=${payload.id}`);
+    } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); } finally { setReauditLoading(false); }
+  }, [files?.url, report?.url, expandedSite, router]);
 
   const handleEnableMonitoring = useCallback(async () => {
     if (!expandedSite?.latestPaidScan?.id) return;

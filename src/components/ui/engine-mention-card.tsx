@@ -1,14 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { AIEngine, EngineBreakdown } from '@/types/ai-mentions';
-
-const ENGINE_LABELS: Record<AIEngine, string> = {
-  chatgpt: 'ChatGPT',
-  perplexity: 'Perplexity',
-  gemini: 'Gemini',
-  claude: 'Claude',
-};
+import type { AIEngine, EngineBreakdown, MentionEngineStatus } from '@/types/ai-mentions';
+import { getAIEngineLabel } from '@/lib/ai-engines';
 
 const SENTIMENT_LABELS: Record<EngineBreakdown['sentiment'], { text: string; color: string }> = {
   positive: { text: 'Positive', color: 'text-emerald-400' },
@@ -20,13 +14,21 @@ const SENTIMENT_LABELS: Record<EngineBreakdown['sentiment'], { text: string; col
 interface EngineMentionCardProps {
   engine: AIEngine;
   breakdown: EngineBreakdown;
+  status?: MentionEngineStatus;
 }
 
-export function EngineMentionCard({ engine, breakdown }: EngineMentionCardProps) {
-  const label = ENGINE_LABELS[engine];
+export function EngineMentionCard({ engine, breakdown, status }: EngineMentionCardProps) {
+  const label = getAIEngineLabel(engine);
   const sentimentInfo = SENTIMENT_LABELS[breakdown.sentiment];
   const ratio = breakdown.total > 0 ? breakdown.mentioned / breakdown.total : 0;
   const barWidth = Math.round(ratio * 100);
+  const statusText = status?.status === 'not_backfilled'
+    ? 'Not tested on this scan yet'
+    : status?.status === 'not_configured'
+      ? 'Not configured on this run'
+      : status?.status === 'error'
+        ? 'Engine test error'
+        : sentimentInfo.text;
 
   return (
     <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
@@ -47,9 +49,13 @@ export function EngineMentionCard({ engine, breakdown }: EngineMentionCardProps)
       <p className={cn('mt-2 flex items-center gap-1.5 text-[11px]', sentimentInfo.color)}>
         <span className={cn(
           'h-1.5 w-1.5 rounded-full',
-          sentimentInfo.color.replace('text-', 'bg-')
+          (status?.status === 'not_backfilled' || status?.status === 'not_configured')
+            ? 'bg-zinc-500'
+            : status?.status === 'error'
+              ? 'bg-red-500'
+              : sentimentInfo.color.replace('text-', 'bg-')
         )} />
-        {sentimentInfo.text}
+        {statusText}
       </p>
     </div>
   );

@@ -28,10 +28,6 @@ export async function GET(
     return NextResponse.json({ error: 'This file bundle belongs to another account.' }, { status: 403 });
   }
 
-  if (!scan.paid) {
-    return NextResponse.json({ error: 'Payment required' }, { status: 403 });
-  }
-
   if (scan.status !== 'complete' || !scan.crawlData) {
     return NextResponse.json({ error: 'Scan not complete' }, { status: 400 });
   }

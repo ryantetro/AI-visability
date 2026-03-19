@@ -1,7 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { scoreColor } from '../lib/utils';
+import { getFaviconUrl } from '@/lib/url-utils';
+import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
+import { AI_ENGINE_META } from '@/lib/ai-engines';
+import type { AIEngine } from '@/types/ai-mentions';
 
 export function CenteredLoading({ label }: { label: string }) {
   return (
@@ -49,5 +54,70 @@ export function ChartTooltipContent({ active, payload, label }: { active?: boole
       <p className="font-medium">{label}</p>
       <p className="mt-0.5 text-white">{Math.round(payload[0].value)}%</p>
     </div>
+  );
+}
+
+/* ── Engine Icon ────────────────────────────────────────────────────────── */
+
+const ENGINE_ICON_MAP: Record<AIEngine, React.ComponentType<{ className?: string }>> = {
+  chatgpt: ChatGPTIcon,
+  perplexity: PerplexityIcon,
+  gemini: GeminiIcon,
+  claude: ClaudeIcon,
+};
+
+const ENGINE_ICON_COLORS = Object.fromEntries(
+  Object.entries(AI_ENGINE_META).map(([engine, meta]) => [engine, meta.color])
+) as Record<AIEngine, string>;
+
+export function EngineIcon({ engine, className }: { engine: string; className?: string }) {
+  const normalized = engine.toLowerCase() as AIEngine;
+  const Icon = ENGINE_ICON_MAP[normalized];
+  if (Icon) return <Icon className={className ?? 'size-4'} />;
+  // Fallback: colored circle with first letter
+  const color = ENGINE_ICON_COLORS[normalized] ?? '#71717a';
+  return (
+    <span
+      className={cn('inline-flex items-center justify-center rounded-full text-[8px] font-bold text-white', className ?? 'size-4')}
+      style={{ backgroundColor: color }}
+    >
+      {engine.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+/* ── Brand Favicon ──────────────────────────────────────────────────────── */
+
+function brandAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 55%, 50%)`;
+}
+
+export function BrandFavicon({ name, size = 20 }: { name: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const domain = name.includes('.') ? name : `${name}.com`;
+
+  if (failed) {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+        style={{ width: size, height: size, backgroundColor: brandAvatarColor(name) }}
+      >
+        {name.charAt(0).toUpperCase()}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={getFaviconUrl(domain, size)}
+      alt=""
+      width={size}
+      height={size}
+      className="shrink-0 rounded-sm object-contain"
+      onError={() => setFailed(true)}
+    />
   );
 }

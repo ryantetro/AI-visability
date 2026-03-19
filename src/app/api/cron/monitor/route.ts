@@ -1,7 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase, getAlertService, getMentionTester, getPromptMonitoring } from '@/lib/services/registry';
 import { analyzeResponse } from '@/lib/ai-mentions/mention-analyzer';
+import { listActiveMonitoringDomains } from '@/lib/monitoring';
+import { startScan } from '@/lib/scan-workflow';
+import { getSupabaseClient } from '@/lib/supabase';
+import { getDomain } from '@/lib/url-utils';
 import type { MentionPrompt } from '@/types/ai-mentions';
+
+const VALID_CATEGORIES: MentionPrompt['category'][] = [
+  'direct', 'category', 'comparison', 'recommendation',
+  'workflow', 'use-case', 'problem-solution', 'buyer-intent',
+];
+
+function isValidCategory(cat: string): cat is MentionPrompt['category'] {
+  return (VALID_CATEGORIES as string[]).includes(cat);
+}
+
+const RESCAN_STALENESS_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_RESCANS_PER_RUN = 5;
+
+async function getUserIdByEmail(email: string): Promise<string | null> {
+  try {
+    const supabase = getSupabaseClient();
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single();
+    return data?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 function getWeekStart(): string {
   const now = new Date();
@@ -23,6 +53,57 @@ export async function GET(request: NextRequest) {
   const alertService = getAlertService();
 
   try {
+    // ── Phase 0: Automated re-scans for score trending ──────────
+    const rescans: Array<{ domain: string; status: string; scanId?: string }> = [];
+
+    try {
+      const monitoredDomains = await listActiveMonitoringDomains();
+      let rescanCount = 0;
+
+      for (const record of monitoredDomains) {
+        if (rescanCount >= MAX_RESCANS_PER_RUN) break;
+
+        try {
+          const domain = getDomain(record.url);
+          const latestScan = await db.findLatestScanByDomain(domain);
+          const lastCompleted = latestScan?.completedAt ?? 0;
+
+          if (Date.now() - lastCompleted < RESCAN_STALENESS_MS) {
+            rescans.push({ domain, status: 'recent, skipping' });
+            continue;
+          }
+
+          const userId = await getUserIdByEmail(record.email);
+          if (!userId) {
+            rescans.push({ domain, status: 'no user found, skipping' });
+            continue;
+          }
+
+          const result = await startScan(
+            {
+              url: record.url,
+              force: true,
+              ip: 'cron',
+              userEmail: record.email,
+              userId,
+            },
+            {
+              db,
+              schedule: async (task) => { await task(); },
+            }
+          );
+
+          const scanId = (result.body as { id?: string }).id;
+          rescans.push({ domain, status: result.status === 200 ? 'rescanned' : 'failed', scanId });
+          if (result.status === 200) rescanCount++;
+        } catch {
+          rescans.push({ domain: record.domain, status: 'error' });
+        }
+      }
+    } catch {
+      rescans.push({ domain: '*', status: 'phase0 error' });
+    }
+
     // ── Phase 1: Existing score-check loop ───────────────────────
     const scans = await db.listCompletedScans(10);
     const results = [];
@@ -77,9 +158,7 @@ export async function GET(request: NextRequest) {
           const mentionPrompt: MentionPrompt = {
             id: prompt.id,
             text: prompt.promptText,
-            category: (prompt.category === 'brand' || prompt.category === 'competitor' || prompt.category === 'industry')
-              ? prompt.category as 'direct'
-              : 'direct',
+            category: isValidCategory(prompt.category) ? prompt.category : 'direct',
             industry: prompt.industry ?? '',
           };
 
@@ -133,6 +212,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
+      rescans,
       checked: results.length,
       results,
       promptMonitoring: {

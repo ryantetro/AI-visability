@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { isValidUrl } from '@/lib/url-utils';
+import { useAuth } from '@/hooks/use-auth';
 import { colors, brand } from '@/styles/tokens';
 
 export default function LandingB() {
   const router = useRouter();
+  const { user } = useAuth();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -16,6 +18,10 @@ export default function LandingB() {
     e.preventDefault();
     if (!url.trim() || !isValidUrl(url)) {
       setError('Please enter a valid URL');
+      return;
+    }
+    if (!user) {
+      router.push(`/login?next=/analysis&scanUrl=${encodeURIComponent(url)}`);
       return;
     }
     setLoading(true);
@@ -92,7 +98,7 @@ export default function LandingB() {
           </form>
 
           <p className="mt-4 text-xs" style={{ color: colors.neutral[600] }}>
-            Free audit — no signup required. Real Puppeteer crawling. Results in 30 seconds.
+            Free audit. Secure account. Real Puppeteer crawling. Results in about 30 seconds.
           </p>
         </div>
       </section>

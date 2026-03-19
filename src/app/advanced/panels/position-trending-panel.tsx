@@ -6,6 +6,7 @@ import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primiti
 import { cn } from '@/lib/utils';
 import { ENGINE_COLORS } from '../lib/constants';
 import type { TrendPoint } from '../lib/types';
+import { getAIEngineLabel } from '@/lib/ai-engines';
 
 export function PositionTrendingPanel({ domain }: { domain: string }) {
   const [trends, setTrends] = useState<TrendPoint[]>([]);
@@ -58,7 +59,7 @@ export function PositionTrendingPanel({ domain }: { domain: string }) {
         {engines.map((engine) => (
           <div key={engine} className="flex items-center gap-1.5">
             <span className="inline-block h-2 w-2 rounded-full" style={{ background: ENGINE_COLORS[engine] ?? '#71717a' }} />
-            <span className="text-[10px] capitalize text-zinc-500">{engine}</span>
+            <span className="text-[10px] text-zinc-500">{getAIEngineLabel(engine as TrendPoint['engine'])}</span>
           </div>
         ))}
       </div>
@@ -74,7 +75,7 @@ export function PositionTrendingPanel({ domain }: { domain: string }) {
             const delta = latest && earliest ? latest.mentionRate - earliest.mentionRate : 0;
             return (
               <div key={engine} className="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-center">
-                <p className="text-[10px] capitalize text-zinc-500">{engine}</p>
+                <p className="text-[10px] text-zinc-500">{getAIEngineLabel(engine as TrendPoint['engine'])}</p>
                 <p className="text-sm font-bold tabular-nums text-zinc-200">{latest?.mentionRate ?? 0}%</p>
                 {delta !== 0 && <p className={cn('text-[9px] tabular-nums', delta > 0 ? 'text-[#25c972]' : 'text-[#ff5252]')}>{delta > 0 ? '+' : ''}{delta}%</p>}
               </div>

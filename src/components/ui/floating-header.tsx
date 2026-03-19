@@ -20,26 +20,27 @@ export function FloatingHeader() {
     return (
         <header
             className={cn(
-                'relative z-50 w-full max-w-3xl rounded-full border shadow-lg mx-4',
-                'bg-[#0c0a09]/95 supports-[backdrop-filter]:bg-[#0c0a09]/80 backdrop-blur-lg',
-                'border-[rgba(255,255,255,0.08)]'
+                'relative z-50 w-full max-w-3xl rounded-2xl border mx-4',
+                'bg-[rgba(8,8,10,0.65)] supports-[backdrop-filter]:bg-[rgba(8,8,10,0.45)] backdrop-blur-2xl backdrop-saturate-150',
+                'border-[rgba(255,255,255,0.06)]',
+                'shadow-[0_1px_2px_rgba(0,0,0,0.3),0_8px_32px_rgba(0,0,0,0.2)]'
             )}
         >
-            <nav className="flex items-center justify-between p-1.5 pl-3">
+            <nav className="flex items-center justify-between px-2 py-1.5 sm:px-3">
                 {/* Logo Section */}
-                <Link href="/" className="hover:bg-[rgba(255,255,255,0.05)] flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 transition-colors duration-100">
-                    <div className="flex items-center justify-center rounded-full bg-[var(--color-primary-500)] p-1 h-6 w-6 shadow-[0_0_18px_rgba(53,109,244,0.42)]">
+                <Link href="/" className="flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-1.5 transition-colors duration-150 hover:bg-[rgba(255,255,255,0.04)]">
+                    <div className="flex items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-primary-400)] to-[var(--color-primary-600)] h-7 w-7 shadow-[0_0_12px_rgba(53,109,244,0.25)]">
                         <span className="text-white text-[10px] font-bold leading-none tracking-tight">AI</span>
                     </div>
-                    <p className="font-sans text-base font-bold tracking-tight">AISO</p>
+                    <span className="text-[15px] font-semibold tracking-[-0.01em] text-white/90">AISO</span>
                 </Link>
 
                 {/* Desktop Links */}
-                <div className="hidden items-center gap-1 lg:flex">
+                <div className="hidden items-center gap-0.5 lg:flex">
                     {links.map((link) => (
                         <Link
                             key={link.label}
-                            className={buttonVariants({ variant: 'ghost', size: 'sm', className: "rounded-full hover:bg-[rgba(255,255,255,0.05)] hover:text-white text-[#d6d3d1]" })}
+                            className={buttonVariants({ variant: 'ghost', size: 'sm', className: "rounded-lg hover:bg-[rgba(255,255,255,0.05)] hover:text-white/95 text-white/50 text-[13px] font-medium transition-colors duration-150 px-3" })}
                             href={link.href}
                         >
                             {link.label}
@@ -48,12 +49,12 @@ export function FloatingHeader() {
                 </div>
 
                 {/* Mobile menu & CTAs */}
-                <div className="flex items-center gap-2">
-                    <Button size="sm" variant="ghost" className="rounded-full hidden sm:flex hover:bg-[rgba(255,255,255,0.05)] hover:text-white text-[#d6d3d1]" asChild>
+                <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="ghost" className="rounded-lg hidden sm:flex hover:bg-[rgba(255,255,255,0.05)] hover:text-white/95 text-white/50 text-[13px] font-medium h-8" asChild>
                         <Link href="/#resources">Resources</Link>
                     </Button>
-                    <Button size="sm" className="rounded-full bg-[var(--color-primary-500)] hover:bg-[var(--color-primary-600)] text-white shadow-[0_0_20px_rgba(53,109,244,0.32)] hidden sm:flex" asChild>
-                        <Link href="/#scan">Check My AI Score</Link>
+                    <Button size="sm" className="rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/90 text-[13px] font-medium border border-white/[0.06] hidden sm:flex h-8 px-3.5 transition-all duration-150" asChild>
+                        <Link href="/#scan">Get Started</Link>
                     </Button>
 
                     <Sheet open={open} onOpenChange={setOpen}>
@@ -61,28 +62,28 @@ export function FloatingHeader() {
                             size="icon"
                             variant="outline"
                             onClick={() => setOpen(!open)}
-                            className="lg:hidden rounded-full h-8 w-8 bg-transparent border-[rgba(255,255,255,0.1)] text-white hover:bg-[rgba(255,255,255,0.05)]"
+                            className="lg:hidden rounded-lg h-8 w-8 bg-transparent border-[rgba(255,255,255,0.08)] text-white/70 hover:bg-[rgba(255,255,255,0.05)] hover:text-white"
                         >
                             <MenuIcon className="size-4" />
                         </Button>
                         <SheetContent
-                            className="bg-[#0c0a09]/95 supports-[backdrop-filter]:bg-[#0c0a09]/80 gap-0 backdrop-blur-xl border-[rgba(255,255,255,0.08)]"
+                            className="bg-[rgba(8,8,10,0.95)] supports-[backdrop-filter]:bg-[rgba(8,8,10,0.85)] gap-0 backdrop-blur-2xl border-[rgba(255,255,255,0.06)]"
                             showClose={false}
                             side="left"
                         >
-                            <div className="flex items-center gap-2 px-6 pt-8 pb-4">
-                                <div className="flex items-center justify-center rounded-full bg-[var(--color-primary-500)] p-1 h-6 w-6 shadow-[0_0_18px_rgba(53,109,244,0.42)]">
+                            <div className="flex items-center gap-2.5 px-6 pt-8 pb-4">
+                                <div className="flex items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-primary-400)] to-[var(--color-primary-600)] h-7 w-7 shadow-[0_0_12px_rgba(53,109,244,0.25)]">
                                     <span className="text-white text-[10px] font-bold leading-none tracking-tight">AI</span>
                                 </div>
-                                <p className="font-sans text-base font-bold tracking-tight text-white">AISO</p>
+                                <span className="text-[15px] font-semibold tracking-[-0.01em] text-white/90">AISO</span>
                             </div>
-                            <div className="grid gap-y-2 overflow-y-auto px-4 pt-4 pb-5">
+                            <div className="grid gap-y-1 overflow-y-auto px-4 pt-4 pb-5">
                                 {links.map((link) => (
                                     <Link
                                         key={link.label}
                                         className={buttonVariants({
                                             variant: 'ghost',
-                                            className: 'justify-start rounded-full text-[#d6d3d1] hover:text-white hover:bg-[rgba(255,255,255,0.05)] text-base h-12',
+                                            className: 'justify-start rounded-lg text-white/50 hover:text-white/90 hover:bg-[rgba(255,255,255,0.05)] text-[15px] h-12',
                                         })}
                                         href={link.href}
                                         onClick={() => setOpen(false)}
@@ -92,11 +93,11 @@ export function FloatingHeader() {
                                 ))}
                             </div>
                             <SheetFooter className="px-4 pb-8 flex-col gap-3 sm:flex-col">
-                                <Button variant="outline" className="w-full rounded-full border-[rgba(255,255,255,0.1)] text-white hover:bg-[rgba(255,255,255,0.05)] h-11" onClick={() => setOpen(false)} asChild>
+                                <Button variant="outline" className="w-full rounded-lg border-[rgba(255,255,255,0.08)] text-white/80 hover:bg-[rgba(255,255,255,0.05)] h-11" onClick={() => setOpen(false)} asChild>
                                     <Link href="/#resources">Resources</Link>
                                 </Button>
-                                <Button className="w-full rounded-full bg-[var(--color-primary-500)] hover:bg-[var(--color-primary-600)] text-white h-11" onClick={() => setOpen(false)} asChild>
-                                    <Link href="/#scan">Check My AI Score</Link>
+                                <Button className="w-full rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/90 border border-white/[0.06] h-11" onClick={() => setOpen(false)} asChild>
+                                    <Link href="/#scan">Get Started</Link>
                                 </Button>
                             </SheetFooter>
                         </SheetContent>

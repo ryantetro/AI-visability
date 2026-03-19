@@ -6,6 +6,7 @@ import { normalizeUrl, isValidUrl } from '@/lib/url-utils';
 import { checkScanRateLimit, recordScanRequest } from '@/lib/scan-rate-limit';
 import { runWebHealthEnrichment, createUnavailableWebHealth } from '@/lib/web-health';
 import { runMentionTests } from '@/lib/ai-mentions';
+import { AI_ENGINES } from '@/lib/ai-engines';
 import { CrawlData } from '@/types/crawler';
 import { DatabaseService } from '@/types/services';
 import { ScanJob, ScanProgress } from '@/types/scan';
@@ -210,7 +211,6 @@ export async function runScan(scanId: string, db = getDatabase()) {
 
     scan.status = 'scoring';
     scan.progress.status = 'scoring';
-    scan.progress.checks[7].status = 'running';
     await db.saveScan(scan);
 
     const enrichmentStartedAt = Date.now();
@@ -246,14 +246,19 @@ export async function runScan(scanId: string, db = getDatabase()) {
 
     try {
       const mentionTester = getMentionTester();
+      const availableEngines = mentionTester.availableEngines();
+      const disabledEngines = AI_ENGINES.filter((engine) => !availableEngines.includes(engine));
+      console.log(`[scan-workflow] Starting AI mention testing. Available engines: ${availableEngines.join(', ') || 'none'}. Disabled (no API key): ${disabledEngines.join(', ') || 'none'}.`);
       const mentionSummary = await withTimeout(
         runMentionTests(crawlData, mentionTester),
-        30000,
+        120000,
         'AI mention testing timed out.'
       );
+      console.log('[scan-workflow] AI mention testing complete, score:', mentionSummary.overallScore);
       scan.mentionSummary = mentionSummary;
       scan.progress.checks[6].status = 'done';
-    } catch {
+    } catch (err) {
+      console.error('[scan-workflow] AI mention testing failed:', err);
       scan.progress.checks[6].status = 'error';
     }
     await db.saveScan(scan);

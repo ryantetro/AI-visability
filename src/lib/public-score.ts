@@ -1,6 +1,8 @@
 import { getDatabase } from '@/lib/services/registry';
 import { ScoreResult } from '@/types/score';
+import { MentionSummary } from '@/types/ai-mentions';
 import { getDomain } from '@/lib/url-utils';
+import { normalizeMentionSummary } from '@/lib/ai-mentions/summary';
 
 export interface PublicScoreSummary {
   id: string;
@@ -10,6 +12,7 @@ export interface PublicScoreSummary {
   percentage: number;
   aiVisibility: number;
   webHealth: number | null;
+  mentionScore: number | null;
   total: number;
   maxTotal: number;
   band: string;
@@ -31,6 +34,7 @@ export async function getPublicScoreSummary(scanId: string): Promise<PublicScore
   }
 
   const scoreResult = scan.scoreResult as ScoreResult;
+  const mentionSummary = normalizeMentionSummary(scan.mentionSummary as MentionSummary | undefined);
 
   return {
     id: scan.id,
@@ -40,6 +44,7 @@ export async function getPublicScoreSummary(scanId: string): Promise<PublicScore
     percentage: scoreResult.scores.overall ?? scoreResult.percentage,
     aiVisibility: scoreResult.scores.aiVisibility,
     webHealth: scoreResult.scores.webHealth,
+    mentionScore: mentionSummary?.overallScore ?? null,
     total: scoreResult.total,
     maxTotal: scoreResult.maxTotal,
     band: scoreResult.overallBand,

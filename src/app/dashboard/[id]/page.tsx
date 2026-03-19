@@ -6,5 +6,5 @@ export default async function LegacyDashboardPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/advanced?report=${id}`);
+  redirect(`/dashboard?report=${id}`);
 }

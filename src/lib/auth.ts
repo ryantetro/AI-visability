@@ -1,11 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { AuthUser } from '@/types/auth';
-import { getSupabaseAnonClient, getSupabaseClient } from '@/lib/supabase';
+import {
+  createMiddlewareSupabaseClient,
+  createRouteHandlerSupabaseClient,
+  getSupabaseClient,
+} from '@/lib/supabase';
 
 export const AUTH_COOKIE_NAME = 'aiso_auth_session';
 export const REFRESH_COOKIE_NAME = 'aiso_refresh_token';
 const ACCESS_MAX_AGE = 60 * 60; // 1 hour
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+export const PASSWORD_MIN_LENGTH = 8;
+
+export type AuthFailureReason = 'no_session' | 'token_invalid' | 'refresh_failed' | 'signed_out';
+type AuthCallbackType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change' | 'email';
+
+export interface AuthSessionState {
+  user: AuthUser | null;
+  reason?: AuthFailureReason;
+  session: {
+    accessToken?: string;
+    refreshToken?: string;
+    expiresAt?: string | null;
+  } | null;
+}
+
+export class AuthActionError extends Error {
+  code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'AuthActionError';
+  }
+}
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -24,127 +52,123 @@ function buildNameFromEmail(email: string) {
     .join(' ');
 }
 
-export async function requestOtp(email: string, next?: string) {
-  const normalized = normalizeEmail(email);
-  if (!isValidEmail(normalized)) {
-    throw new Error('Please enter a valid email address.');
-  }
-
-  const supabase = getSupabaseAnonClient();
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  let redirectTo = `${siteUrl}/auth/callback`;
-  if (next && next.startsWith('/')) {
-    redirectTo += `?next=${encodeURIComponent(next)}`;
-  }
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email: normalized,
-    options: {
-      emailRedirectTo: redirectTo,
-    },
-  });
-  if (error) {
-    throw new Error(error.message);
-  }
+function secureCookies() {
+  return process.env.NODE_ENV === 'production';
 }
 
-export async function verifyOtp(email: string, code: string) {
-  const normalized = normalizeEmail(email);
-  if (!isValidEmail(normalized)) {
-    throw new Error('Please enter a valid email address.');
-  }
+function expiresAtIso(expiresAt?: number | null) {
+  if (!expiresAt) return null;
+  return new Date(expiresAt * 1000).toISOString();
+}
 
-  const supabase = getSupabaseAnonClient();
-  const { data, error } = await supabase.auth.verifyOtp({
-    email: normalized,
-    token: code.trim(),
-    type: 'email',
-  });
+function getDisplayName(user: { email?: string | null; user_metadata?: Record<string, unknown> } | null) {
+  const metadataName = typeof user?.user_metadata?.full_name === 'string'
+    ? user.user_metadata.full_name.trim()
+    : '';
+  if (metadataName) return metadataName;
+  return buildNameFromEmail(user?.email ?? '');
+}
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data.session) {
-    throw new Error('Verification succeeded but no session was returned.');
-  }
-
-  const user: AuthUser = {
-    id: data.user?.id ?? normalized,
-    email: data.user?.email ?? normalized,
-    name: buildNameFromEmail(data.user?.email ?? normalized),
+function toAuthUser(user: {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+} | null): AuthUser | null {
+  if (!user) return null;
+  const email = user.email ?? '';
+  return {
+    id: user.id,
+    email,
+    name: getDisplayName(user),
     provider: 'email',
   };
-
-  return { user, accessToken: data.session.access_token, refreshToken: data.session.refresh_token };
 }
 
-/** Verify Magic Link (token_hash from URL when user clicks email link). */
-export async function verifyMagicLink(tokenHash: string) {
-  const supabase = getSupabaseAnonClient();
-  const { data, error } = await supabase.auth.verifyOtp({
-    token_hash: tokenHash,
-    type: 'email',
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data.session) {
-    throw new Error('Verification succeeded but no session was returned.');
-  }
-
-  const user: AuthUser = {
-    id: data.user?.id ?? '',
-    email: data.user?.email ?? '',
-    name: buildNameFromEmail(data.user?.email ?? ''),
-    provider: 'email',
-  };
-
-  return { user, accessToken: data.session.access_token, refreshToken: data.session.refresh_token };
+function getAppUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 }
 
-export async function getAuthUserFromRequest(request: NextRequest): Promise<AuthUser | null> {
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  if (!token) return null;
+function isSupportedCallbackType(value: string | null | undefined): value is AuthCallbackType {
+  return value === 'signup'
+    || value === 'invite'
+    || value === 'magiclink'
+    || value === 'recovery'
+    || value === 'email_change'
+    || value === 'email';
+}
 
-  try {
-    const supabase = getSupabaseClient();
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data.user) return null;
+function buildAuthCallbackUrl(next?: string | null, scanUrl?: string | null) {
+  const url = new URL('/auth/callback', getAppUrl());
+  url.searchParams.set('next', sanitizeRedirectPath(next, '/analysis'));
+  if (scanUrl?.trim()) {
+    url.searchParams.set('scanUrl', scanUrl.trim());
+  }
+  return url.toString();
+}
 
-    return {
-      id: data.user.id,
-      email: data.user.email ?? '',
-      name: buildNameFromEmail(data.user.email ?? ''),
-      provider: 'email',
-    };
-  } catch {
-    return null;
+function validatePassword(password: string) {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    throw new AuthActionError('WEAK_PASSWORD', `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.`);
+  }
+
+  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    throw new AuthActionError('WEAK_PASSWORD', 'Password must include at least one letter and one number.');
   }
 }
 
-export function setAuthCookies(response: NextResponse, accessToken: string, refreshToken: string) {
-  const secure = process.env.NODE_ENV === 'production';
-  response.cookies.set(AUTH_COOKIE_NAME, accessToken, {
+function mapSupabaseAuthError(error: { message?: string | null }, fallbackMessage: string) {
+  const message = error.message?.trim() || fallbackMessage;
+
+  if (/user already registered/i.test(message)) {
+    return new AuthActionError('EMAIL_TAKEN', 'An account with this email already exists. Sign in or reset your password.');
+  }
+
+  if (/email not confirmed/i.test(message)) {
+    return new AuthActionError('EMAIL_NOT_CONFIRMED', 'Please verify your email before signing in.');
+  }
+
+  if (/invalid login credentials/i.test(message)) {
+    return new AuthActionError('INVALID_CREDENTIALS', 'We couldn’t sign you in with that email and password.');
+  }
+
+  if (/password should be at least|weak password/i.test(message)) {
+    return new AuthActionError('WEAK_PASSWORD', message);
+  }
+
+  return new AuthActionError('AUTH_ERROR', message);
+}
+
+export function buildPostAuthRedirectPath(next: string | null | undefined, scanUrl?: string | null) {
+  if (scanUrl?.trim()) {
+    return `/analysis?prefill=${encodeURIComponent(scanUrl.trim())}`;
+  }
+
+  return sanitizeRedirectPath(next, '/analysis');
+}
+
+export function setSessionCookies(
+  response: NextResponse,
+  session: { access_token: string; refresh_token: string; expires_at?: number | null }
+) {
+  const secure = secureCookies();
+  response.cookies.set(AUTH_COOKIE_NAME, session.access_token, {
     httpOnly: true,
     sameSite: 'lax',
     secure,
     path: '/',
     maxAge: ACCESS_MAX_AGE,
   });
-  response.cookies.set(REFRESH_COOKIE_NAME, refreshToken, {
+  response.cookies.set(REFRESH_COOKIE_NAME, session.refresh_token, {
     httpOnly: true,
     sameSite: 'lax',
     secure,
-    path: '/api/auth/refresh',
+    path: '/',
     maxAge: REFRESH_MAX_AGE,
   });
 }
 
-export function clearAuthCookies(response: NextResponse) {
-  const secure = process.env.NODE_ENV === 'production';
+export function clearSession(response: NextResponse) {
+  const secure = secureCookies();
   response.cookies.set(AUTH_COOKIE_NAME, '', {
     httpOnly: true,
     sameSite: 'lax',
@@ -156,11 +180,351 @@ export function clearAuthCookies(response: NextResponse) {
     httpOnly: true,
     sameSite: 'lax',
     secure,
-    path: '/api/auth/refresh',
+    path: '/',
     maxAge: 0,
   });
 }
 
+// Test-only token map — allows tests to bypass Supabase auth verification
+const _testTokens = new Map<string, AuthUser>();
+
+export function _setTestAuth(token: string, user: AuthUser) {
+  _testTokens.set(token, user);
+}
+
+export function _clearTestAuth() {
+  _testTokens.clear();
+}
+
+async function getUserFromAccessToken(accessToken: string): Promise<AuthUser | null> {
+  const testUser = _testTokens.get(accessToken);
+  if (testUser) return testUser;
+
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    if (error || !data.user) return null;
+    return toAuthUser(data.user);
+  } catch {
+    return null;
+  }
+}
+
+export async function refreshAuthSession(refreshToken: string) {
+  const supabase = createRouteHandlerSupabaseClient();
+  const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+  if (error || !data.session || !data.user) {
+    return null;
+  }
+
+  return {
+    user: toAuthUser(data.user),
+    session: {
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      expiresAt: expiresAtIso(data.session.expires_at),
+    },
+    rawSession: data.session,
+  };
+}
+
+export async function getServerAuthSession(request: NextRequest): Promise<AuthSessionState> {
+  const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+
+  if (accessToken) {
+    const user = await getUserFromAccessToken(accessToken);
+    if (user) {
+      return {
+        user,
+        session: { accessToken, refreshToken, expiresAt: null },
+      };
+    }
+  }
+
+  if (!refreshToken) {
+    return { user: null, reason: 'no_session', session: null };
+  }
+
+  try {
+    const refreshed = await refreshAuthSession(refreshToken);
+    if (!refreshed?.user || !refreshed.session.accessToken || !refreshed.session.refreshToken) {
+      return { user: null, reason: 'refresh_failed', session: null };
+    }
+
+    return {
+      user: refreshed.user,
+      reason: accessToken ? 'token_invalid' : undefined,
+      session: refreshed.session,
+    };
+  } catch {
+    return { user: null, reason: 'refresh_failed', session: null };
+  }
+}
+
+export async function getServerAuthUser(request: NextRequest): Promise<AuthUser | null> {
+  const auth = await getServerAuthSession(request);
+  return auth.user;
+}
+
+export async function getAuthUserFromRequest(request: NextRequest): Promise<AuthUser | null> {
+  return getServerAuthUser(request);
+}
+
+export async function requireServerAuth(request: NextRequest): Promise<AuthUser> {
+  const user = await getServerAuthUser(request);
+  if (!user) {
+    throw new Error('Authentication required.');
+  }
+  return user;
+}
+
+export async function signUpWithPassword(
+  email: string,
+  password: string,
+  options?: { name?: string; next?: string | null; scanUrl?: string | null }
+) {
+  const normalized = normalizeEmail(email);
+  if (!isValidEmail(normalized)) {
+    throw new AuthActionError('INVALID_EMAIL', 'Please enter a valid email address.');
+  }
+  validatePassword(password);
+
+  const supabase = createRouteHandlerSupabaseClient();
+  const fullName = options?.name?.trim();
+  const { data, error } = await supabase.auth.signUp({
+    email: normalized,
+    password,
+    options: {
+      emailRedirectTo: buildAuthCallbackUrl(options?.next, options?.scanUrl),
+      data: fullName ? { full_name: fullName } : undefined,
+    },
+  });
+
+  if (error) {
+    throw mapSupabaseAuthError(error, 'Failed to create your account.');
+  }
+
+  const user = toAuthUser(data.user);
+  if (!user) {
+    throw new AuthActionError('AUTH_ERROR', 'Your account was created, but we could not load your user profile.');
+  }
+
+  return {
+    user,
+    session: data.session,
+    requiresEmailVerification: !data.session,
+  };
+}
+
+export async function signInWithPassword(email: string, password: string) {
+  const normalized = normalizeEmail(email);
+  if (!isValidEmail(normalized)) {
+    throw new AuthActionError('INVALID_EMAIL', 'Please enter a valid email address.');
+  }
+
+  const supabase = createRouteHandlerSupabaseClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalized,
+    password,
+  });
+
+  if (error) {
+    throw mapSupabaseAuthError(error, 'Failed to sign you in.');
+  }
+
+  if (!data.session) {
+    throw new AuthActionError('AUTH_ERROR', 'Sign-in succeeded but no session was returned.');
+  }
+
+  const user = toAuthUser(data.user);
+  if (!user) {
+    throw new AuthActionError('AUTH_ERROR', 'Sign-in succeeded but no user was returned.');
+  }
+
+  return { user, session: data.session };
+}
+
+export async function sendPasswordReset(
+  email: string,
+  options?: { next?: string | null; scanUrl?: string | null }
+) {
+  const normalized = normalizeEmail(email);
+  if (!isValidEmail(normalized)) {
+    throw new AuthActionError('INVALID_EMAIL', 'Please enter a valid email address.');
+  }
+
+  const supabase = createRouteHandlerSupabaseClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(normalized, {
+    redirectTo: buildAuthCallbackUrl(options?.next, options?.scanUrl),
+  });
+
+  if (error) {
+    throw mapSupabaseAuthError(error, 'Failed to send your password reset link.');
+  }
+}
+
+export async function completePasswordRecovery(request: NextRequest, newPassword: string) {
+  validatePassword(newPassword);
+
+  const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+  if (!accessToken || !refreshToken) {
+    throw new AuthActionError(
+      'RECOVERY_SESSION_MISSING',
+      'Your password reset session is missing or expired. Request a new reset link.'
+    );
+  }
+
+  const supabase = createRouteHandlerSupabaseClient();
+  const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  if (sessionError || !sessionData.session) {
+    throw new AuthActionError(
+      'RECOVERY_SESSION_MISSING',
+      'Your password reset session is invalid or expired. Request a new reset link.'
+    );
+  }
+
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) {
+    throw mapSupabaseAuthError(error, 'Failed to update your password.');
+  }
+
+  const user = toAuthUser(data.user);
+  if (!user) {
+    throw new AuthActionError('AUTH_ERROR', 'Password reset succeeded but no user was returned.');
+  }
+
+  return {
+    user,
+    session: sessionData.session,
+  };
+}
+
+export async function verifyEmailCallback(params: {
+  code?: string | null;
+  tokenHash?: string | null;
+  type?: string | null;
+}) {
+  const supabase = createRouteHandlerSupabaseClient();
+  const callbackType = isSupportedCallbackType(params.type) ? params.type : 'email';
+
+  if (params.code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
+    if (error) {
+      throw mapSupabaseAuthError(error, 'Failed to verify your email link.');
+    }
+
+    if (!data.session) {
+      throw new AuthActionError('AUTH_ERROR', 'Verification succeeded but no session was returned.');
+    }
+
+    const user = toAuthUser(data.user);
+    if (!user) {
+      throw new AuthActionError('AUTH_ERROR', 'Verification succeeded but no user was returned.');
+    }
+
+    return { user, session: data.session, type: callbackType };
+  }
+
+  if (!params.tokenHash) {
+    throw new AuthActionError('MISSING_TOKEN', 'Missing verification token.');
+  }
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    token_hash: params.tokenHash,
+    type: callbackType,
+  });
+
+  if (error) {
+    throw mapSupabaseAuthError(error, 'Failed to verify your email link.');
+  }
+
+  if (!data.session) {
+    throw new AuthActionError('AUTH_ERROR', 'Verification succeeded but no session was returned.');
+  }
+
+  const user = toAuthUser(data.user);
+  if (!user) {
+    throw new AuthActionError('AUTH_ERROR', 'Verification succeeded but no user was returned.');
+  }
+
+  return { user, session: data.session, type: callbackType };
+}
+
+export async function refreshRequestSession(
+  request: NextRequest,
+  response: NextResponse
+): Promise<AuthSessionState> {
+  const auth = await getServerAuthSession(request);
+
+  if (auth.session?.accessToken && auth.session.refreshToken) {
+    setSessionCookies(response, {
+      access_token: auth.session.accessToken,
+      refresh_token: auth.session.refreshToken,
+      expires_at: auth.session.expiresAt ? Date.parse(auth.session.expiresAt) / 1000 : undefined,
+    });
+  } else if (!auth.user) {
+    clearSession(response);
+  }
+
+  return auth;
+}
+
+export async function maybeRefreshSessionInMiddleware(
+  request: NextRequest,
+  response: NextResponse
+): Promise<AuthSessionState> {
+  const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+
+  if (accessToken) {
+    const user = await getUserFromAccessToken(accessToken);
+    if (user) {
+      return {
+        user,
+        session: { accessToken, refreshToken, expiresAt: null },
+      };
+    }
+  }
+
+  if (!refreshToken) {
+    return { user: null, reason: 'no_session', session: null };
+  }
+
+  try {
+    const supabase = createMiddlewareSupabaseClient();
+    const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+    if (error || !data.session || !data.user) {
+      // Only clear session for definitive auth errors (invalid/used refresh token)
+      // Check if it's a definitive auth error vs a transient one
+      const isDefinitive = error?.message
+        && (/invalid.*token|token.*revoked|token.*expired|already.*used/i.test(error.message));
+      if (isDefinitive) {
+        clearSession(response);
+      }
+      // On transient errors, return failure but don't wipe cookies
+      return { user: null, reason: 'refresh_failed', session: null };
+    }
+
+    setSessionCookies(response, data.session);
+    return {
+      user: toAuthUser(data.user),
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: expiresAtIso(data.session.expires_at),
+      },
+    };
+  } catch {
+    // Network/timeout error — don't wipe cookies, just return failure
+    return { user: null, reason: 'refresh_failed', session: null };
+  }
+}
 
 export function sanitizeAuthUser(user: AuthUser) {
   return {
@@ -169,4 +533,10 @@ export function sanitizeAuthUser(user: AuthUser) {
     name: user.name,
     provider: user.provider,
   };
+}
+
+export function sanitizeRedirectPath(next: string | null | undefined, fallback = '/analysis') {
+  if (!next || !next.startsWith('/')) return fallback;
+  if (next.startsWith('//')) return fallback;
+  return next;
 }

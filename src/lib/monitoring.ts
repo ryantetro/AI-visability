@@ -168,6 +168,27 @@ export async function listMonitoringDomains(email: string) {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+export async function listActiveMonitoringDomains(): Promise<MonitoringRecord[]> {
+  if (hasSupabaseConfig()) {
+    const rows = await querySupabase<
+      Array<{
+        id: string;
+        domain: string;
+        alert_threshold: number;
+        created_at: string;
+        status?: 'active' | 'paused' | null;
+        updated_at?: string | null;
+        scan_id?: string | null;
+        url?: string | null;
+        email?: string | null;
+      }>
+    >('monitoring_domains?status=eq.active&select=*');
+    return rows.map(fromRow);
+  }
+
+  return [...getMonitoringStore().values()].filter((r) => r.status === 'active');
+}
+
 export async function removeMonitoringDomain(domain: string, email?: string) {
   const normalizedDomain = domain.toLowerCase();
 

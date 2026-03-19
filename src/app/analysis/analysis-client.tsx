@@ -12,11 +12,10 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
-  Crown,
   Gauge,
   Globe2,
   HelpCircle,
-  Info,
+  LayoutDashboard,
   Linkedin,
   RefreshCw,
   Share2,
@@ -65,6 +64,7 @@ import { YwsBreakdownSection, type CheckItem } from '@/components/ui/yws-breakdo
 import { EngineMentionCard } from '@/components/ui/engine-mention-card';
 import { MentionPromptCheck } from '@/components/ui/mention-prompt-check';
 import type { MentionSummary, AIEngine } from '@/types/ai-mentions';
+import { AI_ENGINES, getAIEngineLabel } from '@/lib/ai-engines';
 import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
 import { analysisExampleReport, analysisExampleScan } from '@/lib/analysis-example-report';
 import { getCheckFixContent } from '@/lib/analysis-fix-content';
@@ -512,6 +512,14 @@ export function AnalysisPageContent() {
 
   const emptyState = !scanId && !reportId && !exampleMode;
 
+  // Redirect report view to report page — analysis is for URL input + scan progress only
+  useEffect(() => {
+    if (reportId && !exampleMode && typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      router.replace(`/report?report=${reportId}${hash}`);
+    }
+  }, [reportId, exampleMode, router]);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && id) {
       if (exampleMode) {
@@ -726,7 +734,8 @@ export function AnalysisPageContent() {
     if (exampleMode) return;
     if (!id) return;
     if (!user) return;
-    if (!reportId && !isComplete) return;
+    if (reportId) return; // Redirecting to report page, don't load here
+    if (!isComplete) return;
     if (report) return;
 
     let active = true;
@@ -742,7 +751,7 @@ export function AnalysisPageContent() {
 
         if (!reportId && typeof window !== 'undefined') {
           const hash = window.location.hash || '';
-          router.replace(`/analysis?report=${id}${hash}`);
+          router.replace(`/report?report=${id}${hash}`);
         }
       } catch {
         // Silent fallback keeps the reveal route usable even if report load fails.
@@ -818,7 +827,7 @@ export function AnalysisPageContent() {
     }
   };
 
-  const handleCheckout = async (plan?: 'lifetime' | 'monthly') => {
+  const handleCheckout = async (plan?: string) => {
     setActionError('');
     setUnlockModalOpen(false);
     setCheckoutLoading(true);
@@ -827,7 +836,7 @@ export function AnalysisPageContent() {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scanId: id, plan: plan || 'lifetime' }),
+        body: JSON.stringify({ scanId: id, plan: plan || 'starter_monthly' }),
       });
 
       if (!res.ok) {
@@ -932,7 +941,7 @@ export function AnalysisPageContent() {
             // Refresh usage data after upgrade
             fetch('/api/auth/usage').then((r) => r.ok ? r.json() : null).then((d) => { if (d && active) setUsageData(d); }).catch(() => {});
             const hash = window.location.hash || '';
-            router.replace(`/analysis?report=${id}${hash}`);
+            router.replace(`/report?report=${id}${hash}`);
             return;
           }
           await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1066,70 +1075,9 @@ export function AnalysisPageContent() {
           </p>
 
           <div className="mx-auto mt-10 max-w-xl space-y-4">
-            {/* Analysis Limit: dynamic per-account usage */}
-            {usageData?.isPaid ? (
-              <div className="flex min-h-[60px] items-center gap-3 rounded-xl border border-emerald-500/40 bg-white/[0.03] px-5 py-4">
-                <Crown className="h-4 w-4 text-emerald-400" />
-                <p className="text-[13px] font-semibold text-[var(--text-primary)]">Unlimited Analyses</p>
-                <span className="ml-auto rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-medium text-emerald-400">{usageData.plan}</span>
-              </div>
-            ) : (
-              <>
-                <div className="flex min-h-[60px] flex-col gap-3 rounded-xl border border-amber-500/40 bg-white/[0.03] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-[var(--text-primary)]">Analysis Limit</p>
-                    <div className="mt-1.5 h-1 w-20 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-amber-500/80 transition-all"
-                        style={{ width: usageData ? `${(usageData.used / usageData.limit) * 100}%` : '0%' }}
-                      />
-                    </div>
-                    <p className="mt-1.5 text-[12px] text-[var(--text-muted)]">
-                      {usageData ? `${usageData.remaining} analyses left · ${usageData.used}/${usageData.limit} used` : 'Loading...'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setUnlockModalOpen(true)}
-                    className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-zinc-700/90 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-zinc-600/90"
-                  >
-                    <Crown className="h-3.5 w-3.5 text-amber-400" />
-                    Unlock All Features
-                  </button>
-                </div>
-
-                {/* Upgrade: muted orange accent — only show when at limit */}
-                {usageData && usageData.remaining === 0 && (
-                  <div className="flex min-h-[60px] flex-col gap-3 rounded-xl border border-orange-600/40 bg-orange-900/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div className="flex min-w-0 gap-3">
-                      <Info className="h-4 w-4 shrink-0 text-orange-500/80" />
-                      <p className="text-[13px] text-[var(--text-secondary)]">
-                        Upgrade to run website analyses. You can view an example report to see what you&apos;ll get.
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => router.push('/analysis?example=1')}
-                        className="rounded-lg bg-zinc-700/90 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-zinc-600/90"
-                      >
-                        View example
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUnlockModalOpen(true)}
-                        className="rounded-lg bg-orange-700 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-orange-600"
-                      >
-                        Upgrade
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
             {/* URL Input: dark gray bg, thin light gray border */}
             <UrlInput
+              key={prefillUrl ?? 'analysis-url-input'}
               onSubmit={handleStartAnalysis}
               loading={loading}
               variant="minimal"
@@ -1259,11 +1207,20 @@ export function AnalysisPageContent() {
                     type="button"
                     onClick={handleReaudit}
                     disabled={reauditLoading}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:bg-white/[0.05] hover:text-white disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                   >
                     <RefreshCw className={cn('h-3.5 w-3.5', reauditLoading && 'animate-spin')} />
                     {reauditLoading ? 'Re-running...' : 'Re-audit'}
                   </button>
+                )}
+                {report?.hasPaid && (
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:bg-white/[0.05] hover:text-white"
+                  >
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    Open in Dashboard
+                  </Link>
                 )}
               </div>
             </div>
@@ -1639,8 +1596,8 @@ export function AnalysisPageContent() {
                       </button>
                     )}
                     {report.hasPaid ? (
-                      <Link href={`/advanced?report=${report.id}`} className="aiso-button aiso-button-primary px-4 py-2.5 text-sm">
-                        Open advanced tools
+                      <Link href={`/dashboard?report=${report.id}`} className="aiso-button aiso-button-primary px-4 py-2.5 text-sm">
+                        Open dashboard
                         <ChevronRight className="h-4 w-4" />
                       </Link>
                     ) : null}
@@ -1690,9 +1647,9 @@ export function AnalysisPageContent() {
               {(() => {
                 const mentionData = (report as ReportData & { mentionSummary?: MentionSummary }).mentionSummary ?? (data as unknown as Record<string, unknown>)?.mentionSummary as MentionSummary | undefined;
                 if (!mentionData) return null;
-                const engines: AIEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude'];
-                const mentionPass = engines.filter((e) => mentionData.engineBreakdown[e]?.mentioned > 0).length;
-                const mentionFail = engines.filter((e) => mentionData.engineBreakdown[e]?.mentioned === 0 && mentionData.engineBreakdown[e]?.total > 0).length;
+                const engines: AIEngine[] = AI_ENGINES;
+                const mentionPass = engines.filter((e) => mentionData.engineStatus[e]?.status === 'complete' && mentionData.engineBreakdown[e]?.mentioned > 0).length;
+                const mentionFail = engines.filter((e) => mentionData.engineStatus[e]?.status === 'complete' && mentionData.engineBreakdown[e]?.mentioned === 0 && mentionData.engineBreakdown[e]?.total > 0).length;
                 return (
                   <YwsBreakdownSection
                     title="AI Mentions"
@@ -1705,11 +1662,26 @@ export function AnalysisPageContent() {
                     subSections={[
                       {
                         label: 'Engine Breakdown',
-                        checks: engines.map((engine) => ({
-                          label: engine.charAt(0).toUpperCase() + engine.slice(1),
-                          detail: `${mentionData.engineBreakdown[engine]?.mentioned ?? 0}/${mentionData.engineBreakdown[engine]?.total ?? 0} prompts mentioned · ${mentionData.engineBreakdown[engine]?.sentiment ?? 'not-found'}`,
-                          verdict: (mentionData.engineBreakdown[engine]?.mentioned ?? 0) > 0 ? 'pass' as const : 'fail' as const,
-                        })),
+                        checks: engines.map((engine) => {
+                          const eb = mentionData.engineBreakdown[engine];
+                          const status = mentionData.engineStatus[engine];
+                          const mentioned = eb?.mentioned ?? 0;
+                          const total = eb?.total ?? 0;
+                          return {
+                            label: getAIEngineLabel(engine),
+                            detail: status?.status === 'not_backfilled'
+                              ? 'Not tested on this scan yet'
+                              : status?.status === 'not_configured'
+                                ? 'Not configured on this run'
+                                : status?.status === 'error'
+                                  ? `Testing error${status.errorMessage ? ` · ${status.errorMessage}` : ''}`
+                                  : `${mentioned}/${total} prompts mentioned · ${eb?.sentiment ?? 'not-found'}`,
+                            verdict: status?.status !== 'complete'
+                              ? 'unknown' as const
+                              : mentioned > 0 ? 'pass' as const : 'fail' as const,
+                            engineKey: engine,
+                          };
+                        }),
                       },
                       {
                         label: 'Prompt Results',

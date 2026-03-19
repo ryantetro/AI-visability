@@ -97,6 +97,23 @@ export default function HistoryPage() {
     let active = true;
 
     async function loadScans() {
+      // Primary: fetch all user scans from DB in a single call
+      try {
+        const res = await fetch('/api/user/scans');
+        if (res.ok) {
+          const data = await res.json();
+          const scans = (data.scans ?? []) as RecentScanData[];
+          if (active) {
+            setRecentScans(
+              scans.sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))
+            );
+            setLoading(false);
+          }
+          return;
+        }
+      } catch { /* fall through to localStorage fallback */ }
+
+      // Fallback: load from localStorage scan IDs
       const recentIds = getRecentScanEntries().map((entry) => entry.id);
       if (recentIds.length === 0) {
         if (active) {

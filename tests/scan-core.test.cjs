@@ -37,8 +37,8 @@ const reportRoute = require('../src/app/api/scan/[id]/report/route.ts');
 const publicScorePage = require('../src/app/score/[id]/page.tsx');
 const {
   AUTH_COOKIE_NAME,
-  createGoogleDemoUser,
-  createSession,
+  _setTestAuth,
+  _clearTestAuth,
 } = require('../src/lib/auth.ts');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,6 +46,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 test.beforeEach(() => {
   resetMockDb();
   resetScanRateLimitStore();
+  _clearTestAuth();
 });
 
 function withMockFetch(implementation, run) {
@@ -60,8 +61,9 @@ function withMockFetch(implementation, run) {
 }
 
 function createAuthedRequest(url, email = 'owner@example.com') {
-  const user = createGoogleDemoUser(email);
-  const token = createSession(user);
+  const user = { id: `test-${email}`, email, name: 'Test User', provider: 'email' };
+  const token = `test-token-${email}`;
+  _setTestAuth(token, user);
   return new NextRequest(url, {
     headers: {
       cookie: `${AUTH_COOKIE_NAME}=${token}`,
@@ -715,7 +717,7 @@ test(
     };
 
     assert.equal(estimateRemainingSeconds(pendingScan, 3_000), 30);
-    assert.equal(estimateRemainingSeconds(midScan, 10_000), 30);
+    assert.equal(estimateRemainingSeconds(midScan, 10_000), 35);
     assert.equal(estimateRemainingSeconds(slowScan, 120_000), 45);
     assert.equal(
       estimateRemainingSeconds(

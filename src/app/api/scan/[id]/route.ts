@@ -5,7 +5,10 @@ import { ScoreResult } from '@/types/score';
 import { serializeScoreResult } from '@/lib/report-serializer';
 import type { CrawlData } from '@/types/crawler';
 import { getAuthUserFromRequest } from '@/lib/auth';
+import { getUserAccess } from '@/lib/access';
 import { getDomain, getFaviconUrl } from '@/lib/url-utils';
+import { normalizeMentionSummary } from '@/lib/ai-mentions/summary';
+import type { MentionSummary } from '@/types/ai-mentions';
 
 interface PreviewHomepageData {
   assetUrls?: string[];
@@ -63,6 +66,16 @@ export async function GET(
 
   const serializedScore = scoreResult ? serializeScoreResult(scoreResult) : null;
   const assetPreview = buildAssetPreview(scan);
+  const mentionSummary = normalizeMentionSummary(scan.mentionSummary as MentionSummary | null | undefined);
+
+  // Derive hasPaid from plan-based access OR legacy scan.paid flag
+  let hasPaid = !!scan.paid;
+  try {
+    const access = await getUserAccess(user.id, user.email);
+    hasPaid = access.isPaid || hasPaid;
+  } catch {
+    // Profile lookup failed — fall back to legacy scan.paid check
+  }
 
   return NextResponse.json({
     id: scan.id,
@@ -78,10 +91,10 @@ export async function GET(
     band: scan.status === 'complete' ? scoreResult?.band : undefined,
     bandInfo: scan.status === 'complete' ? scoreResult?.bandInfo : undefined,
     assetPreview,
-    mentionSummary: scan.mentionSummary ?? null,
-    mentionScore: scan.mentionSummary ? (scan.mentionSummary as { overallScore?: number }).overallScore ?? null : null,
+    mentionSummary,
+    mentionScore: mentionSummary?.overallScore ?? null,
     hasEmail: !!scan.email,
-    hasPaid: !!scan.paid,
+    hasPaid,
     createdAt: scan.createdAt,
     completedAt: scan.completedAt,
     estimatedRemainingSec,

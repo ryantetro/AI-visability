@@ -8,6 +8,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import type { FileMeta, PromptCategory, WorkstreamMeta } from './types';
+import { AI_ENGINE_META } from '@/lib/ai-engines';
 
 export const FILE_META: Record<string, FileMeta> = {
   'llms.txt': {
@@ -105,12 +106,9 @@ export const PROMPT_CATEGORIES: { id: PromptCategory; label: string }[] = [
   { id: 'custom', label: 'Custom' },
 ];
 
-export const ENGINE_COLORS: Record<string, string> = {
-  chatgpt: '#10b981',
-  perplexity: '#3b82f6',
-  gemini: '#f59e0b',
-  claude: '#a855f7',
-};
+export const ENGINE_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(AI_ENGINE_META).map(([engine, meta]) => [engine, meta.color])
+);
 
 export const BOT_COLORS: Record<string, string> = {
   GPTBot: '#10b981',
@@ -132,3 +130,5 @@ export const BOT_CATEGORY_LABEL: Record<string, string> = {
 };
 
 export const CHART_COLORS = { pass: '#25c972', fail: '#ff5252', unknown: '#ff8a1e' } as const;
+
+export const SENTIMENT_COLORS = { positive: '#25c972', neutral: '#ffbb00', negative: '#ff5252' } as const;

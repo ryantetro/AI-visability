@@ -1,4 +1,5 @@
 import { ScanJob } from './scan';
+import type { AIEngine } from './ai-mentions';
 
 export interface DatabaseService {
   getScan(id: string): Promise<ScanJob | null>;
@@ -16,11 +17,16 @@ export interface CheckoutSession {
   url: string;
 }
 
-export type PaymentPlan = 'lifetime' | 'monthly';
+export type PaymentPlan = 'starter_monthly' | 'starter_annual' | 'pro_monthly' | 'pro_annual';
 
 export interface PaymentService {
   createCheckout(scanId: string, plan?: PaymentPlan): Promise<CheckoutSession>;
   verifyPayment(sessionId: string): Promise<{ paid: boolean; scanId: string; plan?: string }>;
+}
+
+export interface SubscriptionPaymentService extends PaymentService {
+  createSubscriptionCheckout(userId: string, email: string, plan?: PaymentPlan): Promise<CheckoutSession>;
+  createPortalSession(userId: string, email: string): Promise<string>;
 }
 
 export interface AIService {
@@ -48,7 +54,7 @@ export interface PromptResult {
   id: string;
   promptId: string;
   domain: string;
-  engine: string;
+  engine: AIEngine;
   mentioned: boolean;
   position: number | null;
   sentiment: string | null;
@@ -63,7 +69,7 @@ export interface CompetitorAppearance {
   domain: string;
   competitor: string;
   competitorDomain: string | null;
-  engine: string;
+  engine: AIEngine;
   promptId: string | null;
   position: number | null;
   coMentioned: boolean;
@@ -75,7 +81,7 @@ export interface CompetitorSummary {
   competitor: string;
   appearances: number;
   avgPosition: number | null;
-  engines: string[];
+  engines: AIEngine[];
   coMentionedCount: number;
 }
 

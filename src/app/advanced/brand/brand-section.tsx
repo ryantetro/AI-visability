@@ -1,20 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, Download, ExternalLink } from 'lucide-react';
-import { CollapsibleSection, DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
+import { ChevronDown, Copy, Download, ExternalLink, Zap, Wrench, Sparkles } from 'lucide-react';
+import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
+import type { PrioritizedFix } from '@/types/score';
 import { cn } from '@/lib/utils';
 import { formatPlatformLabel } from '@/lib/platform-detection';
-import { AiVisibilityDashboard } from '../panels/ai-visibility-dashboard';
+import { AiPresenceTab } from '../panels/ai-presence-tab';
 import { CitationTrackingPanel } from '../panels/citation-tracking-panel';
-import { PromptLibraryPanel } from '../panels/prompt-library-panel';
-import { PositionTrendingPanel } from '../panels/position-trending-panel';
 import { ContentGapsSection } from '../panels/content-gaps-section';
 import { FixCard } from '../panels/fix-card';
-import { getFileMeta, getGroupedFixes, matchFixToFile, verificationPath, downloadTextFile, buildCursorPrompt } from '../lib/utils';
+import { getFileMeta, getGroupedFixes, matchFixToFile, verificationPath, downloadTextFile, buildCursorPrompt, buildAllFilesPrompt } from '../lib/utils';
 import type { DashboardReportData, FilesData, GeneratedFile } from '../lib/types';
 
-type BrandTab = 'visibility' | 'prompts' | 'citations' | 'fixes' | 'files';
+type BrandTab = 'presence' | 'improve' | 'citations' | 'files';
 
 interface BrandSectionProps {
   report: DashboardReportData;
@@ -24,15 +23,15 @@ interface BrandSectionProps {
 }
 
 export function BrandSection({ report, files, domain, platformLabel }: BrandSectionProps) {
-  const [activeTab, setActiveTab] = useState<BrandTab>('visibility');
+  const [activeTab, setActiveTab] = useState<BrandTab>('presence');
   const [copiedFile, setCopiedFile] = useState<string | null>(null);
   const [copiedSinglePrompt, setCopiedSinglePrompt] = useState<string | null>(null);
+  const [copiedAllPrompts, setCopiedAllPrompts] = useState(false);
 
   const tabs: { id: BrandTab; label: string }[] = [
-    { id: 'visibility', label: 'Visibility' },
-    { id: 'prompts', label: 'Prompts' },
+    { id: 'presence', label: 'AI Presence' },
+    { id: 'improve', label: 'Improve' },
     { id: 'citations', label: 'Citations' },
-    { id: 'fixes', label: 'Fixes' },
     { id: 'files', label: 'Files' },
   ];
 
@@ -59,6 +58,16 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
     } catch { /* clipboard blocked */ }
   };
 
+  const handleCopyAllPrompts = async () => {
+    if (!files || !effectivePlatformLabel) return;
+    const prompt = buildAllFilesPrompt(files.files, domain, effectivePlatformLabel, files.url);
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedAllPrompts(true);
+      setTimeout(() => setCopiedAllPrompts(false), 2200);
+    } catch { /* clipboard blocked */ }
+  };
+
   return (
     <div className="space-y-6">
       {/* Sub-tab bar */}
@@ -80,26 +89,28 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
         ))}
       </div>
 
-      {activeTab === 'visibility' && (
-        <>
-          <AiVisibilityDashboard report={report} />
-          <PositionTrendingPanel domain={domain} />
-        </>
+      {activeTab === 'presence' && (
+        <AiPresenceTab report={report} domain={domain} />
       )}
 
-      {activeTab === 'prompts' && <PromptLibraryPanel domain={domain} />}
-
-      {activeTab === 'citations' && <CitationTrackingPanel report={report} />}
-
-      {activeTab === 'fixes' && (
+      {activeTab === 'improve' && (
         <>
+          {fixes.length > 0 && <FixSummaryCards fixes={fixes} />}
+          <ContentGapsSection domain={domain} />
+
           {groupedFixes.length > 0 ? (
-            <div className="space-y-4">
-              {groupedFixes.map((group) => (
-                <CollapsibleSection key={group.key} title={group.title} defaultOpen>
-                  <DashboardPanel className="p-5">
-                    <SectionTitle eyebrow="What to fix" title={group.title} description={group.description} />
-                    <div className="mt-5 space-y-3">
+            <div className="space-y-3">
+              {groupedFixes.map((group, groupIdx) => {
+                const GroupIcon = group.icon;
+                return (
+                  <WorkstreamSection
+                    key={group.key}
+                    icon={<GroupIcon className="h-4 w-4 text-zinc-400" />}
+                    title={group.title}
+                    count={group.fixes.length}
+                    defaultOpen={groupIdx === 0}
+                  >
+                    <div className="space-y-2 px-4 pb-4">
                       {group.fixes.map((fix, index) => {
                         const relatedFile = files ? matchFixToFile(fix, files.files) : null;
                         return (
@@ -120,22 +131,35 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
                         );
                       })}
                     </div>
-                  </DashboardPanel>
-                </CollapsibleSection>
-              ))}
+                  </WorkstreamSection>
+                );
+              })}
             </div>
           ) : (
             <DashboardPanel className="p-5">
               <p className="text-center text-sm text-zinc-500">No fixes needed. Your site is in great shape!</p>
             </DashboardPanel>
           )}
-          <ContentGapsSection domain={domain} />
+
+          {/* <PromptLibraryPanel domain={domain} /> */}
         </>
       )}
 
+      {activeTab === 'citations' && <CitationTrackingPanel report={report} />}
+
       {activeTab === 'files' && files && files.files.length > 0 && (
         <DashboardPanel className="p-5">
-          <SectionTitle eyebrow="Files to deploy" title="Generated assets" description={`${files.files.length} deploy-ready files with verification links`} />
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <SectionTitle eyebrow="Files to deploy" title="Generated assets" description={`${files.files.length} deploy-ready files with verification links`} />
+            <button
+              type="button"
+              onClick={handleCopyAllPrompts}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#25c972]/30 bg-[#25c972]/10 px-3.5 py-2 text-xs font-medium text-[#25c972] transition-colors hover:bg-[#25c972]/20"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {copiedAllPrompts ? 'All prompts copied!' : 'Copy All Prompts'}
+            </button>
+          </div>
           <div className="mt-5 space-y-3">
             {files.files.map((file) => {
               const meta = getFileMeta(file.filename);
@@ -143,27 +167,34 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
               const verifyTarget = verificationPath(files.url, file.filename);
               return (
                 <div key={file.filename} className="rounded-[1.1rem] border border-white/8 bg-white/[0.02] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <Icon className="h-4 w-4 shrink-0 text-zinc-400" />
-                      <div>
-                        <p className="text-sm font-semibold text-white">{file.filename}</p>
-                        <p className="mt-0.5 text-[12px] text-zinc-500">{meta.subtitle}</p>
-                      </div>
+                  {/* File info — always on top */}
+                  <div className="flex items-start gap-2.5">
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">{file.filename}</p>
+                      <p className="mt-0.5 text-[12px] text-zinc-500">{meta.subtitle}</p>
+                      {file.installInstructions && (
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-600">{file.installInstructions.split('.')[0]}.</p>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => handleCopyFile(file)} className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
-                        <Copy className="h-3.5 w-3.5" />
-                        {copiedFile === file.filename ? 'Copied' : 'Copy'}
-                      </button>
-                      <button type="button" onClick={() => downloadTextFile(file.filename, file.content)} className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
-                        <Download className="h-3.5 w-3.5" />
-                        Download
-                      </button>
-                      <a href={verifyTarget} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
-                        Verify <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    </div>
+                  </div>
+                  {/* Actions — always on a separate row */}
+                  <div className="mt-3 flex flex-wrap gap-2 pl-[26px]">
+                    <button type="button" onClick={() => handleCopyFilePrompt(file)} className="inline-flex items-center gap-1.5 rounded-xl border border-[#25c972]/20 bg-[#25c972]/[0.06] px-3 py-2 text-xs font-medium text-[#25c972] transition-colors hover:bg-[#25c972]/15">
+                      <Zap className="h-3.5 w-3.5" />
+                      {copiedSinglePrompt === file.filename ? 'Prompt copied!' : 'Copy Prompt'}
+                    </button>
+                    <button type="button" onClick={() => handleCopyFile(file)} className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
+                      <Copy className="h-3.5 w-3.5" />
+                      {copiedFile === file.filename ? 'Copied' : 'Copy'}
+                    </button>
+                    <button type="button" onClick={() => downloadTextFile(file.filename, file.content)} className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </button>
+                    <a href={verifyTarget} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
+                      Verify <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
                   </div>
                 </div>
               );
@@ -177,6 +208,78 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
           <p className="text-center text-sm text-zinc-500">No generated files available. Run a scan to generate deployment files.</p>
         </DashboardPanel>
       )}
+    </div>
+  );
+}
+
+/* ── Fix Summary Cards ────────────────────────────────────────────────────── */
+
+function FixSummaryCards({ fixes }: { fixes: PrioritizedFix[] }) {
+  const quickCount = fixes.filter((f) => f.effortBand === 'quick').length;
+  const deepCount = fixes.filter((f) => f.effortBand === 'medium' || f.effortBand === 'technical').length;
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3.5">
+        <Zap className="h-5 w-5 shrink-0 text-emerald-400" />
+        <div className="min-w-0">
+          <p className="text-[14px] font-semibold text-white">
+            Quick Wins
+            <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500/15 px-1.5 text-[11px] font-bold text-emerald-300">
+              {quickCount}
+            </span>
+          </p>
+          <p className="text-[11px] text-zinc-500">Minimal effort</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3.5">
+        <Wrench className="h-5 w-5 shrink-0 text-blue-400" />
+        <div className="min-w-0">
+          <p className="text-[14px] font-semibold text-white">
+            Deep Fixes
+            <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500/15 px-1.5 text-[11px] font-bold text-blue-300">
+              {deepCount}
+            </span>
+          </p>
+          <p className="text-[11px] text-zinc-500">Requires more effort</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Workstream Section (replaces CollapsibleSection + DashboardPanel nesting) */
+
+function WorkstreamSection({
+  icon,
+  title,
+  count,
+  defaultOpen,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  count: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+
+  return (
+    <div className="rounded-xl border border-white/8 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-2.5 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.03]"
+      >
+        {icon}
+        <span className="text-sm font-semibold text-white">{title}</span>
+        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white/[0.08] px-1.5 text-[11px] font-bold text-zinc-300">
+          {count}
+        </span>
+        <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-zinc-500 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && <div className="pt-0">{children}</div>}
     </div>
   );
 }

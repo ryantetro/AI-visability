@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getDatabase } from '@/lib/services/registry';
+import { getUserAccess } from '@/lib/access';
 import { generateAllFiles } from '@/lib/generator';
 import { createArchiveFilename, createGeneratedFilesArchive } from '@/lib/files-archive';
 import { CrawlData } from '@/types/crawler';
@@ -27,7 +28,15 @@ export async function GET(
     return NextResponse.json({ error: 'This archive belongs to another account.' }, { status: 403 });
   }
 
-  if (!scan.paid) {
+  // Check plan-based access (preferred) with fallback to legacy scan.paid flag
+  let hasAccess = !!scan.paid;
+  try {
+    const access = await getUserAccess(user.id, user.email);
+    hasAccess = access.canAccessFeature('file_download') || hasAccess;
+  } catch {
+    // Profile lookup failed — fall back to legacy scan.paid check
+  }
+  if (!hasAccess) {
     return NextResponse.json({ error: 'Payment required' }, { status: 403 });
   }
 

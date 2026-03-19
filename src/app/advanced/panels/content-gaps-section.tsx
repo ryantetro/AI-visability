@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { CollapsibleSection, DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import { cn } from '@/lib/utils';
 import type { ContentGap } from '../lib/types';
+import type { AIEngine } from '@/types/ai-mentions';
 
 export function ContentGapsSection({ domain }: { domain: string }) {
   const [gaps, setGaps] = useState<ContentGap[]>([]);
@@ -17,9 +18,9 @@ export function ContentGapsSection({ domain }: { domain: string }) {
         if (!res.ok || cancelled) return;
         const data = await res.json();
         const prompts: Array<{ id: string; promptText: string; category: string }> = data.prompts ?? [];
-        const results: Array<{ promptId: string; engine: string; mentioned: boolean }> = data.results ?? [];
+        const results: Array<{ promptId: string; engine: AIEngine; mentioned: boolean }> = data.results ?? [];
 
-        const byPrompt = new Map<string, { mentioned: number; total: number; engines: Set<string> }>();
+        const byPrompt = new Map<string, { mentioned: number; total: number; engines: Set<AIEngine> }>();
         for (const r of results) {
           const existing = byPrompt.get(r.promptId);
           if (existing) {

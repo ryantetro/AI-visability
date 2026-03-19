@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
-
-const AUTH_COOKIE = 'aiso_auth_session';
+import { maybeRefreshSessionInMiddleware } from '@/lib/auth';
 
 // ── AI Bot Detection ─────────────────────────────────────────────
 
@@ -49,6 +47,7 @@ async function logBotVisit(domain: string, botName: string, category: string, pa
 const PUBLIC_PATHS = new Set([
   '/',
   '/login',
+  '/pricing',
   '/terms',
   '/privacy',
   '/landing/b',
@@ -57,38 +56,17 @@ const PUBLIC_PATHS = new Set([
 
 /** Prefix patterns that are always public. */
 const PUBLIC_PREFIXES = [
+  '/auth/',
   '/api/auth/',           // auth endpoints must be reachable before login
   '/api/scan',            // scan creation/polling is public (auth checked in route handlers)
   '/api/crawler-visits',  // internal bot logging endpoint (uses x-internal-secret)
+  '/api/cron/',           // cron endpoints (use MONITORING_SECRET bearer token)
+  '/api/webhooks/',       // Stripe webhooks (verified via signature, not session)
   '/score/',              // public score pages
   '/certified/',          // public certified badge pages
   '/_next/',              // Next.js internals
   '/favicon',
 ];
-
-let jwtSecret: Uint8Array | null = null;
-
-function getJwtSecret(): Uint8Array | null {
-  if (jwtSecret) return jwtSecret;
-  const secret = process.env.SUPABASE_JWT_SECRET;
-  if (!secret) return null;
-  jwtSecret = new TextEncoder().encode(secret);
-  return jwtSecret;
-}
-
-async function isTokenValid(token: string): Promise<boolean> {
-  const secret = getJwtSecret();
-  if (!secret) {
-    // If no JWT secret configured, fall back to cookie-presence check
-    return true;
-  }
-  try {
-    await jwtVerify(token, secret);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -118,22 +96,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for auth cookie
-  const token = request.cookies.get(AUTH_COOKIE)?.value;
-  if (!token) {
-    return handleUnauthenticated(request, pathname);
+  const response = NextResponse.next();
+  try {
+    const auth = await maybeRefreshSessionInMiddleware(request, response);
+    if (!auth.user) {
+      // Only redirect on definitive auth failures (no_session)
+      // On transient errors (refresh_failed from network issues), let request through
+      // — route handlers have their own auth checks as a second layer
+      if (auth.reason === 'no_session') {
+        const unauthenticated = handleUnauthenticated(request, pathname);
+        for (const cookie of response.cookies.getAll()) {
+          unauthenticated.cookies.set(cookie);
+        }
+        return unauthenticated;
+      }
+      // refresh_failed but has cookies — let through, route handlers will re-check
+    }
+  } catch {
+    // On exception (Supabase unreachable, etc.), let request through
+    // Route handlers have their own auth checks as a second layer
   }
 
-  // Validate the JWT
-  const valid = await isTokenValid(token);
-  if (!valid) {
-    // Expired or invalid token — clear the stale cookie and redirect/401
-    const response = handleUnauthenticated(request, pathname);
-    response.cookies.set(AUTH_COOKIE, '', { path: '/', maxAge: 0 });
-    return response;
-  }
-
-  return NextResponse.next();
+  return response;
 }
 
 function handleUnauthenticated(request: NextRequest, pathname: string): NextResponse {

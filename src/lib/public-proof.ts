@@ -400,25 +400,72 @@ export async function getPublicProfile(scanId: string) {
 }
 
 export async function listLeaderboardEntries(limit = 25): Promise<LeaderboardEntry[]> {
+  return listLeaderboardEntriesFiltered(limit, 'all');
+}
+
+/**
+ * List leaderboard entries from all completed scans.
+ * Any completed scan is eligible — no profile/verification required.
+ * Deduplicates by domain, keeping the best score per domain.
+ */
+export async function listLeaderboardEntriesFiltered(
+  limit = 100,
+  timeFilter: 'all' | '24h' | '30d' = 'all'
+): Promise<LeaderboardEntry[]> {
   const db = getDatabase();
-  const scans = await db.listCompletedScans(Math.max(limit * 4, 50));
-  const entries: Array<{ summary: PublicScoreSummary; profile: PublicProfileRecord }> = [];
+  // Fetch more than needed so we can deduplicate by domain
+  const scans = await db.listCompletedScans(Math.min(limit * 4, 200));
+
+  const now = Date.now();
+  const cutoffMs =
+    timeFilter === '24h' ? 24 * 60 * 60 * 1000
+    : timeFilter === '30d' ? 30 * 24 * 60 * 60 * 1000
+    : 0;
+
+  // Best score per domain
+  const bestByDomain = new Map<string, PublicScoreSummary>();
 
   for (const scan of scans) {
-    const profile = await getProfileByDomain(getDomain(scan.url));
-    if (!profile || !profile.verified || !profile.enabled || !profile.leaderboardEnabled || profile.scanId !== scan.id) {
+    if (cutoffMs > 0 && scan.completedAt && now - scan.completedAt > cutoffMs) {
       continue;
     }
 
     const summary = await getPublicScoreSummary(scan.id);
     if (!summary) continue;
-    entries.push({ summary, profile });
+
+    const existing = bestByDomain.get(summary.domain);
+    if (!existing || summary.percentage > existing.percentage) {
+      bestByDomain.set(summary.domain, summary);
+    }
   }
 
-  return entries
-    .sort((a, b) => b.summary.percentage - a.summary.percentage || b.summary.completedAt - a.summary.completedAt)
-    .slice(0, limit)
-    .map((entry, index) => ({ rank: index + 1, ...entry }));
+  const sorted = Array.from(bestByDomain.values())
+    .sort((a, b) => b.percentage - a.percentage || b.completedAt - a.completedAt)
+    .slice(0, limit);
+
+  // Check if domain has a verified profile (for certified page link)
+  const entries: LeaderboardEntry[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const summary = sorted[i];
+    const profile = await getProfileByDomain(summary.domain);
+    entries.push({
+      rank: i + 1,
+      summary,
+      profile: profile ?? {
+        id: '',
+        scanId: summary.id,
+        domain: summary.domain,
+        enabled: false,
+        badgeEnabled: false,
+        leaderboardEnabled: false,
+        verified: false,
+        createdAt: summary.completedAt,
+        updatedAt: summary.completedAt,
+      },
+    });
+  }
+
+  return entries;
 }
 
 export async function getCertifiedSummary(domain: string) {

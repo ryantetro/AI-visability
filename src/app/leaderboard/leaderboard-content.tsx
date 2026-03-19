@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Medal, Trophy } from 'lucide-react';
+import { ExternalLink, Loader2, Medal, Trophy } from 'lucide-react';
 import { getFaviconUrl } from '@/lib/url-utils';
 import { cn } from '@/lib/utils';
 
@@ -11,10 +11,9 @@ interface LeaderboardEntry {
   domain: string;
   url: string;
   overall: number;
-  speed: number;
-  quality: number;
-  security: number;
-  ai?: number;
+  aiVisibility: number;
+  webHealth: number | null;
+  mentionScore: number | null;
   completedAt?: number;
   hasCertified?: boolean;
 }
@@ -42,8 +41,34 @@ function scoreColor(score: number): string {
   return 'text-[#ff5252]';
 }
 
-export function LeaderboardContent({ entries }: { entries: LeaderboardEntry[] }) {
+export function LeaderboardContent({ entries: initialEntries }: { entries: LeaderboardEntry[] }) {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  const [entries, setEntries] = useState<LeaderboardEntry[]>(initialEntries);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (timeFilter === 'all') {
+      setEntries(initialEntries);
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+
+    fetch(`/api/leaderboard?filter=${timeFilter}&limit=100`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: LeaderboardEntry[]) => {
+        if (active) setEntries(data);
+      })
+      .catch(() => {
+        if (active) setEntries([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [timeFilter, initialEntries]);
 
   return (
     <div className="mt-8">
@@ -67,115 +92,147 @@ export function LeaderboardContent({ entries }: { entries: LeaderboardEntry[] })
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]">
-        <table className="w-full table-fixed border-collapse">
-          <colgroup>
-            <col style={{ width: '3%' }} />
-            <col style={{ width: '28%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '37%' }} />
-            <col style={{ width: '20%' }} />
-          </colgroup>
-          <thead>
-            <tr className="border-b border-white/[0.08]">
-              <th className="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
-                #
-              </th>
-              <th className="min-w-0 px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
-                Site
-              </th>
-              <th className="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
-                Overall
-              </th>
-              <th className="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
-                Scores
-              </th>
-              <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
-                Date
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr
-                key={entry.domain}
-                className="border-b border-white/[0.04] transition-colors last:border-0 hover:bg-white/[0.02]"
-              >
-                <td className="px-2 py-3 sm:px-4 sm:py-4">
-                  <div className="flex items-center gap-2">
-                    {entry.rank <= 3 ? (
-                      <Medal
-                        className={cn(
-                          'h-5 w-5',
-                          entry.rank === 1 && 'text-amber-400',
-                          entry.rank === 2 && 'text-zinc-300',
-                          entry.rank === 3 && 'text-amber-600'
-                        )}
-                      />
-                    ) : null}
-                    <span className="text-sm font-medium text-[var(--text-primary)]">
-                      {entry.rank}
-                    </span>
-                  </div>
-                </td>
-                <td className="min-w-0 px-2 py-3 sm:px-4 sm:py-4">
-                  <Link
-                    href={entry.hasCertified ? `/certified/${encodeURIComponent(entry.domain)}` : entry.url}
-                    target={entry.hasCertified ? undefined : '_blank'}
-                    rel={entry.hasCertified ? undefined : 'noreferrer'}
-                    className="group flex items-center gap-3"
-                  >
-                    <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/5">
-                      <img
-                        src={getFaviconUrl(entry.domain, 32)}
-                        alt=""
-                        className="h-5 w-5 object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling;
-                          if (fallback) {
-                            fallback.classList.remove('hidden');
-                            fallback.classList.add('flex');
-                          }
-                        }}
-                      />
-                      <span className="hidden h-5 w-5 items-center justify-center rounded bg-indigo-500/20 text-indigo-400">
-                        <Trophy className="h-3 w-3" />
-                      </span>
-                    </span>
-                    <div className="min-w-0 overflow-hidden">
-                      <span className="inline-flex items-center gap-1.5 truncate text-sm font-semibold text-[var(--text-primary)] group-hover:underline">
-                        {entry.domain}
-                        <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
-                      </span>
-                      <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{entry.url}</p>
-                    </div>
-                  </Link>
-                </td>
-                <td className="px-2 py-3 sm:px-4 sm:py-4">
-                  <span className="text-sm font-bold">
-                    <span className={scoreColor(entry.overall)}>{entry.overall}</span>
-                    <span className="text-[var(--text-primary)]">/100</span>
-                  </span>
-                </td>
-                <td className="overflow-hidden px-2 py-3 sm:px-4 sm:py-4">
-                  <span className="text-sm text-[var(--text-muted)]">
-                    <span className="text-[#25c972]">•</span> Speed {entry.speed}
-                    <span className="mx-1 text-[#25c972]">•</span> Quality {entry.quality}
-                    <span className="mx-1 text-[#25c972]">•</span> Sec {entry.security}
-                    {entry.ai != null && (
-                      <><span className="mx-1 text-[#25c972]">•</span> AI {entry.ai}</>
-                    )}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap px-2 py-3 text-right text-xs text-[var(--text-muted)] sm:px-4 sm:py-4">
-                  {entry.completedAt ? formatRelativeDate(entry.completedAt) : '—'}
-                </td>
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+        </div>
+      ) : entries.length === 0 ? (
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-6 py-16 text-center">
+          <p className="text-sm text-[var(--text-muted)]">
+            {timeFilter === '24h'
+              ? 'No scans completed in the last 24 hours.'
+              : timeFilter === '30d'
+              ? 'No scans completed in the last 30 days.'
+              : 'No scans yet. Be the first to scan your site!'}
+          </p>
+          <Link
+            href="/analysis"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#356df4] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            Run a Free Scan
+          </Link>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]">
+          <table className="w-full table-fixed border-collapse">
+            <colgroup>
+              <col style={{ width: '3%' }} />
+              <col style={{ width: '25%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '40%' }} />
+              <col style={{ width: '20%' }} />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-white/[0.08]">
+                <th className="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
+                  #
+                </th>
+                <th className="min-w-0 px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
+                  Site
+                </th>
+                <th className="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
+                  Overall
+                </th>
+                <th className="px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
+                  Scores
+                </th>
+                <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] sm:px-4 sm:py-4">
+                  Date
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr
+                  key={entry.domain}
+                  className="border-b border-white/[0.04] transition-colors last:border-0 hover:bg-white/[0.02]"
+                >
+                  <td className="px-2 py-3 sm:px-4 sm:py-4">
+                    <div className="flex items-center gap-2">
+                      {entry.rank <= 3 ? (
+                        <Medal
+                          className={cn(
+                            'h-5 w-5',
+                            entry.rank === 1 && 'text-amber-400',
+                            entry.rank === 2 && 'text-zinc-300',
+                            entry.rank === 3 && 'text-amber-600'
+                          )}
+                        />
+                      ) : null}
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                        {entry.rank}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="min-w-0 px-2 py-3 sm:px-4 sm:py-4">
+                    <Link
+                      href={entry.hasCertified ? `/certified/${encodeURIComponent(entry.domain)}` : entry.url}
+                      target={entry.hasCertified ? undefined : '_blank'}
+                      rel={entry.hasCertified ? undefined : 'noreferrer'}
+                      className="group flex items-center gap-3"
+                    >
+                      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/5">
+                        <img
+                          src={getFaviconUrl(entry.domain, 32)}
+                          alt=""
+                          className="h-5 w-5 object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling;
+                            if (fallback) {
+                              fallback.classList.remove('hidden');
+                              fallback.classList.add('flex');
+                            }
+                          }}
+                        />
+                        <span className="hidden h-5 w-5 items-center justify-center rounded bg-indigo-500/20 text-indigo-400">
+                          <Trophy className="h-3 w-3" />
+                        </span>
+                      </span>
+                      <div className="min-w-0 overflow-hidden">
+                        <span className="inline-flex items-center gap-1.5 truncate text-sm font-semibold text-[var(--text-primary)] group-hover:underline">
+                          {entry.domain}
+                          <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+                        </span>
+                        <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{entry.url}</p>
+                      </div>
+                    </Link>
+                  </td>
+                  <td className="px-2 py-3 sm:px-4 sm:py-4">
+                    <span className="text-sm font-bold">
+                      <span className={scoreColor(entry.overall)}>{entry.overall}</span>
+                      <span className="text-[var(--text-primary)]">/100</span>
+                    </span>
+                  </td>
+                  <td className="overflow-hidden px-2 py-3 sm:px-4 sm:py-4">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[var(--text-muted)]">
+                      <span>
+                        <span className="text-[#356df4]">●</span>{' '}
+                        AI Visibility <span className={scoreColor(entry.aiVisibility)}>{entry.aiVisibility}</span>
+                      </span>
+                      {entry.webHealth != null && (
+                        <span>
+                          <span className="text-[#25c972]">●</span>{' '}
+                          Web Health <span className={scoreColor(entry.webHealth)}>{entry.webHealth}</span>
+                        </span>
+                      )}
+                      {entry.mentionScore != null && (
+                        <span>
+                          <span className="text-[#a855f7]">●</span>{' '}
+                          AI Mentions <span className={scoreColor(entry.mentionScore)}>{entry.mentionScore}</span>
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-3 text-right text-xs text-[var(--text-muted)] sm:px-4 sm:py-4">
+                    {entry.completedAt ? formatRelativeDate(entry.completedAt) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

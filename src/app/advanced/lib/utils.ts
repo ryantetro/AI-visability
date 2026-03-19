@@ -112,7 +112,7 @@ export function getLatestScanByDomain(scans: RecentScanData[], domain: string) {
   return (
     scans
       .filter((scan) => getDomain(scan.url) === domain)
-      .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))[0] ?? null
+      .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null
   );
 }
 
@@ -120,7 +120,7 @@ export function getLatestPaidScanByDomain(scans: RecentScanData[], domain: strin
   return (
     scans
       .filter((scan) => scan.hasPaid && getDomain(scan.url) === domain)
-      .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))[0] ?? null
+      .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null
   );
 }
 
@@ -196,6 +196,32 @@ Target: ${meta.installTarget}
 1. Deploy the file
 2. Open \`${siteUrl}${filePath}\` in a browser — the file content should display as plain text
 3. Confirm the response has a 200 status code (check in browser DevTools → Network tab)`;
+}
+
+export function buildAllFilesPrompt(
+  files: GeneratedFile[],
+  domain: string,
+  platform: string,
+  baseUrl: string
+): string {
+  const header = `You are a senior web developer implementing AI visibility improvements for ${domain} (${platform}). Deploy the following ${files.length} files to make this site fully visible to AI models like ChatGPT, Claude, and Perplexity.\n`;
+
+  const sections = files.map((file) => {
+    const meta = getFileMeta(file.filename);
+    return buildCursorPrompt(file, domain, platform, meta, baseUrl);
+  });
+
+  const verifyUrl = baseUrl.replace(/\/$/, '');
+  const checklist = files
+    .map((file) => {
+      if (file.filename === 'organization-schema.json') {
+        return `- [ ] Visit ${verifyUrl}/ and view source — confirm \`application/ld+json\` block is present`;
+      }
+      return `- [ ] Visit ${verifyUrl}/${file.filename} — confirm 200 status and correct content`;
+    })
+    .join('\n');
+
+  return `${header}\n${sections.join('\n\n---\n\n')}\n\n---\n\n## Final Verification Checklist\n${checklist}\n\nOnce all files are deployed and verified, the site will have a complete AI visibility foundation.`;
 }
 
 function getFileDeployContext(filename: string): string {

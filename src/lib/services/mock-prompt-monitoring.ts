@@ -1,4 +1,5 @@
 import type { PromptMonitoringService, MonitoredPrompt, PromptResult, CompetitorAppearance, CompetitorSummary } from '@/types/services';
+import type { AIEngine } from '@/types/ai-mentions';
 import { randomUUID } from 'crypto';
 
 const prompts = new Map<string, MonitoredPrompt>();
@@ -69,7 +70,7 @@ export const mockPromptMonitoring: PromptMonitoringService = {
       (a) => a.domain === domain && new Date(a.detectedAt).getTime() >= cutoff
     );
 
-    const map = new Map<string, { appearances: number; positions: number[]; engines: Set<string>; coMentioned: number }>();
+    const map = new Map<string, { appearances: number; positions: number[]; engines: Set<AIEngine>; coMentioned: number }>();
     for (const a of relevant) {
       const existing = map.get(a.competitor);
       if (existing) {

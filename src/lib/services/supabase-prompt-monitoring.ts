@@ -1,4 +1,5 @@
 import type { PromptMonitoringService, MonitoredPrompt, PromptResult, CompetitorSummary } from '@/types/services';
+import type { AIEngine } from '@/types/ai-mentions';
 
 function hasSupabaseConfig() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -35,7 +36,7 @@ interface ResultRow {
   id: string;
   prompt_id: string;
   domain: string;
-  engine: string;
+  engine: AIEngine;
   mentioned: boolean;
   position: number | null;
   sentiment: string | null;
@@ -241,13 +242,13 @@ export const supabasePromptMonitoring: PromptMonitoringService = {
 
     const rows = (await res.json()) as Array<{
       competitor: string;
-      engine: string;
+      engine: AIEngine;
       position: number | null;
       co_mentioned: boolean;
     }>;
 
     // Aggregate client-side
-    const map = new Map<string, { appearances: number; positions: number[]; engines: Set<string>; coMentioned: number }>();
+    const map = new Map<string, { appearances: number; positions: number[]; engines: Set<AIEngine>; coMentioned: number }>();
     for (const row of rows) {
       const existing = map.get(row.competitor);
       if (existing) {

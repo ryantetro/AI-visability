@@ -70,7 +70,7 @@ function SuccessContent() {
         </p>
         {resolvedScanId && !verifying && (
           <Link
-            href={`/advanced?report=${resolvedScanId}`}
+            href={`/dashboard?report=${resolvedScanId}`}
             className="aiso-button aiso-button-primary px-6 py-3 text-sm"
           >
             Open Advanced Tools

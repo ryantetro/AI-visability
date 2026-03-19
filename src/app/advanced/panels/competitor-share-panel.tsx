@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import type { CompetitorData } from '../lib/types';
+import { getAIEngineLabel } from '@/lib/ai-engines';
 
 export function CompetitorSharePanel({ domain }: { domain: string }) {
   const [competitors, setCompetitors] = useState<CompetitorData[]>([]);
@@ -45,7 +46,7 @@ export function CompetitorSharePanel({ domain }: { domain: string }) {
                 <div className="h-full rounded-full bg-[#ff8a1e] transition-all" style={{ width: `${pct}%` }} />
               </div>
               <div className="mt-1.5 flex items-center gap-1.5">
-                {c.engines.map((e) => <span key={e} className="text-[9px] capitalize text-zinc-600">{e}</span>)}
+                {c.engines.map((e) => <span key={e} className="text-[9px] text-zinc-600">{getAIEngineLabel(e)}</span>)}
                 {c.coMentionedCount > 0 && <span className="ml-auto text-[9px] text-[#25c972]/70">co-mentioned {c.coMentionedCount}x</span>}
               </div>
             </div>

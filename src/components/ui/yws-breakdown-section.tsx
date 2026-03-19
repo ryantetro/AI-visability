@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Copy, HelpCircle, Info, Lock, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CheckFixContent } from '@/lib/analysis-fix-content';
+import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
+import { AI_ENGINE_META } from '@/lib/ai-engines';
+
+export type EngineKey = 'chatgpt' | 'perplexity' | 'gemini' | 'claude';
 
 export interface CheckItem {
   label: string;
@@ -12,7 +16,18 @@ export interface CheckItem {
   points?: number;
   maxPoints?: number;
   fixContent?: CheckFixContent;
+  /** When set, renders the AI platform icon instead of the verdict icon */
+  engineKey?: EngineKey;
+  /** Optional React element rendered above fixContent (e.g. social card preview) */
+  previewWidget?: React.ReactNode;
 }
+
+const ENGINE_ICONS: Record<EngineKey, React.ComponentType<{ className?: string }>> = {
+  chatgpt: ChatGPTIcon,
+  perplexity: PerplexityIcon,
+  gemini: GeminiIcon,
+  claude: ClaudeIcon,
+};
 
 export interface SubSection {
   label: string;
@@ -155,8 +170,16 @@ export function YwsBreakdownSection({
   );
 }
 
+const ENGINE_ICON_COLORS: Record<EngineKey, string> = {
+  chatgpt: AI_ENGINE_META.chatgpt.color,
+  perplexity: AI_ENGINE_META.perplexity.color,
+  gemini: AI_ENGINE_META.gemini.color,
+  claude: AI_ENGINE_META.claude.color,
+};
+
 function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boolean }) {
   const hasData = !locked && check.detail !== undefined && check.verdict !== undefined;
+  const EngineIcon = check.engineKey ? ENGINE_ICONS[check.engineKey] : null;
 
   if (hasData) {
     const verdictStyles = {
@@ -165,7 +188,7 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
       unknown: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', Icon: HelpCircle },
     };
     const style = verdictStyles[check.verdict!];
-    const Icon = style.Icon;
+    const VerdictIcon = style.Icon;
 
     const fixContent = check.fixContent;
 
@@ -181,7 +204,16 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <Icon className={cn('h-4 w-4 shrink-0', style.text)} />
+              {EngineIcon ? (
+                <span
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                  style={{ color: ENGINE_ICON_COLORS[check.engineKey!] }}
+                >
+                  <EngineIcon className="h-5 w-5" />
+                </span>
+              ) : (
+                <VerdictIcon className={cn('h-4 w-4 shrink-0', style.text)} />
+              )}
               <p className="font-medium text-white">{check.label}</p>
             </div>
             <p className="mt-1 text-xs leading-6 text-zinc-400">{check.detail}</p>
@@ -202,8 +234,14 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
           </span>
         </div>
 
+        {check.previewWidget && (
+          <div className="mt-4 border-t border-white/10 pt-4">
+            {check.previewWidget}
+          </div>
+        )}
+
         {fixContent ? (
-          <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+          <div className={cn('mt-4 space-y-3 border-t border-white/10 pt-4', check.previewWidget && 'border-t-0 pt-0')}>
             {(fixContent.currentValue || fixContent.recommendedValue) ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <DetailPanel
@@ -270,7 +308,13 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
       <div className="flex min-w-0 flex-1 items-start gap-2">
-        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
+        {EngineIcon ? (
+          <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', ENGINE_ICON_COLORS[check.engineKey!])}>
+            <EngineIcon className="h-5 w-5" />
+          </span>
+        ) : (
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
+        )}
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <p className="font-medium text-zinc-300">{check.label}</p>

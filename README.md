@@ -2,6 +2,8 @@
 
 A well-structured **React** + **Next.js** (App Router) application with TypeScript, Tailwind CSS, and ESLint.
 
+The AI visibility layer supports ChatGPT, Perplexity, Gemini, and Claude when the corresponding API keys are configured.
+
 ## Quick start
 
 ```bash
@@ -22,6 +24,8 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm test` | Run local scan/scoring regression tests |
 | `npm run test:live` | Run curated live-fixture crawl checks |
 | `npm run test:live:saas` | Run the SaaS live-fixture set |
+| `node scripts/check-ai-engines.cjs` | Print configured AI visibility engines and active models |
+| `node scripts/backfill-claude-ai-visibility.cjs 30` | Backfill recent Claude scan data and seed prompt-monitoring baseline |
 
 ## Repository structure
 
@@ -68,3 +72,14 @@ The fixture expectations are intentionally loose so normal site changes do not c
 - **TypeScript**
 - **Tailwind CSS v4**
 - **ESLint** (Next.js config)
+
+## AI visibility providers
+
+The scan and monitoring pipeline can query multiple AI engines in parallel:
+
+- `ChatGPT` via `OPENAI_API_KEY`
+- `Claude` via `ANTHROPIC_API_KEY`
+- `Gemini` via `GOOGLE_GENAI_API_KEY`
+- `Perplexity` via `PERPLEXITY_API_KEY`
+
+If Claude is enabled after older scans already exist, run `node scripts/backfill-claude-ai-visibility.cjs 30` to refresh recent mention summaries and seed a current Claude baseline for active prompt monitoring.

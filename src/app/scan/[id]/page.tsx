@@ -14,7 +14,7 @@ export default async function LegacyScanPage({
   }
 
   if (scan.email && scan.status === 'complete') {
-    redirect(`/analysis?report=${id}`);
+    redirect(`/report?report=${id}`);
   }
 
   redirect(`/analysis?scan=${id}`);

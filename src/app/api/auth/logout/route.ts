@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AUTH_COOKIE_NAME, clearAuthCookies } from '@/lib/auth';
+import { AUTH_COOKIE_NAME, clearSession } from '@/lib/auth';
 import { getSupabaseClient } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
@@ -11,11 +11,12 @@ export async function POST(request: NextRequest) {
       const supabase = getSupabaseClient();
       await supabase.auth.admin.signOut(token);
     } catch {
+      console.error('[auth.logout] failed to revoke session server-side');
       // Best-effort: cookie will be cleared regardless
     }
   }
 
   const response = NextResponse.json({ ok: true });
-  clearAuthCookies(response);
+  clearSession(response);
   return response;
 }

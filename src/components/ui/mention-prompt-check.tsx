@@ -1,14 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { MentionPrompt, MentionResult, AIEngine } from '@/types/ai-mentions';
-
-const ENGINE_LABELS: Record<AIEngine, string> = {
-  chatgpt: 'ChatGPT',
-  perplexity: 'Perplexity',
-  gemini: 'Gemini',
-  claude: 'Claude',
-};
+import type { MentionPrompt, MentionResult } from '@/types/ai-mentions';
+import { getAIEngineLabel } from '@/lib/ai-engines';
 
 interface MentionPromptCheckProps {
   prompt: MentionPrompt;
@@ -52,7 +46,7 @@ export function MentionPromptCheck({ prompt, results }: MentionPromptCheckProps)
                     : 'bg-zinc-500/10 text-zinc-500'
                 )}
               >
-                {r.mentioned ? '✓' : '✗'} {ENGINE_LABELS[r.engine]}
+                {r.mentioned ? '✓' : '✗'} {getAIEngineLabel(r.engine)}
               </span>
             ))}
           </div>

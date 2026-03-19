@@ -6,6 +6,7 @@ import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primiti
 import { cn } from '@/lib/utils';
 import { PROMPT_CATEGORIES } from '../lib/constants';
 import type { PromptCategory, PromptMonitoringData } from '../lib/types';
+import { AI_ENGINES, getAIEngineLabel } from '@/lib/ai-engines';
 
 export function PromptLibraryPanel({ domain }: { domain: string }) {
   const [data, setData] = useState<PromptMonitoringData | null>(null);
@@ -146,14 +147,14 @@ export function PromptLibraryPanel({ domain }: { domain: string }) {
         <div className="mt-5">
           <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Mention rate by engine</p>
           <div className="flex flex-wrap gap-2">
-            {(['chatgpt', 'perplexity', 'gemini', 'claude'] as const).map((engine) => {
+            {AI_ENGINES.map((engine) => {
               const engineResults = results.filter((r) => r.engine === engine);
               if (engineResults.length === 0) return null;
               const mentioned = engineResults.filter((r) => r.mentioned).length;
               const rate = Math.round((mentioned / engineResults.length) * 100);
               return (
                 <div key={engine} className="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-center">
-                  <p className="text-[10px] capitalize text-zinc-500">{engine}</p>
+                  <p className="text-[10px] text-zinc-500">{getAIEngineLabel(engine)}</p>
                   <p className={cn('text-sm font-bold tabular-nums', rate >= 60 ? 'text-[#25c972]' : rate >= 30 ? 'text-[#ffbb00]' : 'text-[#ff5252]')}>{rate}%</p>
                   <p className="text-[9px] text-zinc-600">{engineResults.length} checks</p>
                 </div>

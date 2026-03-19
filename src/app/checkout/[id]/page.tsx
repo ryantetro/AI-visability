@@ -28,7 +28,7 @@ export default function CheckoutPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.paid) {
-          router.push(`/advanced?report=${data.scanId}&checkout=success&session_id=${id}`);
+          router.push(`/dashboard?report=${data.scanId}&checkout=success&session_id=${id}`);
         }
       }
     } catch {

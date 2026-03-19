@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { isValidUrl } from '@/lib/url-utils';
+import { useAuth } from '@/hooks/use-auth';
 import { colors, brand } from '@/styles/tokens';
 
 export default function LandingC() {
   const router = useRouter();
+  const { user } = useAuth();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -16,6 +18,10 @@ export default function LandingC() {
     e.preventDefault();
     if (!url.trim() || !isValidUrl(url)) {
       setError('Please enter a valid URL');
+      return;
+    }
+    if (!user) {
+      router.push(`/login?next=/analysis&scanUrl=${encodeURIComponent(url)}`);
       return;
     }
     setLoading(true);
@@ -85,7 +91,7 @@ export default function LandingC() {
           </form>
 
           <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Free. 30 seconds. No signup.
+            Free. 30 seconds. Secure account.
           </p>
         </div>
       </section>
@@ -228,7 +234,7 @@ export default function LandingC() {
           Check your score
         </h2>
         <p className="mx-auto mt-2 max-w-sm text-sm" style={{ color: 'var(--text-tertiary)' }}>
-          Free audit. No signup. See how AI search engines see your business.
+          Free audit. Secure sign-in. See how AI search engines see your business.
         </p>
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

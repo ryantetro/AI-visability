@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getPromptMonitoring } from '@/lib/services/registry';
+import type { AIEngine } from '@/types/ai-mentions';
 
 export interface PositionTrendPoint {
   week: string;
-  engine: string;
+  engine: AIEngine;
   avgPosition: number | null;
   mentionRate: number;
   totalChecks: number;
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
         const [week, engine] = key.split('::');
         return {
           week,
-          engine,
+          engine: engine as AIEngine,
           avgPosition: data.positions.length > 0
             ? Math.round((data.positions.reduce((a, b) => a + b, 0) / data.positions.length) * 10) / 10
             : null,

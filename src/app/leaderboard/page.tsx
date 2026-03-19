@@ -5,7 +5,7 @@ import {
   Send,
   Zap,
 } from 'lucide-react';
-import { listLeaderboardEntries } from '@/lib/public-proof';
+import { listLeaderboardEntriesFiltered } from '@/lib/public-proof';
 
 import { FloatingFeedback } from '@/components/ui/floating-feedback';
 import { LeaderboardContent } from './leaderboard-content';
@@ -14,12 +14,6 @@ export const metadata = {
   title: 'Leaderboard | AISO',
   description: 'Track the top public reports. See how your site stacks up and explore what makes the leaders stand out.',
 };
-
-const DEMO_ENTRIES = [
-  { domain: 'getvoices.ai', url: 'https://getvoices.ai', overall: 98, speed: 96, quality: 100, security: 97, completedAt: Date.now() - 5 * 24 * 60 * 60 * 1000 },
-  { domain: 'webstudio.is', url: 'https://webstudio.is', overall: 98, speed: 99, quality: 97, security: 98, completedAt: Date.now() - 60 * 24 * 60 * 60 * 1000 },
-  { domain: 'launchigniter.com', url: 'https://launchigniter.com', overall: 97, speed: 95, quality: 100, security: 96, completedAt: Date.now() - 16 * 24 * 60 * 60 * 1000 },
-];
 
 const FEATURED_SPOTS = [
   {
@@ -40,21 +34,18 @@ const FEATURED_SPOTS = [
 ];
 
 export default async function LeaderboardPage() {
-  const entries = await listLeaderboardEntries(100);
-  const displayEntries =
-    entries.length > 0
-      ? entries.map(({ rank, summary }) => ({
-          rank,
-          domain: summary.domain,
-          url: summary.url,
-          overall: summary.percentage,
-          speed: summary.webHealth ?? Math.min(100, summary.percentage + 2),
-          quality: summary.aiVisibility,
-          security: summary.webHealth ?? Math.min(100, summary.percentage - 1),
-          completedAt: summary.completedAt,
-          hasCertified: true,
-        }))
-      : DEMO_ENTRIES.map((e, i) => ({ ...e, rank: i + 1, hasCertified: false }));
+  const entries = await listLeaderboardEntriesFiltered(100, 'all');
+  const displayEntries = entries.map(({ rank, summary, profile }) => ({
+    rank,
+    domain: summary.domain,
+    url: summary.url,
+    overall: summary.percentage,
+    aiVisibility: summary.aiVisibility,
+    webHealth: summary.webHealth,
+    mentionScore: summary.mentionScore,
+    completedAt: summary.completedAt,
+    hasCertified: profile.verified && profile.enabled,
+  }));
 
   return (
       <div className="mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
@@ -63,7 +54,7 @@ export default async function LeaderboardPage() {
             Leaderboard
           </h1>
           <p className="mx-auto mt-2 max-w-2xl text-center text-[15px] text-[var(--text-muted)]">
-            Track the top 100 public reports from the last 24 hours, 30 days, and all time. See how your site stacks up and explore what makes the leaders stand out.
+            Track the top 100 scanned sites. See how your site stacks up and explore what makes the leaders stand out.
           </p>
 
           <div className="mt-8">

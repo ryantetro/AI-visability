@@ -1,27 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyMagicLink, setAuthCookies } from '@/lib/auth';
+import {
+  buildPostAuthRedirectPath,
+  sanitizeRedirectPath,
+  setSessionCookies,
+  verifyEmailCallback,
+} from '@/lib/auth';
 
-/**
- * Handles Magic Link callback from Supabase Auth.
- * User clicks the link in their email and lands here with token_hash in the URL.
- */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const code = searchParams.get('code');
   const tokenHash = searchParams.get('token_hash');
-  const next = searchParams.get('next') || '/analysis';
+  const type = searchParams.get('type');
+  const next = sanitizeRedirectPath(searchParams.get('next'), '/analysis');
+  const scanUrl = searchParams.get('scanUrl');
 
-  if (!tokenHash) {
+  if (!tokenHash && !code) {
     return NextResponse.redirect(
       new URL('/login?error=Missing+verification+token', request.url)
     );
   }
 
   try {
-    const { accessToken, refreshToken } = await verifyMagicLink(tokenHash);
-    const response = NextResponse.redirect(new URL(next, request.url));
-    setAuthCookies(response, accessToken, refreshToken);
+    const { session, type: callbackType } = await verifyEmailCallback({
+      code,
+      tokenHash,
+      type,
+    });
+
+    const responseUrl = callbackType === 'recovery'
+      ? new URL('/login', request.url)
+      : new URL(buildPostAuthRedirectPath(next, scanUrl), request.url);
+    if (callbackType === 'recovery') {
+      responseUrl.searchParams.set('mode', 'reset-password');
+      responseUrl.searchParams.set('next', next);
+      if (scanUrl) {
+        responseUrl.searchParams.set('scanUrl', scanUrl);
+      }
+    }
+
+    const response = NextResponse.redirect(responseUrl);
+    setSessionCookies(response, session);
     return response;
   } catch (error) {
+    console.error('[auth.callback] verification failed', error);
     const message = error instanceof Error ? error.message : 'Verification failed';
     return NextResponse.redirect(
       new URL(`/login?error=${encodeURIComponent(message)}`, request.url)

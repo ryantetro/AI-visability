@@ -20,21 +20,25 @@ export async function POST(request: NextRequest) {
   const result = await payment.verifyPayment(sessionId);
 
   if (result.paid) {
-    const db = getDatabase();
-    const scan = await db.getScan(result.scanId);
-    if (scan && scan.email?.toLowerCase() === user.email.toLowerCase()) {
-      scan.paid = true;
-      await db.saveScan(scan);
+    // For mock mode: do the plan upgrade here since there's no webhook
+    // For real Stripe: the webhook handles the actual upgrade, this is just a status check
+    const plan = result.plan || 'starter_monthly';
 
-      // Upgrade the user's plan
-      const plan = result.plan || 'lifetime';
-      try {
-        await upgradeUserPlan(user.id, plan);
-      } catch {
-        // Non-blocking: scan unlock still succeeds even if plan upgrade fails
+    if (result.scanId && !result.scanId.startsWith('upgrade_')) {
+      const db = getDatabase();
+      const scan = await db.getScan(result.scanId);
+      if (scan && scan.email?.toLowerCase() === user.email.toLowerCase()) {
+        scan.paid = true;
+        await db.saveScan(scan);
+      } else if (scan) {
+        return NextResponse.json({ error: 'This checkout belongs to another account.' }, { status: 403 });
       }
-    } else {
-      return NextResponse.json({ error: 'This checkout belongs to another account.' }, { status: 403 });
+    }
+
+    try {
+      await upgradeUserPlan(user.id, plan);
+    } catch {
+      // Non-blocking: scan unlock still succeeds even if plan upgrade fails
     }
   }
 

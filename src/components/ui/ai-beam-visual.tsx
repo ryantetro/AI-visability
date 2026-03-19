@@ -52,7 +52,7 @@ export function AIBeamVisual() {
             <div className="flex size-full flex-col items-stretch justify-between gap-10">
                 {/* Row 1 */}
                 <div className="flex flex-row items-center justify-between">
-                    <Circle ref={chatGptRef} label="ChatGPT" className="text-white">
+                    <Circle ref={chatGptRef} label="ChatGPT" className="text-[#74aa9c]">
                         <ChatGPTIcon />
                     </Circle>
                     <Circle ref={perplexityRef} label="Perplexity" className="text-[#20B8CD]">
@@ -62,7 +62,7 @@ export function AIBeamVisual() {
 
                 {/* Row 2 — Centre */}
                 <div className="flex flex-row items-center justify-between">
-                    <Circle ref={geminiRef} label="Gemini" className="text-[#8ab4f8]">
+                    <Circle ref={geminiRef} label="Gemini" className="text-[#4285F4]">
                         <GeminiIcon />
                     </Circle>
 

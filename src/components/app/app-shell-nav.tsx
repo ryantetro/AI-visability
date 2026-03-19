@@ -3,17 +3,18 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, Clock3, Crown, Diamond, Loader2, LogOut, Megaphone, Trophy, Zap } from 'lucide-react';
+import { BarChart3, Clock3, Diamond, Loader2, LogOut, Megaphone, Trophy, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
+import { planStringToTier, PLANS } from '@/lib/pricing';
 
-type AppSection = 'analysis' | 'history' | 'leaderboard' | 'advanced' | 'featured';
+type AppSection = 'analysis' | 'history' | 'leaderboard' | 'advanced' | 'featured' | 'dashboard';
 
 const navItems: { key: AppSection; label: string; href: string; icon: typeof BarChart3 }[] = [
   { key: 'analysis', label: 'Analysis', href: '/analysis', icon: BarChart3 },
   { key: 'history', label: 'History', href: '/history', icon: Clock3 },
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', icon: Trophy },
-  { key: 'advanced', label: 'Advanced', href: '/advanced', icon: Diamond },
+  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: Diamond },
 ];
 
 function AisoLogo({ className }: { className?: string }) {
@@ -46,7 +47,7 @@ function AisoLogo({ className }: { className?: string }) {
 }
 
 function detectActiveSection(pathname: string): AppSection {
-  if (pathname.startsWith('/advanced')) return 'advanced';
+  if (pathname.startsWith('/dashboard') || pathname.startsWith('/report') || pathname.startsWith('/brand') || pathname.startsWith('/competitors') || pathname.startsWith('/settings') || pathname.startsWith('/advanced')) return 'advanced';
   if (pathname.startsWith('/history')) return 'history';
   if (pathname.startsWith('/leaderboard')) return 'leaderboard';
   if (pathname.startsWith('/featured')) return 'featured';
@@ -93,7 +94,7 @@ export function AppShellNav() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
-  const handleUpgrade = async (plan: 'monthly' | 'lifetime') => {
+  const handleUpgrade = async (plan: string) => {
     setCheckoutLoading(plan);
     try {
       const res = await fetch('/api/checkout', {
@@ -107,15 +108,14 @@ export function AppShellNav() {
       router.push(session.url);
     } catch {
       setDropdownOpen(false);
-      router.push('/analysis');
+      router.push('/pricing');
     } finally {
       setCheckoutLoading(null);
     }
   };
 
-  const planLabel = usageData?.isPaid
-    ? usageData.plan === 'lifetime' ? 'Lifetime Plan' : 'Monthly Plan'
-    : 'Free Plan';
+  const tier = usageData?.plan ? planStringToTier(usageData.plan) : 'free';
+  const planLabel = tier !== 'free' ? `${PLANS[tier].name} Plan` : 'Free Plan';
 
   return (
     <header className="w-full border-b border-white/[0.06] bg-transparent px-6 py-4 sm:px-8">
@@ -195,33 +195,50 @@ export function AppShellNav() {
                     <p className="text-[12px] font-medium text-[var(--text-muted)]">{planLabel}</p>
                   </div>
 
-                  {!usageData?.isPaid && (
+                  {tier === 'free' && (
                     <div className="border-b border-white/[0.06] py-1.5">
                       <button
                         type="button"
                         disabled={checkoutLoading !== null}
-                        onClick={() => void handleUpgrade('monthly')}
+                        onClick={() => void handleUpgrade('starter_monthly')}
                         className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-[var(--text-primary)] transition-colors hover:bg-white/[0.04] disabled:opacity-50"
                       >
-                        {checkoutLoading === 'monthly' ? (
+                        {checkoutLoading === 'starter_monthly' ? (
                           <Loader2 className="h-4 w-4 animate-spin text-[#25c972]" />
                         ) : (
                           <Zap className="h-4 w-4 text-[#25c972]" />
                         )}
-                        Subscribe Monthly
+                        Upgrade to Starter — $29/mo
                       </button>
                       <button
                         type="button"
                         disabled={checkoutLoading !== null}
-                        onClick={() => void handleUpgrade('lifetime')}
+                        onClick={() => void handleUpgrade('pro_monthly')}
                         className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-[var(--text-primary)] transition-colors hover:bg-white/[0.04] disabled:opacity-50"
                       >
-                        {checkoutLoading === 'lifetime' ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                        {checkoutLoading === 'pro_monthly' ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-[#356df4]" />
                         ) : (
-                          <Crown className="h-4 w-4 text-amber-400" />
+                          <Zap className="h-4 w-4 text-[#356df4]" />
                         )}
-                        Upgrade to Lifetime
+                        Upgrade to Pro — $79/mo
+                      </button>
+                    </div>
+                  )}
+                  {tier === 'starter' && (
+                    <div className="border-b border-white/[0.06] py-1.5">
+                      <button
+                        type="button"
+                        disabled={checkoutLoading !== null}
+                        onClick={() => void handleUpgrade('pro_monthly')}
+                        className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-[var(--text-primary)] transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+                      >
+                        {checkoutLoading === 'pro_monthly' ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-[#356df4]" />
+                        ) : (
+                          <Zap className="h-4 w-4 text-[#356df4]" />
+                        )}
+                        Upgrade to Pro — $79/mo
                       </button>
                     </div>
                   )}

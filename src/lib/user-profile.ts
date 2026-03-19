@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@/lib/supabase';
+import { type PlanTier, planStringToTier, PLANS } from '@/lib/pricing';
 
 export interface UserProfile {
   id: string;
@@ -16,6 +17,9 @@ export interface UserUsage {
   remaining: number;
   isPaid: boolean;
   plan: string;
+  tier: PlanTier;
+  domains: number;
+  prompts: number;
 }
 
 export async function getOrCreateProfile(userId: string, email: string): Promise<UserProfile> {
@@ -70,17 +74,23 @@ export async function incrementScanCount(userId: string): Promise<void> {
 }
 
 export function canUserScan(profile: UserProfile): boolean {
-  return profile.plan !== 'free' || profile.scans_used < profile.free_scan_limit;
+  // All users can scan (free users just can't access paid features)
+  return true;
 }
 
 export function getUserUsage(profile: UserProfile): UserUsage {
-  const isPaid = profile.plan !== 'free';
+  const tier = planStringToTier(profile.plan);
+  const isPaid = tier !== 'free';
+  const planConfig = PLANS[tier];
   return {
     used: profile.scans_used,
     limit: profile.free_scan_limit,
-    remaining: isPaid ? Infinity : Math.max(0, profile.free_scan_limit - profile.scans_used),
+    remaining: Infinity,
     isPaid,
     plan: profile.plan,
+    tier,
+    domains: planConfig.domains,
+    prompts: planConfig.prompts,
   };
 }
 

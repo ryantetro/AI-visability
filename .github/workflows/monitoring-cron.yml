@@ -1,18 +1,20 @@
 name: Scheduled Monitoring Re-scans
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 jobs:
   rescan:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
       - run: npm ci
-      - run: node scripts/run-monitoring.mjs
+      - name: Run monitoring cron
+        run: node scripts/run-monitoring.mjs
         env:
           APP_URL: ${{ secrets.APP_URL }}
           MONITORING_SECRET: ${{ secrets.MONITORING_SECRET }}

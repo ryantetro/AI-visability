@@ -8,9 +8,14 @@ import { DashboardLayout } from '@/components/app/dashboard-layout';
 import { DomainContextProvider } from '@/contexts/domain-context';
 
 const LANDING_PATHS = ['/', '/landing/b', '/landing/c'];
-const APP_PATH_PREFIXES = ['/analysis', '/history', '/leaderboard', '/advanced', '/featured'];
 
-function AdvancedDashboardLayout({ children }: { children: React.ReactNode }) {
+/** Routes that need sidebar + domain context (workspace pages) */
+const WORKSPACE_PREFIXES = ['/dashboard', '/report', '/brand', '/competitors', '/settings', '/advanced', '/history'];
+
+/** Routes that need sidebar but NOT domain context */
+const APP_PATH_PREFIXES = ['/analysis', '/leaderboard', '/featured', ...WORKSPACE_PREFIXES];
+
+function WorkspaceDashboardLayout({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const reportId = searchParams.get('report');
 
@@ -24,17 +29,18 @@ function AdvancedDashboardLayout({ children }: { children: React.ReactNode }) {
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const showHeaderFooter = LANDING_PATHS.includes(pathname ?? '');
+  const isWorkspace = WORKSPACE_PREFIXES.some((p) => (pathname ?? '').startsWith(p));
   const showAppLayout = APP_PATH_PREFIXES.some((p) => (pathname ?? '').startsWith(p));
-  const isAdvanced = (pathname ?? '').startsWith('/advanced');
+
+  if (isWorkspace) {
+    return (
+      <Suspense>
+        <WorkspaceDashboardLayout>{children}</WorkspaceDashboardLayout>
+      </Suspense>
+    );
+  }
 
   if (showAppLayout) {
-    if (isAdvanced) {
-      return (
-        <Suspense>
-          <AdvancedDashboardLayout>{children}</AdvancedDashboardLayout>
-        </Suspense>
-      );
-    }
     return <DashboardLayout>{children}</DashboardLayout>;
   }
 

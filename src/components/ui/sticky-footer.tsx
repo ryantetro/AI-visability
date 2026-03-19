@@ -7,7 +7,6 @@ import {
     GithubIcon,
     TwitterIcon,
     LinkedinIcon,
-    SearchIcon,
 } from 'lucide-react';
 import { Button } from './button';
 import Link from 'next/link';
@@ -28,105 +27,84 @@ type StickyFooterProps = React.ComponentProps<'footer'>;
 export function StickyFooter({ className, ...props }: StickyFooterProps) {
     return (
         <footer
-            className={cn('relative h-[600px] w-full', className)}
-            style={{ clipPath: 'polygon(0% 0, 100% 0%, 100% 100%, 0 100%)' }}
+            className={cn('relative w-full border-t border-white/[0.06]', className)}
+            style={{
+                background:
+                    'linear-gradient(180deg, rgba(6,6,6,1) 0%, rgba(4,4,5,1) 100%)',
+            }}
             {...props}
         >
-            {/* 
-        This div is fixed to the bottom. Because the footer itself has h-[600px] 
-        and is placed sequentially in the normal layout flow, as you scroll past it, 
-        the blank space of the footer reveals this fixed layer behind it.
-      */}
-            <div className="fixed bottom-0 h-[600px] w-full overflow-hidden border-t border-white/10 -z-20">
-                <div
-                    className="absolute inset-0"
-                    style={{
-                        background:
-                            'radial-gradient(circle at 50% -8%, rgba(255,255,255,0.035), transparent 22%), radial-gradient(circle at 50% 120%, rgba(255,255,255,0.02), transparent 28%), linear-gradient(180deg, #050505 0%, #060606 42%, #040404 100%)',
-                    }}
-                />
-                <div
-                    aria-hidden
-                    className="absolute inset-0 opacity-[0.58] pointer-events-none"
-                    style={{
-                        background:
-                            'repeating-linear-gradient(90deg, rgba(255,255,255,0.014) 0, rgba(255,255,255,0.014) 1px, transparent 1px, transparent 88px), linear-gradient(180deg, rgba(255,255,255,0.018), transparent 22%, transparent 78%, rgba(255,255,255,0.012))',
-                    }}
-                />
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[linear-gradient(180deg,rgba(255,255,255,0.028)_0%,rgba(255,255,255,0.012)_22%,rgba(6,6,6,0)_100%)]" />
-                <div className="sticky top-[calc(100vh-600px)] h-full overflow-y-auto w-full max-w-[1280px] mx-auto">
-                    <div className="relative flex size-full flex-col justify-between gap-5 px-4 py-12 md:px-8">
-                        {/* Main Footer Content */}
-                        <div className="relative z-10 mt-10 flex flex-col gap-12 md:flex-row xl:mt-0 justify-between">
-                            <AnimatedContainer className="w-full max-w-sm space-y-6">
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center justify-center rounded-full bg-[var(--color-primary-500)] p-2 shadow-[0_0_20px_rgba(68,131,255,0.32)]">
-                                        <span className="text-white text-xs font-bold leading-none tracking-tight">
-                                            AI
-                                        </span>
-                                    </div>
-                                    <span className="font-semibold tracking-wide text-white">
-                                        AISO
-                                    </span>
-                                </div>
-                                <p className="max-w-xs text-sm leading-relaxed text-[var(--text-secondary)]">
-                                    Make your business visible to AI. Check how ChatGPT, Perplexity, and Claude perceive your brand, and use our tools to optimize your answers.
-                                </p>
-                                <div className="flex gap-3">
-                                    {socialLinks.map((link) => (
-                                        <Button
-                                            key={link.title}
-                                            size="icon"
-                                            variant="ghost"
-                                            className="size-10 rounded-full bg-[rgba(255,255,255,0.05)] text-[#d6d3d1] hover:bg-[rgba(255,255,255,0.1)] hover:text-white"
-                                            asChild
-                                        >
-                                            <Link href={link.href} aria-label={link.title}>
-                                                <link.icon className="size-4" />
-                                            </Link>
-                                        </Button>
-                                    ))}
+            <div className="w-full max-w-[1280px] mx-auto px-4 py-14 md:px-8">
+                <div className="flex flex-col gap-12 md:flex-row justify-between">
+                    {/* Brand column */}
+                    <AnimatedContainer className="w-full max-w-sm space-y-6">
+                        <div className="flex items-center gap-2.5">
+                            <div className="flex items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-primary-400)] to-[var(--color-primary-600)] h-7 w-7 shadow-[0_0_12px_rgba(53,109,244,0.25)]">
+                                <span className="text-white text-[10px] font-bold leading-none tracking-tight">
+                                    AI
+                                </span>
+                            </div>
+                            <span className="text-[15px] font-semibold tracking-[-0.01em] text-white/90">
+                                AISO
+                            </span>
+                        </div>
+                        <p className="max-w-xs text-sm leading-relaxed text-white/40">
+                            Make your business visible to AI. Check how ChatGPT, Perplexity, and Claude perceive your brand, and use our tools to optimize your answers.
+                        </p>
+                        <div className="flex gap-2">
+                            {socialLinks.map((link) => (
+                                <Button
+                                    key={link.title}
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-9 rounded-lg bg-white/[0.03] text-white/30 hover:bg-white/[0.06] hover:text-white/60"
+                                    asChild
+                                >
+                                    <Link href={link.href} aria-label={link.title}>
+                                        <link.icon className="size-4" />
+                                    </Link>
+                                </Button>
+                            ))}
+                        </div>
+                    </AnimatedContainer>
+
+                    {/* Link columns */}
+                    <div className="flex gap-12 lg:gap-24 flex-wrap">
+                        {footerLinkGroups.map((group, index) => (
+                            <AnimatedContainer
+                                key={group.label}
+                                delay={0.1 + index * 0.1}
+                                className="min-w-[140px]"
+                            >
+                                <div>
+                                    <h3 className="text-[11px] uppercase tracking-[0.1em] font-semibold text-white/50 mb-5">
+                                        {group.label}
+                                    </h3>
+                                    <ul className="space-y-3 text-sm text-white/35">
+                                        {group.links.map((link) => (
+                                            <li key={link.title}>
+                                                <Link
+                                                    href={link.href}
+                                                    className="inline-flex items-center transition-colors duration-150 hover:text-white/70"
+                                                >
+                                                    {link.icon && <link.icon className="me-2 size-4" />}
+                                                    {link.title}
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </div>
                             </AnimatedContainer>
+                        ))}
+                    </div>
+                </div>
 
-                            <div className="flex gap-12 lg:gap-24 flex-wrap">
-                                {footerLinkGroups.map((group, index) => (
-                                    <AnimatedContainer
-                                        key={group.label}
-                                        delay={0.1 + index * 0.1}
-                                        className="min-w-[140px]"
-                                    >
-                                        <div>
-                                            <h3 className="text-sm uppercase tracking-wider font-semibold text-white mb-6">
-                                                {group.label}
-                                            </h3>
-                                            <ul className="space-y-3 text-sm text-[var(--text-secondary)]">
-                                                {group.links.map((link) => (
-                                                    <li key={link.title}>
-                                                        <Link
-                                                            href={link.href}
-                                                            className="inline-flex items-center transition-all duration-300 hover:text-[var(--color-primary-300)]"
-                                                        >
-                                                            {link.icon && <link.icon className="me-2 size-4" />}
-                                                            {link.title}
-                                                        </Link>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </AnimatedContainer>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Bottom Bar */}
-                        <div className="relative z-10 flex flex-col items-center justify-between gap-4 border-t border-[rgba(255,255,255,0.1)] pt-8 pb-4 text-xs text-[var(--text-tertiary)] md:flex-row">
-                            <p>© {new Date().getFullYear()} AISO — AI Search Optimization. All rights reserved.</p>
-                            <div className="flex gap-6">
-                                <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
-                                <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-                            </div>
-                        </div>
+                {/* Bottom Bar */}
+                <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/[0.06] pt-8 text-xs text-white/25 md:flex-row">
+                    <p>&copy; {new Date().getFullYear()} AISO &mdash; AI Search Optimization. All rights reserved.</p>
+                    <div className="flex gap-6">
+                        <Link href="/terms" className="hover:text-white/50 transition-colors duration-150">Terms of Service</Link>
+                        <Link href="/privacy" className="hover:text-white/50 transition-colors duration-150">Privacy Policy</Link>
                     </div>
                 </div>
             </div>

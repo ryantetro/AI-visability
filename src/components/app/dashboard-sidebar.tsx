@@ -6,9 +6,12 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import {
   Check,
   Clock3,
+  CreditCard,
+  FileText,
   Globe2,
   Heart,
   LayoutDashboard,
+  Lock,
   Menu,
   Plus,
   Settings2,
@@ -20,6 +23,8 @@ import { cn } from '@/lib/utils';
 import { getFaviconUrl } from '@/lib/url-utils';
 import { useDomainContext } from '@/contexts/domain-context';
 import { scoreColor } from '@/app/advanced/lib/utils';
+import { usePlan } from '@/hooks/use-plan';
+import { NAV_GATES, canAccess } from '@/lib/pricing';
 
 type SidebarItem = {
   key: string;
@@ -33,24 +38,30 @@ const NAV_ITEMS: SidebarItem[] = [
   {
     key: 'dashboard',
     label: 'Dashboard',
-    href: '/advanced',
+    href: '/dashboard',
     icon: LayoutDashboard,
-    matchFn: (p, s) => p.startsWith('/advanced') && !s,
+    matchFn: (p) => p === '/dashboard',
+  },
+  {
+    key: 'report',
+    label: 'Report',
+    href: '/report',
+    icon: FileText,
+    matchFn: (p) => p === '/report',
   },
   {
     key: 'brand',
     label: 'Brand',
-    href: '/advanced?section=brand',
+    href: '/brand',
     icon: Heart,
-    matchFn: (p, s) =>
-      (p.startsWith('/advanced') && s === 'brand') || p.startsWith('/analysis'),
+    matchFn: (p) => p === '/brand' || p.startsWith('/analysis'),
   },
   {
     key: 'competitors',
     label: 'Competitors',
-    href: '/advanced?section=competitors',
+    href: '/competitors',
     icon: Users,
-    matchFn: (p, s) => p.startsWith('/advanced') && s === 'competitors',
+    matchFn: (p) => p === '/competitors',
   },
   {
     key: 'history',
@@ -71,10 +82,26 @@ const NAV_ITEMS: SidebarItem[] = [
 const SETTINGS_ITEM: SidebarItem = {
   key: 'settings',
   label: 'Settings',
-  href: '/advanced?section=settings',
+  href: '/settings',
   icon: Settings2,
-  matchFn: (p, s) => p.startsWith('/advanced') && s === 'settings',
+  matchFn: (p) => p === '/settings',
 };
+
+const PRICING_ITEM: SidebarItem = {
+  key: 'pricing',
+  label: 'Pricing',
+  href: '/pricing',
+  icon: CreditCard,
+  matchFn: (p) => p.startsWith('/pricing'),
+};
+
+/** Routes that represent the active workspace and should carry ?report= */
+const WORKSPACE_KEYS = new Set(['dashboard', 'report', 'brand', 'competitors', 'settings']);
+
+function buildNavHref(base: string, reportId: string | null): string {
+  if (!reportId) return base;
+  return `${base}?report=${reportId}`;
+}
 
 function AisoLogo({ className }: { className?: string }) {
   return (
@@ -90,13 +117,34 @@ function AisoLogo({ className }: { className?: string }) {
 function NavItem({
   item,
   active,
+  locked,
   onClick,
 }: {
   item: SidebarItem;
   active: boolean;
+  locked?: boolean;
   onClick?: () => void;
 }) {
   const Icon = item.icon;
+
+  if (locked) {
+    return (
+      <Link
+        href={item.href}
+        onClick={onClick}
+        className={cn(
+          'relative flex items-center gap-3 rounded-lg px-4 text-[13px] font-medium transition-colors',
+          'h-[var(--sidebar-item-height)]',
+          'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-400'
+        )}
+      >
+        <Icon className="h-[18px] w-[18px] shrink-0 text-zinc-600" />
+        <span className="flex-1">{item.label}</span>
+        <Lock className="h-3 w-3 shrink-0 text-zinc-600" />
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={item.href}
@@ -126,6 +174,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
     addDomainInput,
     setAddDomainInput,
     handleAddDomain,
+    handleRemoveDomain,
     addError,
     confirmChecked,
     setConfirmChecked,
@@ -168,7 +217,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
               type="button"
               onClick={() => handleSelectDomain(site.domain)}
               className={cn(
-                'relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
+                'group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
                 isActive
                   ? 'bg-white/[0.08] text-white'
                   : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
@@ -182,9 +231,23 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
                 alt=""
                 className="h-4 w-4 shrink-0 rounded-sm"
               />
-              <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
-                {site.domain}
-              </span>
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-medium">
+                  {site.domain}
+                </span>
+                {site.lastTouchedAt && (() => {
+                  const ageDays = Math.floor((Date.now() - site.lastTouchedAt) / 86400000);
+                  const ageHours = Math.floor((Date.now() - site.lastTouchedAt) / 3600000);
+                  const label = ageHours < 24 ? `${ageHours}h ago` : `${ageDays}d ago`;
+                  const dotColor = ageDays < 1 ? 'bg-[#25c972]' : ageDays <= 7 ? 'bg-[#ffbb00]' : 'bg-[#ff5252]';
+                  return (
+                    <span className="flex items-center gap-1 text-[10px] text-zinc-600">
+                      <span className={cn('inline-block h-1.5 w-1.5 rounded-full', dotColor)} />
+                      {label}
+                    </span>
+                  );
+                })()}
+              </div>
               {score != null && (
                 <span
                   className={cn(
@@ -201,6 +264,24 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
                   {Math.round(score)}
                 </span>
               )}
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveDomain(site.domain);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.stopPropagation();
+                    handleRemoveDomain(site.domain);
+                  }
+                }}
+                className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100"
+                aria-label={`Remove ${site.domain}`}
+              >
+                <X className="h-3 w-3" />
+              </span>
             </button>
           );
         })}
@@ -272,7 +353,9 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const section = searchParams.get('section');
+  const reportParam = searchParams.get('report');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { tier } = usePlan();
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -284,6 +367,8 @@ export function DashboardSidebar() {
   } catch {
     hasDomainContext = false;
   }
+
+  const isFree = tier === 'free';
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -310,23 +395,41 @@ export function DashboardSidebar() {
 
       {/* Nav items */}
       <nav className="mt-2 flex-1 space-y-0.5 px-3">
-        {NAV_ITEMS.map((item) => (
-          <NavItem
-            key={item.key}
-            item={item}
-            active={item.matchFn(pathname, section)}
-            onClick={closeMobile}
-          />
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const requiredTier = NAV_GATES[item.key] ?? 'free';
+          const isLocked = !canAccess(tier, requiredTier);
+          const href = WORKSPACE_KEYS.has(item.key)
+            ? buildNavHref(item.href, reportParam)
+            : item.href;
+          return (
+            <NavItem
+              key={item.key}
+              item={{ ...item, href }}
+              active={item.matchFn(pathname, section)}
+              locked={isLocked}
+              onClick={closeMobile}
+            />
+          );
+        })}
 
         {/* Separator */}
         <div className="!my-3 border-t border-white/[0.06]" />
 
         <NavItem
-          item={SETTINGS_ITEM}
+          item={{ ...SETTINGS_ITEM, href: buildNavHref(SETTINGS_ITEM.href, reportParam) }}
           active={SETTINGS_ITEM.matchFn(pathname, section)}
+          locked={!canAccess(tier, NAV_GATES.settings ?? 'free')}
           onClick={closeMobile}
         />
+
+        {/* Pricing link — visible for free users */}
+        {isFree && (
+          <NavItem
+            item={PRICING_ITEM}
+            active={PRICING_ITEM.matchFn(pathname, section)}
+            onClick={closeMobile}
+          />
+        )}
       </nav>
 
       {/* Bottom logo */}

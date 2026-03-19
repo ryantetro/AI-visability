@@ -2,29 +2,25 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Loader2, LogOut, Megaphone, Zap } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { usePathname, useRouter } from 'next/navigation';
+import { Loader2, LogOut, Megaphone, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { planStringToTier, PLANS } from '@/lib/pricing';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/advanced': 'Dashboard',
+  '/dashboard': 'Dashboard',
+  '/report': 'Full Report',
+  '/brand': 'Brand',
+  '/competitors': 'Competitors',
+  '/settings': 'Settings',
   '/analysis': 'Analysis',
   '/history': 'History',
   '/leaderboard': 'Leaderboard',
   '/featured': 'Featured Spot',
+  '/pricing': 'Pricing',
 };
 
-const SECTION_TITLES: Record<string, string> = {
-  brand: 'Brand',
-  competitors: 'Competitors',
-  settings: 'Settings',
-};
-
-function getPageTitle(pathname: string, section: string | null): string {
-  if (pathname.startsWith('/advanced') && section && SECTION_TITLES[section]) {
-    return SECTION_TITLES[section];
-  }
+function getPageTitle(pathname: string): string {
   for (const [prefix, title] of Object.entries(PAGE_TITLES)) {
     if (pathname.startsWith(prefix)) return title;
   }
@@ -34,15 +30,13 @@ function getPageTitle(pathname: string, section: string | null): string {
 export function DashboardHeaderBar() {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const section = searchParams.get('section');
   const { user, loading, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [usageData, setUsageData] = useState<{ plan: string; isPaid: boolean } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const title = getPageTitle(pathname, section);
+  const title = getPageTitle(pathname);
 
   const initials = user?.name
     ?.split(/\s+/)
@@ -72,7 +66,7 @@ export function DashboardHeaderBar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
-  const handleUpgrade = async (plan: 'monthly' | 'lifetime') => {
+  const handleUpgrade = async (plan: string) => {
     setCheckoutLoading(plan);
     try {
       const res = await fetch('/api/checkout', {
@@ -86,15 +80,14 @@ export function DashboardHeaderBar() {
       router.push(session.url);
     } catch {
       setDropdownOpen(false);
-      router.push('/analysis');
+      router.push('/pricing');
     } finally {
       setCheckoutLoading(null);
     }
   };
 
-  const planLabel = usageData?.isPaid
-    ? usageData.plan === 'lifetime' ? 'Lifetime Plan' : 'Monthly Plan'
-    : 'Free Plan';
+  const tier = usageData?.plan ? planStringToTier(usageData.plan) : 'free';
+  const planLabel = tier !== 'free' ? `${PLANS[tier].name} Plan` : 'Free Plan';
 
   return (
     <header className="sticky top-0 z-30 flex h-[var(--header-bar-height)] shrink-0 items-center justify-between border-b border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] px-6">
@@ -137,33 +130,50 @@ export function DashboardHeaderBar() {
                 <div className="border-b border-white/[0.06] px-5 py-3">
                   <p className="text-[12px] font-medium text-zinc-500">{planLabel}</p>
                 </div>
-                {!usageData?.isPaid && (
+                {tier === 'free' && (
                   <div className="border-b border-white/[0.06] py-1.5">
                     <button
                       type="button"
                       disabled={checkoutLoading !== null}
-                      onClick={() => void handleUpgrade('monthly')}
+                      onClick={() => void handleUpgrade('starter_monthly')}
                       className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
                     >
-                      {checkoutLoading === 'monthly' ? (
+                      {checkoutLoading === 'starter_monthly' ? (
                         <Loader2 className="h-4 w-4 animate-spin text-[#25c972]" />
                       ) : (
                         <Zap className="h-4 w-4 text-[#25c972]" />
                       )}
-                      Subscribe Monthly
+                      Upgrade to Starter — $29/mo
                     </button>
                     <button
                       type="button"
                       disabled={checkoutLoading !== null}
-                      onClick={() => void handleUpgrade('lifetime')}
+                      onClick={() => void handleUpgrade('pro_monthly')}
                       className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
                     >
-                      {checkoutLoading === 'lifetime' ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                      {checkoutLoading === 'pro_monthly' ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[#356df4]" />
                       ) : (
-                        <Crown className="h-4 w-4 text-amber-400" />
+                        <Zap className="h-4 w-4 text-[#356df4]" />
                       )}
-                      Upgrade to Lifetime
+                      Upgrade to Pro — $79/mo
+                    </button>
+                  </div>
+                )}
+                {tier === 'starter' && (
+                  <div className="border-b border-white/[0.06] py-1.5">
+                    <button
+                      type="button"
+                      disabled={checkoutLoading !== null}
+                      onClick={() => void handleUpgrade('pro_monthly')}
+                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+                    >
+                      {checkoutLoading === 'pro_monthly' ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[#356df4]" />
+                      ) : (
+                        <Zap className="h-4 w-4 text-[#356df4]" />
+                      )}
+                      Upgrade to Pro — $79/mo
                     </button>
                   </div>
                 )}
