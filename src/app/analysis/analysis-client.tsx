@@ -121,6 +121,12 @@ interface ReportData {
     fullPrompt: string;
     remainingFixesPrompt: string;
     fixPrompts: { checkId: string; label: string; prompt: string }[];
+    sectionPrompts: Partial<Record<'aiReadiness' | 'contentAuthority' | 'websiteQuality' | 'performanceSecurity', {
+      key: 'aiReadiness' | 'contentAuthority' | 'websiteQuality' | 'performanceSecurity';
+      label: string;
+      prompt: string;
+      actionableFixCount: number;
+    }>>;
   };
   share?: {
     publicUrl: string;

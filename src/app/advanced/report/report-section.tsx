@@ -103,13 +103,13 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
   const fixes = report.score.fixes ?? report.fixes ?? [];
   const copyToLlm = report.copyToLlm ?? files?.copyToLlm ?? null;
   const assetPreview = report.assetPreview ?? null;
-  const [reportPromptCopied, setReportPromptCopied] = useState(false);
+  const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null);
 
-  const handleCopyReportPrompt = () => {
-    if (!copyToLlm?.fullPrompt) return;
-    void navigator.clipboard.writeText(copyToLlm.fullPrompt);
-    setReportPromptCopied(true);
-    setTimeout(() => setReportPromptCopied(false), 2000);
+  const handleCopyPrompt = (key: string, prompt: string | undefined) => {
+    if (!prompt) return;
+    void navigator.clipboard.writeText(prompt);
+    setCopiedPromptKey(key);
+    setTimeout(() => setCopiedPromptKey((current) => (current === key ? null : current)), 2000);
   };
 
   // Always paid since this is the advanced dashboard
@@ -171,11 +171,11 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               {copyToLlm?.fullPrompt && (
                 <button
                   type="button"
-                  onClick={handleCopyReportPrompt}
+                  onClick={() => handleCopyPrompt('full', copyToLlm.fullPrompt)}
                   className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
                 >
                   <Copy className="h-4 w-4" />
-                  {reportPromptCopied ? 'Copied full prompt' : 'Copy to LLM'}
+                  {copiedPromptKey === 'full' ? 'Copied full-site prompt' : 'Copy full-site fix prompt'}
                 </button>
               )}
               <a
@@ -318,13 +318,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           if (readinessDims.length === 0) return null;
           const allChecks = readinessDims.flatMap((d) => d.checks);
           const avgScore = Math.round(readinessDims.reduce((s, d) => s + d.percentage, 0) / readinessDims.length);
+          const readinessPrompt = copyToLlm?.sectionPrompts.aiReadiness?.prompt;
           return (
             <YwsBreakdownSection
               title="AI Readiness"
               score={avgScore}
               scoreColor={scoreColor(avgScore)}
-              onCopyToLlm={handleCopyReportPrompt}
-              copied={reportPromptCopied}
+              onCopyToLlm={readinessPrompt ? () => handleCopyPrompt('aiReadiness', readinessPrompt) : undefined}
+              copied={copiedPromptKey === 'aiReadiness'}
+              copyLabel="Copy section fix prompt"
+              copiedLabel="Copied section prompt"
               passCount={allChecks.filter((c) => c.verdict === 'pass').length}
               failCount={allChecks.filter((c) => c.verdict === 'fail').length}
               unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
@@ -347,13 +350,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           if (contentDims.length === 0) return null;
           const allChecks = contentDims.flatMap((d) => d.checks);
           const avgScore = Math.round(contentDims.reduce((s, d) => s + d.percentage, 0) / contentDims.length);
+          const contentPrompt = copyToLlm?.sectionPrompts.contentAuthority?.prompt;
           return (
             <YwsBreakdownSection
               title="Content & Authority"
               score={avgScore}
               scoreColor={scoreColor(avgScore)}
-              onCopyToLlm={handleCopyReportPrompt}
-              copied={reportPromptCopied}
+              onCopyToLlm={contentPrompt ? () => handleCopyPrompt('contentAuthority', contentPrompt) : undefined}
+              copied={copiedPromptKey === 'contentAuthority'}
+              copyLabel="Copy section fix prompt"
+              copiedLabel="Copied section prompt"
               passCount={allChecks.filter((c) => c.verdict === 'pass').length}
               failCount={allChecks.filter((c) => c.verdict === 'fail').length}
               unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
@@ -386,14 +392,17 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           const qualityPass = qualityChecks.filter((c) => c.verdict === 'pass').length;
           const qualityFail = qualityChecks.filter((c) => c.verdict === 'fail').length;
           const qualityUnknown = qualityChecks.filter((c) => c.verdict === 'unknown').length;
+          const qualityPrompt = copyToLlm?.sectionPrompts.websiteQuality?.prompt;
 
           return (
             <YwsBreakdownSection
               title="Website Quality"
               score={qualityPillar?.percentage ?? webHealth?.percentage ?? null}
               scoreColor={scoreColor(qualityPillar?.percentage ?? webHealth?.percentage ?? null)}
-              onCopyToLlm={handleCopyReportPrompt}
-              copied={reportPromptCopied}
+              onCopyToLlm={qualityPrompt ? () => handleCopyPrompt('websiteQuality', qualityPrompt) : undefined}
+              copied={copiedPromptKey === 'websiteQuality'}
+              copyLabel="Copy section fix prompt"
+              copiedLabel="Copied section prompt"
               passCount={qualityPass}
               failCount={qualityFail}
               unknownCount={qualityUnknown}
@@ -423,13 +432,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           const avgScore = secScore !== null && perfScore !== null
             ? Math.round((secScore + perfScore) / 2)
             : secScore ?? perfScore;
+          const performancePrompt = copyToLlm?.sectionPrompts.performanceSecurity?.prompt;
           return (
             <YwsBreakdownSection
               title="Performance & Security"
               score={avgScore}
               scoreColor={scoreColor(avgScore)}
-              onCopyToLlm={handleCopyReportPrompt}
-              copied={reportPromptCopied}
+              onCopyToLlm={performancePrompt ? () => handleCopyPrompt('performanceSecurity', performancePrompt) : undefined}
+              copied={copiedPromptKey === 'performanceSecurity'}
+              copyLabel="Copy section fix prompt"
+              copiedLabel="Copied section prompt"
               passCount={totalPass}
               failCount={totalFail}
               unknownCount={totalUnknown}

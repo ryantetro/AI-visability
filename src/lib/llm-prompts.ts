@@ -1,4 +1,23 @@
-import { PrioritizedFix, ScoreResult, WebHealthSummary } from '@/types/score';
+import {
+  DimensionKey,
+  PrioritizedFix,
+  ScoreResult,
+  WebHealthPillarKey,
+  WebHealthSummary,
+} from '@/types/score';
+
+export type ReportPromptSectionKey =
+  | 'aiReadiness'
+  | 'contentAuthority'
+  | 'websiteQuality'
+  | 'performanceSecurity';
+
+export interface ReportPromptSection {
+  key: ReportPromptSectionKey;
+  label: string;
+  prompt: string;
+  actionableFixCount: number;
+}
 
 export interface ReportPromptBundle {
   fullPrompt: string;
@@ -8,7 +27,31 @@ export interface ReportPromptBundle {
     label: string;
     prompt: string;
   }>;
+  sectionPrompts: Partial<Record<ReportPromptSectionKey, ReportPromptSection>>;
 }
+
+const REPORT_PROMPT_SECTION_META: Record<ReportPromptSectionKey, {
+  label: string;
+  dimensions?: DimensionKey[];
+  pillars?: WebHealthPillarKey[];
+}> = {
+  aiReadiness: {
+    label: 'AI Readiness',
+    dimensions: ['file-presence', 'structured-data', 'ai-registration'],
+  },
+  contentAuthority: {
+    label: 'Content & Authority',
+    dimensions: ['content-signals', 'topical-authority', 'entity-clarity'],
+  },
+  websiteQuality: {
+    label: 'Website Quality',
+    pillars: ['quality'],
+  },
+  performanceSecurity: {
+    label: 'Performance & Security',
+    pillars: ['performance', 'security'],
+  },
+};
 
 export function buildReportPromptBundle(url: string, score: ScoreResult): ReportPromptBundle {
   return {
@@ -19,10 +62,13 @@ export function buildReportPromptBundle(url: string, score: ScoreResult): Report
       label: fix.label,
       prompt: fix.copyPrompt,
     })),
+    sectionPrompts: buildSectionPromptBundle(url, score),
   };
 }
 
 export function buildFullReportPrompt(url: string, score: ScoreResult): string {
+  const siteContext = buildSiteContext(url);
+  const derivedRequirements = buildDerivedRequirements(score.fixes);
   const aiSummary = score.dimensions
     .map((dimension) => `  - ${dimension.label}: ${dimension.percentage}% (${dimension.score}/${dimension.maxScore})`)
     .join('\n');
@@ -45,10 +91,19 @@ export function buildFullReportPrompt(url: string, score: ScoreResult): string {
         .join('\n\n')
     : 'No blocking fixes were identified.';
 
-  return `You are a senior web developer and SEO engineer. A client's website has been audited for AI visibility — how well AI models (ChatGPT, Claude, Perplexity, etc.) can discover, understand, and accurately reference the site.
+  return `You are a senior web developer, technical SEO engineer, and structured-data specialist. A client's website has been audited for AI visibility — how well AI models (ChatGPT, Claude, Perplexity, Gemini, and Claude) can discover, understand, and accurately reference the site.
+
+## Non-Negotiable Rules
+- Fix only the issues listed below unless a hard dependency must be included.
+- Use the real site context below. Do not invent fake company names, fake contact details, or placeholder URLs like \`example.com\`.
+- Before proposing fixes, inspect the current application, relevant project files, and existing site implementation, then use that real context to tailor the solution.
+- If the tech stack is unknown, state the safest implementation assumption first, then provide the best default implementation plus short alternatives for common stacks.
+- Prefer the smallest production-safe change that resolves the audit finding without breaking existing SEO, schema, routing, or crawl behavior.
+- Use absolute canonical URLs in outputs unless the target format explicitly requires relative paths.
+- If a detail is missing, make the safest reasonable assumption and label it clearly.
 
 ## Site Under Audit
-URL: ${url}
+${siteContext}
 
 ## Current Scores
 - Overall: ${score.scores.overall ?? 'Pending'}/100
@@ -65,22 +120,44 @@ ${webSummary}
 ## Priority Fixes (ordered by ROI)
 ${fixSummary}
 
+${derivedRequirements}
+
 ## Your Task
-For each fix above, provide a complete implementation:
+First inspect the current application, relevant project files, and existing site implementation, then provide a complete, production-ready implementation plan for all remaining fixes above.
 
-1. **Exact code or configuration** — provide the full file content or code snippet, not pseudocode. Use fenced code blocks with the appropriate language tag.
-2. **File path and placement** — specify exactly where this goes in the project (e.g., \`public/llms.txt\`, inject into \`<head>\` of \`index.html\`, add to \`.htaccess\`, etc.).
-3. **Platform-specific notes** — if the implementation differs for common platforms (WordPress, Next.js, Shopify, static HTML), note the variation.
-4. **Why this matters for AI** — one sentence explaining how this specific change improves AI model discoverability or accuracy.
-5. **Verification** — the exact URL to visit or command to run to confirm the fix is live.
+## Output Contract
+For each fix above, return:
+1. **Fix name**
+2. **Why this matters for AI** — one sentence tied directly to discoverability, comprehension, or answer quality.
+3. **Exact code or configuration** — full file content for new files, or exact insertion/replacement snippets for existing files. Use fenced code blocks with the correct language tag.
+4. **File path and placement** — specify exactly where the code belongs in the project.
+5. **Platform-specific notes** — if the implementation differs for common stacks, give the primary recommendation first, then short alternatives.
+6. **Verification** — the exact URL to open or command to run after deployment.
 
-Work through the fixes in the order listed (highest ROI first). If a fix depends on another fix being completed first, note the dependency.`;
+## Quality Bar
+- Work through the fixes in the order listed, highest ROI first.
+- Keep implementations standards-compliant and production-safe.
+- Call out hard dependencies before the dependent fix.
+- Do not return high-level advice without implementation details.
+- If a new file is required, return the entire file contents.`;
 }
 
 export function buildFixPrompt(url: string, fix: PrioritizedFix): string {
+  const siteContext = buildSiteContext(url);
   const checkContext = getCheckContext(fix.checkId);
+  const derivedRequirements = buildDerivedRequirements([fix]);
 
-  return `You are a senior web developer. Implement the following fix for ${url}.
+  return `You are a senior web developer, technical SEO engineer, and implementation specialist. Implement the following fix for the audited site below.
+
+## Non-Negotiable Rules
+- Fix only the issue described below unless a hard dependency is required.
+- Use the real domain and site context below; do not use placeholder brands, fake URLs, or fake business details.
+- Before proposing fixes, inspect the current application, relevant project files, and existing site implementation, then use that real context to tailor the solution.
+- If the stack is unknown, state the safest assumption first, then provide the best default implementation and short alternatives for common stacks.
+- Prefer the smallest production-safe change that resolves the check cleanly.
+
+## Site Under Audit
+${siteContext}
 
 ## Problem
 **${fix.label}**
@@ -100,16 +177,24 @@ ${checkContext}
 ## Implementation Instructions
 ${fix.instruction}
 
+${derivedRequirements}
+
 ## What to Return
-Provide the **complete, production-ready implementation** — not a summary or outline:
+After inspecting the current application, relevant project files, and existing site implementation, provide the **complete, production-ready implementation** — not a summary or outline:
 
 1. **Full file contents or code snippet** in a fenced code block with the correct language tag. If this is a new file (like \`llms.txt\` or \`robots.txt\`), provide the entire file. If it's a modification, show the exact lines to add or change with enough surrounding context to locate the insertion point.
 2. **File path** — where this file or change belongs (e.g., \`public/robots.txt\`, \`<head>\` of the homepage template, a server config file).
-3. **Platform instructions** — if you need to know the tech stack to give exact file paths, provide instructions for the two most common setups (e.g., WordPress + static HTML, or Next.js + plain HTML).
-4. **Verification step** — the exact URL to open or command to run after deploying to confirm the fix is working.`;
+3. **Placement instructions** — exactly where to insert it if the file already exists.
+4. **Platform instructions** — if you need to know the tech stack to give exact file paths, provide instructions for the two most common setups.
+5. **Why this matters for AI** — one sentence tied directly to this check.
+6. **Verification step** — the exact URL to open or command to run after deploying to confirm the fix is working.
+
+Do not answer with pseudocode, placeholders, or generic strategy notes.`;
 }
 
 export function buildRemainingFixesPrompt(url: string, score: ScoreResult): string {
+  const siteContext = buildSiteContext(url);
+  const derivedRequirements = buildDerivedRequirements(score.fixes);
   const quickWins = score.fixes.filter((f) => f.effortBand === 'quick');
   const mediumFixes = score.fixes.filter((f) => f.effortBand === 'medium');
   const technicalFixes = score.fixes.filter((f) => f.effortBand === 'technical');
@@ -128,7 +213,17 @@ export function buildRemainingFixesPrompt(url: string, score: ScoreResult): stri
     formatGroup(technicalFixes, 'Technical — may need developer time'),
   ].filter(Boolean).join('\n\n');
 
-  return `You are a senior web developer planning the implementation roadmap for ${url}.
+  return `You are a senior web developer, technical SEO engineer, and delivery lead planning the implementation roadmap for the audited site below.
+
+## Non-Negotiable Rules
+- Use the real domain and site context below. Do not use placeholder names or fake URLs.
+- Before planning fixes, inspect the current application, relevant project files, and existing site implementation, then use that real context to tailor the roadmap.
+- If the stack is unknown, state assumptions briefly before the roadmap.
+- Prefer the smallest production-safe change that resolves each issue cleanly.
+- Keep the plan implementation-oriented: code, files, verification, and dependencies.
+
+## Site Under Audit
+${siteContext}
 
 ## Current Scores
 - Overall: ${score.scores.overall ?? 'Pending'}/100
@@ -138,8 +233,10 @@ export function buildRemainingFixesPrompt(url: string, score: ScoreResult): stri
 ## All Remaining Fixes (grouped by effort)
 ${groups || 'No remaining fixes.'}
 
+${derivedRequirements}
+
 ## Your Task
-Create a step-by-step implementation plan that a single developer can follow:
+Inspect the current application, relevant project files, and existing site implementation first, then create a step-by-step implementation plan that a single developer can follow:
 
 1. **Start with quick wins** — list them in order with the exact code/config for each. These should be completable in one sitting.
 2. **Then medium effort** — for each, provide the complete implementation with file paths and code.
@@ -151,7 +248,209 @@ For every fix, include:
 - A verification URL or command
 - Any dependencies on other fixes (e.g., "robots.txt must exist before adding Sitemap directive to it")
 
-Format the plan as a numbered checklist so each step can be checked off as completed.`;
+Format the plan as a numbered checklist so each step can be checked off as completed. Do not drift into unrelated recommendations.`;
+}
+
+function buildSectionPromptBundle(url: string, score: ScoreResult): Partial<Record<ReportPromptSectionKey, ReportPromptSection>> {
+  const bundle: Partial<Record<ReportPromptSectionKey, ReportPromptSection>> = {};
+
+  (Object.keys(REPORT_PROMPT_SECTION_META) as ReportPromptSectionKey[]).forEach((sectionKey) => {
+    const fixes = getSectionFixes(score, sectionKey);
+    if (fixes.length === 0) return;
+
+    bundle[sectionKey] = {
+      key: sectionKey,
+      label: REPORT_PROMPT_SECTION_META[sectionKey].label,
+      prompt: buildSectionPrompt(url, score, sectionKey, fixes),
+      actionableFixCount: fixes.length,
+    };
+  });
+
+  return bundle;
+}
+
+function buildSectionPrompt(
+  url: string,
+  score: ScoreResult,
+  sectionKey: ReportPromptSectionKey,
+  fixes: PrioritizedFix[]
+): string {
+  const meta = REPORT_PROMPT_SECTION_META[sectionKey];
+  const sectionScore = getSectionScore(score, sectionKey);
+  const sectionBreakdown = buildSectionBreakdown(score, sectionKey);
+  const siteContext = buildSiteContext(url);
+  const derivedRequirements = buildDerivedRequirements(fixes);
+  const fixSummary = fixes
+    .map((fix, index) => {
+      const lines = [
+        `${index + 1}. [${fix.category.toUpperCase()}] ${fix.label} (ROI: +${fix.estimatedLift} pts, effort: ${fix.effortBand})`,
+        `   Audit finding: ${fix.detail}`,
+        `   Current state: ${fix.actualValue || 'Not detected'}`,
+        `   Target state: ${fix.expectedValue || 'Resolve the failed check'}`,
+        `   Action: ${fix.instruction}`,
+      ];
+      return lines.join('\n');
+    })
+    .join('\n\n');
+
+  return `You are a senior web developer, technical SEO engineer, and structured-data specialist. A client's website has been audited, and you are fixing only the ${meta.label} issues for the site below.
+
+## Non-Negotiable Rules
+- Fix only the ${meta.label} issues listed below unless one is a hard dependency of another.
+- Use the real domain and site context below. Do not use placeholder company names, fake contact details, or \`example.com\` URLs.
+- Before proposing fixes, inspect the current application, relevant project files, and existing site implementation, then use that real context to tailor the solution.
+- If the site stack is unknown, state the safest implementation assumption first, then provide the best default implementation plus short common-stack variations.
+- Prefer the smallest production-safe change that resolves the audit finding without breaking existing SEO, schema, or crawl behavior.
+- If information is missing, make the safest reasonable assumption and label it clearly.
+
+## Site Under Audit
+${siteContext}
+
+## Section
+- Section: ${meta.label}
+- Current section score: ${formatScoreValue(sectionScore)}
+- Actionable fixes in this section: ${fixes.length}
+
+## Relevant Breakdown
+${sectionBreakdown}
+
+## Section Fixes To Implement
+${fixSummary}
+
+${derivedRequirements}
+
+## Your Task
+First inspect the current application, relevant project files, and existing site implementation, then provide a complete, production-ready implementation for only the ${meta.label} issues listed above.
+
+For each fix, include:
+1. **Exact code or configuration** — provide the full file content or code snippet, not pseudocode.
+2. **File path and placement** — specify exactly where the change belongs.
+3. **Platform-specific notes** — if common stacks need different instructions, note the variation.
+4. **Why this matters** — one sentence explaining how this change improves this section of the audit.
+5. **Verification** — the exact URL to visit or command to run to confirm the fix is live.
+
+## Quality Bar
+- Use the real site domain in examples and generated files.
+- Return full file contents for new files and exact insertion snippets for existing files.
+- Keep implementations standards-compliant and safe for production.
+- Do not include fixes from other sections unless one is a hard dependency. If there is a dependency, call it out explicitly before the implementation.
+- Do not answer with generic advice, pseudocode, or placeholder content.`;
+}
+
+function buildSiteContext(url: string): string {
+  const normalizedUrl = normalizeUrl(url);
+  const origin = getOrigin(url);
+  const hostname = getHostname(url);
+
+  return [
+    `- URL: ${normalizedUrl}`,
+    `- Canonical host: ${origin}`,
+    `- Domain: ${hostname}`,
+    '- Use this real domain in all generated examples, file contents, and verification steps.',
+  ].join('\n');
+}
+
+function buildDerivedRequirements(fixes: PrioritizedFix[]): string {
+  const checkIds = new Set(fixes.map((fix) => fix.checkId));
+  const requirements: string[] = [];
+
+  if (checkIds.has('sd-org-schema') || checkIds.has('sd-completeness')) {
+    requirements.push(
+      '- Ensure the Organization or LocalBusiness schema is complete enough to satisfy the audit, including at minimum `name`, `url`, plus at least two of `description`, `logo`, `sameAs`, or `contactPoint` when that information exists in the app.'
+    );
+  }
+
+  if (checkIds.has('sd-org-schema') || checkIds.has('sd-faq') || checkIds.has('sd-validation')) {
+    requirements.push(
+      '- Inspect any existing JSON-LD already present in the application and fix malformed, conflicting, duplicate, or unclassifiable schema blocks so that all schema on the site validates cleanly.'
+    );
+  }
+
+  if (checkIds.has('sd-faq')) {
+    requirements.push(
+      '- Only add FAQ schema for real on-site FAQ content, or create matching visible FAQ content if it is required for the schema to be truthful and production-safe.'
+    );
+  }
+
+  if (requirements.length === 0) return '';
+
+  return `## Derived Requirements\n${requirements.join('\n')}`;
+}
+
+function normalizeUrl(url: string): string {
+  try {
+    return new URL(url).toString().replace(/\/$/, '');
+  } catch {
+    return url;
+  }
+}
+
+function getOrigin(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
+}
+
+function getHostname(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function getSectionFixes(score: ScoreResult, sectionKey: ReportPromptSectionKey): PrioritizedFix[] {
+  const meta = REPORT_PROMPT_SECTION_META[sectionKey];
+  return score.fixes.filter((fix) => {
+    if (meta.dimensions?.includes(fix.dimension as DimensionKey)) return true;
+    if (meta.pillars?.includes(fix.dimension as WebHealthPillarKey)) return true;
+    return false;
+  });
+}
+
+function getSectionScore(score: ScoreResult, sectionKey: ReportPromptSectionKey): number | null {
+  const meta = REPORT_PROMPT_SECTION_META[sectionKey];
+
+  if (meta.dimensions?.length) {
+    const matching = score.dimensions.filter((dimension) => meta.dimensions?.includes(dimension.key));
+    if (matching.length === 0) return null;
+    return Math.round(matching.reduce((sum, dimension) => sum + dimension.percentage, 0) / matching.length);
+  }
+
+  if (meta.pillars?.length) {
+    const pillars = score.webHealth?.pillars?.filter((pillar) => meta.pillars?.includes(pillar.key)) ?? [];
+    const values = pillars
+      .map((pillar) => pillar.percentage)
+      .filter((value): value is number => value !== null);
+
+    if (values.length === 0) return null;
+    return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+  }
+
+  return null;
+}
+
+function buildSectionBreakdown(score: ScoreResult, sectionKey: ReportPromptSectionKey): string {
+  const meta = REPORT_PROMPT_SECTION_META[sectionKey];
+
+  if (meta.dimensions?.length) {
+    const lines = score.dimensions
+      .filter((dimension) => meta.dimensions?.includes(dimension.key))
+      .map((dimension) => `- ${dimension.label}: ${dimension.percentage}% (${dimension.score}/${dimension.maxScore})`);
+    return lines.join('\n');
+  }
+
+  const lines = score.webHealth?.pillars
+    ?.filter((pillar) => meta.pillars?.includes(pillar.key))
+    .map((pillar) => `- ${pillar.label}: ${pillar.percentage ?? 'Pending'}% (${pillar.score}/${pillar.maxScore})`) ?? [];
+
+  return lines.join('\n') || '- No section breakdown available';
+}
+
+function formatScoreValue(value: number | null): string {
+  return value === null ? 'Pending' : `${value}/100`;
 }
 
 function buildWebHealthSummary(webHealth: WebHealthSummary): string {

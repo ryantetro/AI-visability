@@ -1,6 +1,7 @@
 import type { CrawlData } from '@/types/crawler';
-import type { EngineBreakdown, MentionSummary } from '@/types/ai-mentions';
+import type { EngineBreakdown, MentionPrompt, MentionSummary } from '@/types/ai-mentions';
 import { buildBusinessProfile, generatePrompts } from './prompt-generator';
+import { generatePromptsWithLLM } from './llm-prompt-generator';
 import { runEngineTests } from './engine-tester';
 import {
   analyzeResponse, computeScore,
@@ -17,7 +18,18 @@ export async function runMentionTests(
   tester: MentionTesterService
 ): Promise<MentionSummary> {
   const businessProfile = buildBusinessProfile(crawlData);
-  const prompts = generatePrompts(crawlData, businessProfile);
+
+  let prompts: MentionPrompt[];
+  if (process.env.OPENAI_API_KEY && process.env.USE_MOCKS !== 'true') {
+    try {
+      prompts = await generatePromptsWithLLM(crawlData, businessProfile);
+    } catch (err) {
+      console.warn('[mention-tests] LLM prompt gen failed, using templates:', err);
+      prompts = generatePrompts(crawlData, businessProfile);
+    }
+  } else {
+    prompts = generatePrompts(crawlData, businessProfile);
+  }
   const brand = businessProfile.brand;
   const engineRun = await runEngineTests(tester, prompts);
   const responses = engineRun.responses;

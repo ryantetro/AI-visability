@@ -41,6 +41,8 @@ interface YwsBreakdownSectionProps {
   scoreColor: string;
   onCopyToLlm?: () => void;
   copied?: boolean;
+  copyLabel?: string;
+  copiedLabel?: string;
   passCount?: number;
   failCount?: number;
   unknownCount?: number;
@@ -59,6 +61,8 @@ export function YwsBreakdownSection({
   scoreColor,
   onCopyToLlm,
   copied = false,
+  copyLabel = 'Copy to LLM',
+  copiedLabel = 'Copied',
   passCount = 0,
   failCount = 0,
   unknownCount = 0,
@@ -116,7 +120,7 @@ export function YwsBreakdownSection({
                 className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-[12px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.05] hover:text-white"
               >
                 <Copy className="h-3.5 w-3.5" />
-                {copied ? 'Copied' : 'Copy to LLM'}
+                {copied ? copiedLabel : copyLabel}
               </button>
             )}
             <div className="flex items-center gap-5 text-[12px] text-zinc-400">

@@ -2,8 +2,8 @@ import type { CrawlData } from '@/types/crawler';
 import type { BusinessProfile, MentionPrompt } from '@/types/ai-mentions';
 import { extractSiteContent } from './content-extractor';
 
-const MIN_PROMPTS = 15;
-const MAX_PROMPTS = 25;
+export const MIN_PROMPTS = 15;
+export const MAX_PROMPTS = 25;
 
 const SAFE_SOURCES = new Set(['core', 'fallback', 'backfill']);
 const KEYWORD_STOPWORDS = new Set([

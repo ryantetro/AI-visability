@@ -18,6 +18,12 @@ export interface FilesData {
     fullPrompt: string;
     remainingFixesPrompt: string;
     fixPrompts: { checkId: string; label: string; prompt: string }[];
+    sectionPrompts: Partial<Record<'aiReadiness' | 'contentAuthority' | 'websiteQuality' | 'performanceSecurity', {
+      key: 'aiReadiness' | 'contentAuthority' | 'websiteQuality' | 'performanceSecurity';
+      label: string;
+      prompt: string;
+      actionableFixCount: number;
+    }>>;
   } | null;
 }
 
@@ -80,6 +86,12 @@ export interface DashboardReportData {
     fullPrompt: string;
     remainingFixesPrompt: string;
     fixPrompts: { checkId: string; label: string; prompt: string }[];
+    sectionPrompts: Partial<Record<'aiReadiness' | 'contentAuthority' | 'websiteQuality' | 'performanceSecurity', {
+      key: 'aiReadiness' | 'contentAuthority' | 'websiteQuality' | 'performanceSecurity';
+      label: string;
+      prompt: string;
+      actionableFixCount: number;
+    }>>;
   };
   mentionSummary?: MentionSummary | null;
   assetPreview?: AssetPreview | null;
