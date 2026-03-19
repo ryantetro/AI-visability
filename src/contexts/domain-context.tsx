@@ -92,7 +92,8 @@ export function DomainContextProvider({
   const [hiddenDomains, setHiddenDomains] = useState<string[]>([]);
   const [paidOverride, setPaidOverride] = useState(false);
   const [pendingDomain, setPendingDomain] = useState<string | null>(null);
-  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  const domainParam = searchParams.get('domain');
+  const [selectedDomain, setSelectedDomainRaw] = useState<string | null>(domainParam);
   const [files, setFiles] = useState<FilesData | null>(null);
   const [report, setReport] = useState<DashboardReportData | null>(null);
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
@@ -265,19 +266,35 @@ export function DomainContextProvider({
     }).sort((a, b) => (b.lastTouchedAt ?? 0) - (a.lastTouchedAt ?? 0));
   }, [hiddenDomains, manualDomains, paidDomains, recentScans, report?.url, initialReportId]);
 
-  // Auto-select first domain when none selected
-  useEffect(() => {
-    if (!selectedDomain && monitoredSites.length > 0 && !recentLoading) {
-      if (initialReportId && recentScans.length > 0) {
-        const matchedScan = recentScans.find((scan) => scan.id === initialReportId);
-        if (matchedScan) {
-          setSelectedDomain(getDomain(matchedScan.url));
-          return;
-        }
-      }
-      setSelectedDomain(monitoredSites[0].domain);
+  // Persist selected domain in URL so refresh restores it
+  const setSelectedDomain = useCallback((domain: string | null) => {
+    setSelectedDomainRaw(domain);
+    const params = new URLSearchParams(window.location.search);
+    if (domain) {
+      params.set('domain', domain);
+    } else {
+      params.delete('domain');
     }
-  }, [selectedDomain, monitoredSites, recentLoading, initialReportId, recentScans]);
+    const qs = params.toString();
+    const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, '', nextUrl);
+  }, []);
+
+  // Auto-select domain when none selected (or URL param domain not in list)
+  useEffect(() => {
+    if (recentLoading || monitoredSites.length === 0) return;
+    // If already selected and the domain exists in the list, keep it
+    if (selectedDomain && monitoredSites.some(s => s.domain === selectedDomain)) return;
+    // Try to match initialReportId
+    if (initialReportId && recentScans.length > 0) {
+      const matchedScan = recentScans.find((scan) => scan.id === initialReportId);
+      if (matchedScan) {
+        setSelectedDomain(getDomain(matchedScan.url));
+        return;
+      }
+    }
+    setSelectedDomain(monitoredSites[0].domain);
+  }, [selectedDomain, monitoredSites, recentLoading, initialReportId, recentScans, setSelectedDomain]);
 
   const expandedSite = monitoredSites.find((s) => s.domain === selectedDomain) ?? null;
 
@@ -371,7 +388,7 @@ export function DomainContextProvider({
   // --- Handlers ---
   const selectDomain = useCallback((domain: string) => {
     setSelectedDomain(domain);
-  }, []);
+  }, [setSelectedDomain]);
 
   const handleAddDomain = useCallback(async () => {
     setAddError(null);

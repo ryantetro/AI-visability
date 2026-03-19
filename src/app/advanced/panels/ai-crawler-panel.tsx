@@ -197,7 +197,7 @@ export function AICrawlerPanel({ domain }: { domain: string }) {
           <div className="-mt-2 flex items-center justify-center gap-5">
             {chartProviders.map(provider => (
               <div key={provider} className="flex items-center gap-2">
-                <EngineIcon engine={provider} className="size-4" />
+                <EngineIcon engine={provider} className="size-4" style={{ color: ENGINE_COLORS[provider] ?? '#71717a' }} />
                 <span className="text-[11px] font-medium text-zinc-400">
                   {PROVIDER_LABELS[provider] ?? provider}
                 </span>
@@ -219,7 +219,7 @@ export function AICrawlerPanel({ domain }: { domain: string }) {
                   <span className="mt-0.5 text-[13px] font-bold tabular-nums text-zinc-600">
                     {i + 1}
                   </span>
-                  <EngineIcon engine={s.provider} className="mt-0.5 size-5 shrink-0" />
+                  <EngineIcon engine={s.provider} className="mt-0.5 size-5 shrink-0" style={{ color: ENGINE_COLORS[s.provider] ?? '#71717a' }} />
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-semibold text-zinc-200">
                       {PROVIDER_LABELS[s.provider] ?? s.provider}
@@ -304,7 +304,7 @@ function CrawlerChartTooltip({
         .sort((a, b) => b.value - a.value)
         .map(p => (
           <div key={p.dataKey} className="flex items-center gap-2 py-0.5">
-            <EngineIcon engine={p.dataKey} className="size-3.5" />
+            <EngineIcon engine={p.dataKey} className="size-3.5" style={{ color: ENGINE_COLORS[p.dataKey] ?? '#71717a' }} />
             <span className="text-[11px] text-zinc-300">
               {PROVIDER_LABELS[p.dataKey] ?? p.dataKey}
             </span>

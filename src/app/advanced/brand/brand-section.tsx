@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown, Copy, Download, ExternalLink, Zap, Wrench, Sparkles } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import type { PrioritizedFix } from '@/types/score';
@@ -23,8 +24,26 @@ interface BrandSectionProps {
   platformLabel: string | null;
 }
 
+const VALID_TABS: BrandTab[] = ['presence', 'improve', 'citations', 'files', 'traffic'];
+
 export function BrandSection({ report, files, domain, platformLabel }: BrandSectionProps) {
-  const [activeTab, setActiveTab] = useState<BrandTab>('presence');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const tabParam = searchParams.get('tab') as BrandTab | null;
+  const activeTab: BrandTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'presence';
+
+  const setActiveTab = useCallback((tab: BrandTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === 'presence') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+  }, [router, searchParams]);
+
   const [copiedFile, setCopiedFile] = useState<string | null>(null);
   const [copiedSinglePrompt, setCopiedSinglePrompt] = useState<string | null>(null);
   const [copiedAllPrompts, setCopiedAllPrompts] = useState(false);

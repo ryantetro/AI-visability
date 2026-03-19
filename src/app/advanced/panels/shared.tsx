@@ -70,16 +70,16 @@ const ENGINE_ICON_COLORS = Object.fromEntries(
   Object.entries(AI_ENGINE_META).map(([engine, meta]) => [engine, meta.color])
 ) as Record<AIEngine, string>;
 
-export function EngineIcon({ engine, className }: { engine: string; className?: string }) {
+export function EngineIcon({ engine, className, style }: { engine: string; className?: string; style?: React.CSSProperties }) {
   const normalized = engine.toLowerCase() as AIEngine;
   const Icon = ENGINE_ICON_MAP[normalized];
-  if (Icon) return <Icon className={className ?? 'size-4'} />;
+  if (Icon) return <span style={style}><Icon className={className ?? 'size-4'} /></span>;
   // Fallback: colored circle with first letter
   const color = ENGINE_ICON_COLORS[normalized] ?? '#71717a';
   return (
     <span
       className={cn('inline-flex items-center justify-center rounded-full text-[8px] font-bold text-white', className ?? 'size-4')}
-      style={{ backgroundColor: color }}
+      style={{ backgroundColor: color, ...style }}
     >
       {engine.charAt(0).toUpperCase()}
     </span>
