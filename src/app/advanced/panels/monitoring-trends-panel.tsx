@@ -9,6 +9,28 @@ import { ChartTooltipContent } from './shared';
 import type { RecentScanData } from '../lib/types';
 import { getDomain } from '@/lib/url-utils';
 
+function getTrendScore(scan: RecentScanData): number | null {
+  return scan.scores?.overall ?? scan.score ?? null;
+}
+
+function getScanTimestamp(scan: RecentScanData): number {
+  return scan.completedAt ?? scan.createdAt;
+}
+
+function formatTrendLabel(timestamp: number, includeTime: boolean): string {
+  return new Intl.DateTimeFormat('en-US', includeTime
+    ? {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }
+    : {
+        month: 'short',
+        day: 'numeric',
+      }).format(timestamp);
+}
+
 export function MonitoringTrendsPanel({
   recentScans,
   domain,
@@ -23,19 +45,42 @@ export function MonitoringTrendsPanel({
   onEnableMonitoring: () => void;
 }) {
   const domainScans = recentScans
-    .filter((scan) => getDomain(scan.url) === domain && scan.scores?.overall != null)
-    .sort((a, b) => (a.completedAt ?? a.createdAt) - (b.completedAt ?? b.createdAt));
+    .filter((scan) => getDomain(scan.url) === domain)
+    .map((scan) => ({
+      scan,
+      timestamp: getScanTimestamp(scan),
+      score: getTrendScore(scan),
+    }))
+    .filter((entry): entry is { scan: RecentScanData; timestamp: number; score: number } => entry.score != null)
+    .sort((a, b) => a.timestamp - b.timestamp);
 
-  const chartData = domainScans.map((scan) => ({
-    date: formatShortDate(scan.completedAt ?? scan.createdAt),
-    score: scan.scores?.overall ?? scan.score ?? 0,
-  }));
+  const scansPerDay = domainScans.reduce<Record<string, number>>((acc, entry) => {
+    const dayKey = new Date(entry.timestamp).toISOString().slice(0, 10);
+    acc[dayKey] = (acc[dayKey] ?? 0) + 1;
+    return acc;
+  }, {});
 
-  const lastScan = domainScans[domainScans.length - 1] ?? null;
-  const prevScan = domainScans.length >= 2 ? domainScans[domainScans.length - 2] : null;
+  const chartData = domainScans.map((entry) => {
+    const dayKey = new Date(entry.timestamp).toISOString().slice(0, 10);
+    const includeTime = (scansPerDay[dayKey] ?? 0) > 1;
+    return {
+      date: formatTrendLabel(entry.timestamp, includeTime),
+      score: entry.score,
+      fullDate: new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(entry.timestamp),
+    };
+  });
+
+  const lastScan = domainScans[domainScans.length - 1]?.scan ?? null;
+  const prevScan = domainScans.length >= 2 ? domainScans[domainScans.length - 2]?.scan ?? null : null;
   const scoreDelta =
-    lastScan && prevScan && lastScan.scores?.overall != null && prevScan.scores?.overall != null
-      ? Math.round((lastScan.scores.overall ?? 0) - (prevScan.scores.overall ?? 0))
+    lastScan && prevScan && getTrendScore(lastScan) != null && getTrendScore(prevScan) != null
+      ? Math.round((getTrendScore(lastScan) ?? 0) - (getTrendScore(prevScan) ?? 0))
       : null;
 
   return (
@@ -49,7 +94,7 @@ export function MonitoringTrendsPanel({
               <LineChart data={chartData} margin={{ left: 10, right: 20, top: 10, bottom: 5 }}>
                 <XAxis dataKey="date" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltipContent />} />
+                <Tooltip content={<ChartTooltipContent />} labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate ?? ''} />
                 <Line type="monotone" dataKey="score" stroke="#25c972" strokeWidth={2} dot={{ fill: '#25c972', r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -59,7 +104,7 @@ export function MonitoringTrendsPanel({
             <p className={cn('text-3xl font-bold', scoreColor(chartData[0].score))}>
               {Math.round(chartData[0].score)}
             </p>
-            <p className="text-[13px] text-zinc-400">Single data point on {chartData[0].date}</p>
+            <p className="text-[13px] text-zinc-400">Single data point on {formatShortDate(getScanTimestamp(lastScan!))}</p>
             <p className="text-[12px] text-zinc-500">Run more scans to track trends over time.</p>
           </div>
         ) : (
