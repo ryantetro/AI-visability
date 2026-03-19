@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { IBM_Plex_Mono, Manrope, Space_Grotesk } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { ConditionalLayout } from '@/components/layout/conditional-layout';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -42,6 +43,7 @@ export default function RootLayout({
             {children}
           </ErrorBoundary>
         </ConditionalLayout>
+        <Analytics />
       </body>
     </html>
   );
