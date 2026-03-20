@@ -137,7 +137,7 @@ export interface SiteSummary {
   latestScan: RecentScanData | null;
   latestPaidScan: RecentScanData | null;
   lastTouchedAt: number | null;
-  source: 'paid' | 'manual';
+  source: 'tracked' | 'scan';
 }
 
 export interface FileMeta {

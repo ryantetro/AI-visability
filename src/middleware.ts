@@ -59,6 +59,7 @@ const PUBLIC_PREFIXES = [
   '/auth/',
   '/api/auth/',           // auth endpoints must be reachable before login
   '/api/scan',            // scan creation/polling is public (auth checked in route handlers)
+  '/api/track',           // public customer-installed bot tracking endpoint (site-key auth)
   '/api/crawler-visits',  // internal bot logging endpoint (uses x-internal-secret)
   '/api/cron/',           // cron endpoints (use MONITORING_SECRET bearer token)
   '/api/webhooks/',       // Stripe webhooks (verified via signature, not session)

@@ -23,6 +23,8 @@ import type { DashboardReportData, FilesData, RecentScanData, SiteSummary, ApiEr
 interface DomainContextValue {
   // Domain list
   monitoredSites: SiteSummary[];
+  trackedSites: SiteSummary[];
+  scannedSites: SiteSummary[];
   selectedDomain: string | null;
   selectDomain: (domain: string) => void;
 
@@ -30,6 +32,7 @@ interface DomainContextValue {
   addDomainInput: string;
   setAddDomainInput: (v: string) => void;
   handleAddDomain: () => Promise<void>;
+  addTrackedDomain: (domain: string) => Promise<{ ok: boolean; error?: string }>;
   handleRemoveDomain: (domain: string) => void;
   addError: string | null;
   confirmChecked: boolean;
@@ -285,9 +288,27 @@ export function DomainContextProvider({
     return [...domains].map<SiteSummary>((domain) => {
       const latestScan = getLatestScanByDomain(recentScans, domain);
       const latestPaidScan = getLatestPaidScanByDomain(recentScans, domain);
-      return { domain, url: latestPaidScan?.url ?? latestScan?.url ?? `https://${domain}`, latestScan, latestPaidScan, lastTouchedAt: latestPaidScan?.completedAt ?? latestPaidScan?.createdAt ?? latestScan?.completedAt ?? latestScan?.createdAt ?? null, source: paidDomains.includes(domain) ? 'paid' : 'manual' };
+      const lastTouchedAt = Math.max(latestPaidScan?.completedAt ?? 0, latestPaidScan?.createdAt ?? 0, latestScan?.completedAt ?? 0, latestScan?.createdAt ?? 0) || null;
+      return {
+        domain,
+        url: latestPaidScan?.url ?? latestScan?.url ?? `https://${domain}`,
+        latestScan,
+        latestPaidScan,
+        lastTouchedAt,
+        source: manualDomains.includes(domain) ? 'tracked' : 'scan',
+      };
     }).sort((a, b) => (b.lastTouchedAt ?? 0) - (a.lastTouchedAt ?? 0));
   }, [hiddenDomains, manualDomains, paidDomains, recentScans, report?.url, initialReportId]);
+
+  const trackedSites = useMemo(
+    () => monitoredSites.filter((site) => site.source === 'tracked'),
+    [monitoredSites]
+  );
+
+  const scannedSites = useMemo(
+    () => monitoredSites.filter((site) => site.source === 'scan'),
+    [monitoredSites]
+  );
 
   // Persist selected domain in URL so refresh restores it
   const setSelectedDomain = useCallback((domain: string | null) => {
@@ -413,38 +434,70 @@ export function DomainContextProvider({
     setSelectedDomain(domain);
   }, [setSelectedDomain]);
 
-  const handleAddDomain = useCallback(async () => {
-    setAddError(null);
-    if (!normalizedDomain) { setAddError('Please enter a domain'); return; }
-    if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(normalizedDomain)) { setAddError('Please enter a valid domain (e.g. example.com)'); return; }
-    if (monitoredSites.some((s) => s.domain === normalizedDomain) || manualDomains.includes(normalizedDomain)) { setAddError('This domain is already being monitored'); return; }
-    if (!confirmChecked) { setAddError('Please confirm domain ownership'); return; }
+  const addTrackedDomain = useCallback(async (domain: string) => {
+    const normalized = normalizeDomainInput(domain);
+    if (!normalized) {
+      return { ok: false, error: 'Please enter a domain' };
+    }
+    if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(normalized)) {
+      return { ok: false, error: 'Please enter a valid domain (e.g. example.com)' };
+    }
+    if (manualDomains.includes(normalized)) {
+      return { ok: false, error: 'This domain is already being monitored' };
+    }
 
-    // Write-through to DB first
     try {
       const res = await fetch('/api/user/domains', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: normalizedDomain }),
+        body: JSON.stringify({ domain: normalized }),
       });
       if (!res.ok) {
         const data = await res.json();
-        setAddError(data.error || 'Failed to add domain');
         if (res.status === 403) setUnlockModalOpen(true);
-        return;
+        return { ok: false, error: data.error || 'Failed to add domain' };
       }
     } catch {
-      setAddError('Failed to save domain. Please try again.');
+      return { ok: false, error: 'Failed to save domain. Please try again.' };
+    }
+
+    const nextManual = manualDomains.includes(normalized) ? manualDomains : [...manualDomains, normalized];
+    setManualDomains(nextManual);
+    saveStoredDomains(nextManual);
+    const nextHidden = hiddenDomains.filter((d) => d !== normalized);
+    setHiddenDomains(nextHidden);
+    saveHiddenDomains(nextHidden);
+    const matchingPaidScan = getLatestPaidScanByDomain(recentScans, normalized);
+    if (matchingPaidScan) {
+      try {
+        await fetch('/api/monitoring', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scanId: matchingPaidScan.id, alertThreshold: 5 }),
+        });
+        setMonitoringConnected((c) => ({ ...c, [normalized]: true }));
+      } catch { /* silently fail */ }
+    }
+    setSelectedDomain(normalized);
+    return { ok: true };
+  }, [manualDomains, hiddenDomains, recentScans, setSelectedDomain]);
+
+  const handleAddDomain = useCallback(async () => {
+    setAddError(null);
+    if (!normalizedDomain) { setAddError('Please enter a domain'); return; }
+    if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(normalizedDomain)) { setAddError('Please enter a valid domain (e.g. example.com)'); return; }
+    if (manualDomains.includes(normalizedDomain)) { setAddError('This domain is already being monitored'); return; }
+    if (!confirmChecked) { setAddError('Please confirm domain ownership'); return; }
+
+    const result = await addTrackedDomain(normalizedDomain);
+    if (!result.ok) {
+      setAddError(result.error || 'Failed to add domain');
       return;
     }
 
-    // Update local state and cache
-    const nextManual = [...manualDomains, normalizedDomain]; setManualDomains(nextManual); saveStoredDomains(nextManual);
-    const nextHidden = hiddenDomains.filter((d) => d !== normalizedDomain); setHiddenDomains(nextHidden); saveHiddenDomains(nextHidden);
-    const matchingPaidScan = getLatestPaidScanByDomain(recentScans, normalizedDomain);
-    if (matchingPaidScan) { try { await fetch('/api/monitoring', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scanId: matchingPaidScan.id, alertThreshold: 5 }) }); setMonitoringConnected((c) => ({ ...c, [normalizedDomain]: true })); } catch { /* silently fail */ } }
-    setSelectedDomain(normalizedDomain); setAddDomainInput(''); setConfirmChecked(false);
-  }, [normalizedDomain, monitoredSites, manualDomains, confirmChecked, hiddenDomains, recentScans]);
+    setAddDomainInput('');
+    setConfirmChecked(false);
+  }, [normalizedDomain, manualDomains, confirmChecked, addTrackedDomain]);
 
   const handleRemoveDomain = useCallback((domain: string) => {
     // Write-through to DB
@@ -548,11 +601,14 @@ export function DomainContextProvider({
 
   const value = useMemo<DomainContextValue>(() => ({
     monitoredSites,
+    trackedSites,
+    scannedSites,
     selectedDomain,
     selectDomain,
     addDomainInput,
     setAddDomainInput: (v: string) => { setAddDomainInput(v); setAddError(null); },
     handleAddDomain,
+    addTrackedDomain,
     handleRemoveDomain,
     addError,
     confirmChecked,
@@ -582,7 +638,7 @@ export function DomainContextProvider({
     checkoutBanner,
     inputFaviconUrl,
   }), [
-    monitoredSites, selectedDomain, selectDomain, addDomainInput, handleAddDomain, handleRemoveDomain,
+    monitoredSites, trackedSites, scannedSites, selectedDomain, selectDomain, addDomainInput, handleAddDomain, addTrackedDomain, handleRemoveDomain,
     addError, confirmChecked, hasPaidAccess, report, files, workspaceLoading, loadError, recentScans,
     recentLoading, expandedSite, actionError, reauditLoading, handleReaudit, handleRunFirstScan,
     monitoringConnected, monitoringLoading, handleEnableMonitoring, handleDisableMonitoring, unlockModalOpen, handleUnlockComplete,

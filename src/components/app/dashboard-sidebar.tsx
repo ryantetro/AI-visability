@@ -22,9 +22,9 @@ import {
 import { cn } from '@/lib/utils';
 import { getFaviconUrl } from '@/lib/url-utils';
 import { useDomainContext } from '@/contexts/domain-context';
-import { scoreColor } from '@/app/advanced/lib/utils';
 import { usePlan } from '@/hooks/use-plan';
 import { NAV_GATES, canAccess } from '@/lib/pricing';
+import type { SiteSummary } from '@/app/advanced/lib/types';
 
 type SidebarItem = {
   key: string;
@@ -179,7 +179,6 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
     confirmChecked,
     setConfirmChecked,
     inputFaviconUrl,
-    hasPaidAccess,
   } = useDomainContext();
 
   const [showAddInput, setShowAddInput] = useState(false);
@@ -196,95 +195,99 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
     }
   };
 
+  const renderDomainButton = (site: SiteSummary) => {
+    const isActive = site.domain === selectedDomain;
+    const score =
+      site.latestPaidScan?.scores?.overall ??
+      site.latestScan?.scores?.overall ??
+      site.latestScan?.score ??
+      null;
+
+    return (
+      <button
+        key={site.domain}
+        type="button"
+        onClick={() => handleSelectDomain(site.domain)}
+        className={cn(
+          'group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
+          isActive
+            ? 'bg-white/[0.08] text-white'
+            : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
+        )}
+      >
+        {isActive && (
+          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#25c972]" />
+        )}
+        <img
+          src={getFaviconUrl(site.domain, 32)}
+          alt=""
+          className="h-4 w-4 shrink-0 rounded-sm"
+        />
+        <div className="min-w-0 flex-1">
+          <span className="block truncate text-[12px] font-medium">
+            {site.domain}
+          </span>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            {site.lastTouchedAt && (() => {
+              const ageDays = Math.floor((Date.now() - site.lastTouchedAt) / 86400000);
+              const ageHours = Math.floor((Date.now() - site.lastTouchedAt) / 3600000);
+              const label = ageHours < 24 ? `${ageHours}h ago` : `${ageDays}d ago`;
+              const dotColor = ageDays < 1 ? 'bg-[#25c972]' : ageDays <= 7 ? 'bg-[#ffbb00]' : 'bg-[#ff5252]';
+              return (
+                <span className="flex items-center gap-1 text-[10px] text-zinc-600">
+                  <span className={cn('inline-block h-1.5 w-1.5 rounded-full', dotColor)} />
+                  {label}
+                </span>
+              );
+            })()}
+          </div>
+        </div>
+        {score != null && (
+          <span
+            className={cn(
+              'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold',
+              score >= 80
+                ? 'bg-[#25c972]/15 text-[#25c972]'
+                : score >= 60
+                  ? 'bg-[#ffbb00]/15 text-[#ffbb00]'
+                  : score >= 40
+                    ? 'bg-[#ff8a1e]/15 text-[#ff8a1e]'
+                    : 'bg-[#ff5252]/15 text-[#ff5252]'
+            )}
+          >
+            {Math.round(score)}
+          </span>
+        )}
+        <span
+          role="button"
+          tabIndex={-1}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRemoveDomain(site.domain);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.stopPropagation();
+              handleRemoveDomain(site.domain);
+            }
+          }}
+          className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100"
+          aria-label={`Remove ${site.domain}`}
+        >
+          <X className="h-3 w-3" />
+        </span>
+      </button>
+    );
+  };
+
   return (
     <div className="px-3">
       <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">
         Domains
       </p>
 
-      <div className="max-h-[200px] space-y-0.5 overflow-y-auto">
-        {monitoredSites.map((site) => {
-          const isActive = site.domain === selectedDomain;
-          const score =
-            site.latestPaidScan?.scores?.overall ??
-            site.latestScan?.scores?.overall ??
-            site.latestScan?.score ??
-            null;
-
-          return (
-            <button
-              key={site.domain}
-              type="button"
-              onClick={() => handleSelectDomain(site.domain)}
-              className={cn(
-                'group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
-                isActive
-                  ? 'bg-white/[0.08] text-white'
-                  : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
-              )}
-            >
-              {isActive && (
-                <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#25c972]" />
-              )}
-              <img
-                src={getFaviconUrl(site.domain, 32)}
-                alt=""
-                className="h-4 w-4 shrink-0 rounded-sm"
-              />
-              <div className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] font-medium">
-                  {site.domain}
-                </span>
-                {site.lastTouchedAt && (() => {
-                  const ageDays = Math.floor((Date.now() - site.lastTouchedAt) / 86400000);
-                  const ageHours = Math.floor((Date.now() - site.lastTouchedAt) / 3600000);
-                  const label = ageHours < 24 ? `${ageHours}h ago` : `${ageDays}d ago`;
-                  const dotColor = ageDays < 1 ? 'bg-[#25c972]' : ageDays <= 7 ? 'bg-[#ffbb00]' : 'bg-[#ff5252]';
-                  return (
-                    <span className="flex items-center gap-1 text-[10px] text-zinc-600">
-                      <span className={cn('inline-block h-1.5 w-1.5 rounded-full', dotColor)} />
-                      {label}
-                    </span>
-                  );
-                })()}
-              </div>
-              {score != null && (
-                <span
-                  className={cn(
-                    'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold',
-                    score >= 80
-                      ? 'bg-[#25c972]/15 text-[#25c972]'
-                      : score >= 60
-                        ? 'bg-[#ffbb00]/15 text-[#ffbb00]'
-                        : score >= 40
-                          ? 'bg-[#ff8a1e]/15 text-[#ff8a1e]'
-                          : 'bg-[#ff5252]/15 text-[#ff5252]'
-                  )}
-                >
-                  {Math.round(score)}
-                </span>
-              )}
-              <span
-                role="button"
-                tabIndex={-1}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveDomain(site.domain);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.stopPropagation();
-                    handleRemoveDomain(site.domain);
-                  }
-                }}
-                className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100"
-                aria-label={`Remove ${site.domain}`}
-              >
-                <X className="h-3 w-3" />
-              </span>
-            </button>
-          );
-        })}
+      <div className="max-h-[240px] space-y-0.5 overflow-y-auto">
+        {monitoredSites.map((site) => renderDomainButton(site))}
       </div>
 
       {/* Add domain toggle */}

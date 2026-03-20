@@ -30,6 +30,20 @@ export interface ReportPromptBundle {
   sectionPrompts: Partial<Record<ReportPromptSectionKey, ReportPromptSection>>;
 }
 
+export type BotTrackingRuntime = 'next' | 'express';
+
+const BOT_TRACKING_SNIPPET_BOTS = `{
+  GPTBot: 'indexing',
+  'ChatGPT-User': 'indexing',
+  PerplexityBot: 'citation',
+  ClaudeBot: 'indexing',
+  'Claude-Web': 'indexing',
+  'anthropic-ai': 'training',
+  CCBot: 'training',
+  'cohere-ai': 'training',
+  'Google-Extended': 'training',
+}`;
+
 const REPORT_PROMPT_SECTION_META: Record<ReportPromptSectionKey, {
   label: string;
   dimensions?: DimensionKey[];
@@ -140,6 +154,87 @@ For each fix above, return:
 - Call out hard dependencies before the dependent fix.
 - Do not return high-level advice without implementation details.
 - If a new file is required, return the entire file contents.`;
+}
+
+export function buildBotTrackingSnippet(runtime: BotTrackingRuntime, appUrl: string, siteKey: string): string {
+  return runtime === 'next'
+    ? buildNextBotTrackingSnippet(appUrl, siteKey)
+    : buildExpressBotTrackingSnippet(appUrl, siteKey);
+}
+
+export function buildBotTrackingInstallPrompt({
+  domain,
+  runtime,
+  appUrl,
+  siteKey,
+}: {
+  domain: string;
+  runtime: BotTrackingRuntime;
+  appUrl: string;
+  siteKey: string;
+}): string {
+  const snippet = buildBotTrackingSnippet(runtime, appUrl, siteKey);
+  const runtimeLabel = runtime === 'next' ? 'Next.js / Vercel' : 'Express / Node';
+  const primaryFile = runtime === 'next' ? 'middleware.ts or middleware.js at the project root' : 'the main server entry file where app middleware is registered';
+  const placementNote = runtime === 'next'
+    ? 'If the project already has middleware, merge this logic into the existing middleware instead of replacing unrelated auth, redirects, rewrites, or header logic.'
+    : 'Insert this as middleware before the main route handlers, and preserve any existing middleware order that affects auth, security, logging, or response behavior.';
+
+  return `You are a senior web developer implementing an existing AISO bot-tracking integration inside a customer's website project.
+
+## Role / Task
+Add AISO AI bot tracking to the customer's site using the existing AISO tracking endpoint and the selected runtime below.
+
+## Non-Negotiable Rules
+- This task is for the customer's own website/application only. Do not modify AISO itself.
+- Do not add or change AISO backend routes, middleware, database tables, migrations, auth, rate limiting, or tracking services.
+- Do not invent a new \`/api/track\` route in the target project. The tracking endpoint already exists on AISO and must be called exactly as provided below.
+- Do not create new database tables, analytics pipelines, or logging infrastructure in the target project for this feature.
+- Inspect the target project's current middleware/server setup before changing anything, then make the smallest production-safe change.
+- Preserve the project's existing auth, redirects, rewrites, security headers, logging, and error handling behavior.
+- Use the selected runtime only: ${runtimeLabel}.
+- Do not replace the real domain, app URL, or site key with placeholders.
+- Adapt syntax only when necessary to fit the target project's existing code style or TypeScript setup.
+
+## AISO Integration Details
+- Customer domain: ${domain}
+- Selected runtime: ${runtimeLabel}
+- AISO tracking endpoint: ${appUrl}/api/track
+- Site key: ${siteKey}
+- Purpose: detect known AI crawler user agents on the customer's server and send a fire-and-forget POST to AISO when one is detected.
+
+## File / Placement Guidance
+- Primary target location: ${primaryFile}
+- Placement rule: ${placementNote}
+
+## Ready-to-Use Snippet
+\`\`\`javascript
+${snippet}
+\`\`\`
+
+## Implementation Expectations
+- Reuse the target project's existing middleware/server structure rather than inventing a new architecture.
+- If the target project already has middleware logic, merge the AI bot detection into it cleanly.
+- Keep the AISO POST non-blocking so normal page responses are not delayed or broken if the request fails.
+- Do not rename the JSON payload keys (\`sk\`, \`bn\`, \`bc\`, \`p\`, \`ua\`).
+- Do not send a separate domain field; the site key resolves the domain server-side inside AISO.
+
+## What to Return
+After inspecting the target project, return the complete implementation with:
+
+1. **Exact code changes** in fenced code blocks with the correct language tag.
+2. **File path and placement** — exactly which file to edit and where the code belongs.
+3. **Short explanation** — briefly explain why this implementation is correct and how it preserves existing behavior.
+4. **Deployment / verification steps** — the exact command to deploy or run locally and how to confirm the tracking request is firing.
+
+## Verification Checklist
+- Confirm the middleware runs on incoming page requests.
+- Confirm AI bot user agents are detected by substring match.
+- Confirm the POST goes to ${appUrl}/api/track exactly.
+- Confirm the payload contains \`sk\`, \`bn\`, \`bc\`, \`p\`, and \`ua\`.
+- Confirm normal request handling still works even if the tracking POST fails.
+
+Do not answer with a system redesign, backend architecture proposal, database schema, or AISO-side implementation. Return only the customer-site implementation needed to install this integration safely.`;
 }
 
 export function buildFixPrompt(url: string, fix: PrioritizedFix): string {
@@ -267,6 +362,62 @@ function buildSectionPromptBundle(url: string, score: ScoreResult): Partial<Reco
   });
 
   return bundle;
+}
+
+function buildNextBotTrackingSnippet(appUrl: string, siteKey: string): string {
+  return `import { NextResponse } from 'next/server';
+
+const AI_BOTS = ${BOT_TRACKING_SNIPPET_BOTS};
+
+export function middleware(request) {
+  const ua = request.headers.get('user-agent') || '';
+
+  for (const [bot, cat] of Object.entries(AI_BOTS)) {
+    if (ua.includes(bot)) {
+      fetch('${appUrl}/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sk: '${siteKey}',
+          bn: bot,
+          bc: cat,
+          p: request.nextUrl.pathname,
+          ua,
+        }),
+      }).catch(() => {});
+      break;
+    }
+  }
+
+  return NextResponse.next();
+}`;
+}
+
+function buildExpressBotTrackingSnippet(appUrl: string, siteKey: string): string {
+  return `const BOTS = ${BOT_TRACKING_SNIPPET_BOTS};
+
+app.use((req, res, next) => {
+  const ua = req.headers['user-agent'] || '';
+
+  for (const [bot, cat] of Object.entries(BOTS)) {
+    if (ua.includes(bot)) {
+      fetch('${appUrl}/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sk: '${siteKey}',
+          bn: bot,
+          bc: cat,
+          p: req.path,
+          ua,
+        }),
+      }).catch(() => {});
+      break;
+    }
+  }
+
+  next();
+});`;
 }
 
 function buildSectionPrompt(
