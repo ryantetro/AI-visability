@@ -1,3 +1,4 @@
+import { getAccountAccessOverride } from '@/lib/account-access-overrides';
 import { getSupabaseClient } from '@/lib/supabase';
 import { type PlanTier, planStringToTier, PLANS } from '@/lib/pricing';
 
@@ -24,11 +25,12 @@ export interface UserUsage {
 
 export async function getOrCreateProfile(userId: string, email: string): Promise<UserProfile> {
   const supabase = getSupabaseClient();
+  const override = getAccountAccessOverride(email);
 
   const { data, error } = await supabase
     .from('user_profiles')
     .upsert(
-      { id: userId, email: email.toLowerCase() },
+      { id: userId, email: email.toLowerCase(), ...(override?.plan ? { plan: override.plan } : {}) },
       { onConflict: 'id', ignoreDuplicates: true }
     )
     .select()
@@ -44,6 +46,18 @@ export async function getOrCreateProfile(userId: string, email: string): Promise
 
     if (fetchError || !existing) {
       throw new Error(`Failed to get or create user profile: ${error?.message || fetchError?.message}`);
+    }
+    if (override?.plan && existing.plan !== override.plan) {
+      const { data: updated, error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ plan: override.plan, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (!updateError && updated) {
+        return updated as UserProfile;
+      }
     }
     return existing as UserProfile;
   }
@@ -73,13 +87,15 @@ export async function incrementScanCount(userId: string): Promise<void> {
   }
 }
 
-export function canUserScan(profile: UserProfile): boolean {
+export function canUserScan(): boolean {
   // All users can scan (free users just can't access paid features)
   return true;
 }
 
 export function getUserUsage(profile: UserProfile): UserUsage {
-  const tier = planStringToTier(profile.plan);
+  const override = getAccountAccessOverride(profile.email);
+  const effectivePlan = override?.plan ?? profile.plan;
+  const tier = override?.tier ?? planStringToTier(effectivePlan);
   const isPaid = tier !== 'free';
   const planConfig = PLANS[tier];
   return {
@@ -87,10 +103,10 @@ export function getUserUsage(profile: UserProfile): UserUsage {
     limit: profile.free_scan_limit,
     remaining: Infinity,
     isPaid,
-    plan: profile.plan,
+    plan: effectivePlan,
     tier,
-    domains: planConfig.domains,
-    prompts: planConfig.prompts,
+    domains: override?.maxDomains ?? planConfig.domains,
+    prompts: override?.maxPrompts ?? planConfig.prompts,
   };
 }
 

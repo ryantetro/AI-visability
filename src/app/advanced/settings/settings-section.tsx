@@ -1,8 +1,9 @@
 'use client';
 
 import { type ReactNode, useEffect, useState } from 'react';
-import { Bell, Copy, CreditCard, KeyRound, Mail, RefreshCw } from 'lucide-react';
+import { Copy, CreditCard, KeyRound, Mail, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { isUnlimitedPlanLimit } from '@/lib/account-access-overrides';
 import { cn } from '@/lib/utils';
 import { buildBotTrackingInstallPrompt, buildBotTrackingSnippet, type BotTrackingRuntime } from '@/lib/llm-prompts';
 import { usePlan } from '@/hooks/use-plan';
@@ -90,11 +91,17 @@ export function SettingsSection({
   const [trackingPromptCopied, setTrackingPromptCopied] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [appUrl, setAppUrl] = useState(() => normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL || ''));
-  const { tier, plan, email } = usePlan();
+  const { tier, plan, email, maxDomains, maxPrompts } = usePlan();
   const planConfig = PLANS[tier];
   const { monitoredSites } = useDomainContext();
 
   const billingCycle = plan.includes('annual') ? 'Annual' : plan.includes('monthly') ? 'Monthly' : '';
+  const trackedDomainsValue = isUnlimitedPlanLimit(maxDomains)
+    ? `${monitoredSites.length} / Unlimited`
+    : `${monitoredSites.length} / ${maxDomains}`;
+  const trackedPromptsValue = isUnlimitedPlanLimit(maxPrompts)
+    ? '0 / Unlimited'
+    : `0 / ${maxPrompts}`;
   const snippetAppUrl =
     typeof window !== 'undefined' &&
     window.location.origin &&
@@ -267,11 +274,11 @@ export function SettingsSection({
           />
           <FieldRow
             label="Tracked domains"
-            value={`${monitoredSites.length} / ${planConfig.domains}`}
+            value={trackedDomainsValue}
           />
           <FieldRow
             label="Prompts tracked"
-            value={`0 / ${planConfig.prompts}`}
+            value={trackedPromptsValue}
           />
 
           {/* Action row */}

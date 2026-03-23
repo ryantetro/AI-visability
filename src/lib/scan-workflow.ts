@@ -71,7 +71,7 @@ export async function startScan(
   // Per-user scan limit check
   try {
     const profile = await getOrCreateProfile(userId, userEmail);
-    if (!canUserScan(profile)) {
+    if (!canUserScan()) {
       const usage = getUserUsage(profile);
       return {
         status: 403,
