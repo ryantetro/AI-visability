@@ -249,7 +249,31 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
+      {/* Welcome header */}
+      <h1 className="text-3xl font-bold tracking-tight text-white">Welcome to AISO</h1>
+      <p className="mt-2 text-[14px] text-zinc-400">Get your AI visibility score in three simple steps</p>
+
+      {/* 3-step visual flow */}
+      <div className="mx-auto mt-8 flex items-center gap-3">
+        {[
+          { num: '1', label: 'Add domain' },
+          { num: '2', label: 'Run scan' },
+          { num: '3', label: 'Get score' },
+        ].map((step, i) => (
+          <div key={step.num} className="flex items-center gap-3">
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#356df4]/30 bg-[#356df4]/10 text-[14px] font-bold text-[#356df4]">
+                {step.num}
+              </div>
+              <span className="text-[11px] font-medium text-zinc-400">{step.label}</span>
+            </div>
+            {i < 2 && <div className="mb-5 h-px w-8 bg-white/10" />}
+          </div>
+        ))}
+      </div>
+
+      {/* Existing add domain section */}
+      <div className="mt-8 flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
         <Plus className="h-6 w-6 text-zinc-300" />
       </div>
       <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">Add your first domain</h2>

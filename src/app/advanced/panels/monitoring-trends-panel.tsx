@@ -84,7 +84,7 @@ export function MonitoringTrendsPanel({
       : null;
 
   return (
-    <DashboardPanel className="p-5">
+    <DashboardPanel id="monitoring" className="scroll-mt-6 p-5">
       <SectionTitle eyebrow="Monitoring" title="Score Trends" description="Track how your AI visibility score changes over time." />
 
       <div className="mt-5">

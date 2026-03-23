@@ -200,6 +200,7 @@ export function SettingsSection({
         domain: data.domain || domain,
         createdAt: data.createdAt || new Date().toISOString(),
       });
+      localStorage.setItem('aiso_onboarding_tracking_installed', '1');
     } catch (error) {
       setTrackingError(error instanceof Error ? error.message : 'Failed to generate tracking key');
     } finally {
@@ -396,7 +397,7 @@ export function SettingsSection({
       </section>
 
       {/* ─── AI Bot Tracking ─────────────────────────────────────── */}
-      <section>
+      <section id="tracking" className="scroll-mt-6">
         <h2 className="text-[15px] font-semibold text-white">AI Bot Tracking</h2>
         <p className="mt-1 text-[12px] text-zinc-500">
           Server-side middleware that detects AI crawler visits and reports them to your dashboard.

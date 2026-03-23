@@ -33,12 +33,15 @@ export function CollapsibleSection({
 export function DashboardPanel({
   children,
   className,
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
     <section
+      id={id}
       className={cn(
         'rounded-[1.35rem] border border-white/8 bg-[linear-gradient(180deg,rgba(10,10,12,0.96)_0%,rgba(6,6,7,0.985)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.022),0_10px_24px_rgba(0,0,0,0.16)]',
         className

@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { getFaviconUrl } from '@/lib/url-utils';
 import { useDomainContext } from '@/contexts/domain-context';
 import { usePlan } from '@/hooks/use-plan';
+import { useOnboarding } from '@/hooks/use-onboarding';
 import { NAV_GATES, canAccess } from '@/lib/pricing';
 import type { SiteSummary } from '@/app/advanced/lib/types';
 
@@ -352,6 +353,47 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
   );
 }
 
+function SidebarOnboardingProgress() {
+  let onboarding: ReturnType<typeof useOnboarding> | null = null;
+  try {
+    onboarding = useOnboarding();
+  } catch {
+    return null;
+  }
+
+  if (!onboarding || onboarding.allComplete || onboarding.dismissed) return null;
+
+  const { completedCount, totalSteps, progressPct } = onboarding;
+
+  return (
+    <div className="px-3 py-2">
+      <Link
+        href="/dashboard"
+        className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors hover:bg-white/[0.04]"
+      >
+        <svg className="h-5 w-5 shrink-0" viewBox="0 0 20 20">
+          <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
+          <circle
+            cx="10"
+            cy="10"
+            r="8"
+            fill="none"
+            stroke="#25c972"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={`${(progressPct / 100) * 50.27} 50.27`}
+            transform="rotate(-90 10 10)"
+          />
+        </svg>
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium text-zinc-300">Getting Started</p>
+          <p className="text-[10px] text-zinc-500">{completedCount}/{totalSteps} complete</p>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
 export function DashboardSidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -392,6 +434,8 @@ export function DashboardSidebar() {
           </div>
         </>
       )}
+
+      {hasDomainContext && <SidebarOnboardingProgress />}
 
       {/* Separator */}
       <div className="mx-3 border-t border-white/[0.06]" />

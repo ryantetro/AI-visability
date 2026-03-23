@@ -24,6 +24,8 @@ import { MonitoringTrendsPanel } from '../panels/monitoring-trends-panel';
 import { AICrawlerPanel } from '../panels/ai-crawler-panel';
 import { EmptyStateCard } from './empty-state-card';
 import { QuickWinsSection } from './quick-wins-section';
+import { OnboardingChecklist } from '@/components/app/onboarding-checklist';
+import { NextStepsCard } from '@/components/app/next-steps-card';
 import type { DashboardReportData, RecentScanData } from '../lib/types';
 import type { CompetitorComparisonData } from '@/types/competitors';
 
@@ -153,6 +155,8 @@ export function DashboardSection({
 
   return (
     <div className="space-y-6">
+      <OnboardingChecklist />
+
       {/* Scan freshness + rescan (compact, right-aligned) */}
       {onReaudit && (
         <div className="flex items-center justify-end gap-2">
@@ -285,6 +289,8 @@ export function DashboardSection({
         </DashboardPanel>
         </Link>
       </div>
+
+      <NextStepsCard />
 
       {/* Platform Performance */}
       {platformCards.length > 0 ? (
