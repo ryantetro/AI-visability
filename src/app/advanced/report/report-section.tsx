@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, ArrowUpRight, RefreshCw } from 'lucide-react';
+import { Copy, ArrowUpRight, RefreshCw, Share2, Check, Zap, FileCode, Search, Shield, Gauge } from 'lucide-react';
 import { ScoreSummaryHero } from '@/components/app/score-summary-hero';
 import { YwsBreakdownSection } from '@/components/ui/yws-breakdown-section';
-import type { CheckItem } from '@/components/ui/yws-breakdown-section';
+import type { CheckItem, VerdictQuality } from '@/components/ui/yws-breakdown-section';
 import { getCheckFixContent } from '@/lib/analysis-fix-content';
 import { cn } from '@/lib/utils';
 import type { DashboardReportData, FilesData, AssetPreview } from '../lib/types';
@@ -104,12 +104,21 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
   const copyToLlm = report.copyToLlm ?? files?.copyToLlm ?? null;
   const assetPreview = report.assetPreview ?? null;
   const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<'idle' | 'copied'>('idle');
 
   const handleCopyPrompt = (key: string, prompt: string | undefined) => {
     if (!prompt) return;
     void navigator.clipboard.writeText(prompt);
     setCopiedPromptKey(key);
     setTimeout(() => setCopiedPromptKey((current) => (current === key ? null : current)), 2000);
+  };
+
+  const handleShareReport = () => {
+    const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = `${appUrl}/score/${report.id}`;
+    void navigator.clipboard.writeText(shareUrl);
+    setShareState('copied');
+    setTimeout(() => setShareState('idle'), 2500);
   };
 
   // Always paid since this is the advanced dashboard
@@ -178,6 +187,18 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
                   {copiedPromptKey === 'full' ? 'Copied full-site prompt' : 'Copy full-site fix prompt'}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={handleShareReport}
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 hover:text-emerald-300"
+              >
+                {shareState === 'copied' ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Share2 className="h-4 w-4" />
+                )}
+                {shareState === 'copied' ? 'Link copied!' : 'Share Report'}
+              </button>
               <a
                 href={`https://${domain}`}
                 target="_blank"
@@ -191,6 +212,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           }
         />
       </div>
+
+      {/* ─── Take Action Section ─── */}
+      <TakeActionSection
+        report={report}
+        domain={domain}
+        files={files}
+        copyToLlm={copyToLlm}
+        onCopyPrompt={handleCopyPrompt}
+        copiedPromptKey={copiedPromptKey}
+      />
 
       {/* Click hint */}
       <div className="mb-2 flex items-center justify-end gap-1.5 text-[11px] text-zinc-400">
@@ -247,16 +278,26 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
                           : status?.status === 'error'
                             ? `Testing error${status.errorMessage ? ` · ${status.errorMessage}` : ''}`
                             : `${mentioned}/${total} prompts mentioned${sentiment ? ` · ${sentiment}` : ''}`;
+                    const verdict: 'pass' | 'fail' | 'unknown' =
+                      status?.status !== 'complete'
+                        ? 'unknown'
+                        : mentioned > 0
+                          ? 'pass'
+                          : 'fail';
+                    const mentionRatio = total > 0 ? mentioned / total : 0;
+                    const verdictQuality: VerdictQuality | undefined =
+                      verdict === 'pass'
+                        ? mentionRatio >= 0.5
+                          ? 'strong'
+                          : mentionRatio >= 0.25
+                            ? 'normal'
+                            : 'low'
+                        : undefined;
                     return {
                       label: getAIEngineLabel(engine),
                       detail,
-                      verdict: (
-                        status?.status !== 'complete'
-                          ? 'unknown'
-                          : mentioned > 0
-                            ? 'pass'
-                            : 'fail'
-                      ) as 'pass' | 'fail' | 'unknown',
+                      verdict,
+                      verdictQuality,
                       engineKey: engine,
                     };
                   }),
@@ -455,6 +496,205 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
             />
           );
         })()}
+      </div>
+    </div>
+  );
+}
+
+/* ── Take Action Panel ──────────────────────────────────────────────────── */
+
+interface ActionStep {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  action?: { label: string; onClick?: () => void; href?: string };
+}
+
+function TakeActionSection({
+  report,
+  domain,
+  files,
+  copyToLlm,
+  onCopyPrompt,
+  copiedPromptKey,
+}: {
+  report: DashboardReportData;
+  domain: string;
+  files: FilesData | null;
+  copyToLlm: FilesData['copyToLlm'] | null;
+  onCopyPrompt: (key: string, prompt: string | undefined) => void;
+  copiedPromptKey: string | null;
+}) {
+  const scores = report.score.scores;
+  const overallScore = scores.overall ?? scores.aiVisibility;
+  const mentions = report.mentionSummary;
+  const fixes = report.score.fixes ?? report.fixes ?? [];
+  const webHealth = report.score.webHealth;
+  const qualityPillar = webHealth?.pillars?.find((p) => p.key === 'quality');
+  const securityPillar = webHealth?.pillars?.find((p) => p.key === 'security');
+  const perfPillar = webHealth?.pillars?.find((p) => p.key === 'performance');
+
+  const steps: ActionStep[] = [];
+
+  // 1. If there are generated fix files, suggest installing them
+  if (files?.files && files.files.length > 0) {
+    steps.push({
+      icon: <FileCode className="h-5 w-5" />,
+      title: 'Install generated fix files on your site',
+      description: `We generated ${files.files.length} file${files.files.length > 1 ? 's' : ''} to improve your AI visibility. Download and add ${files.files.length > 1 ? 'them' : 'it'} to your website root directory.`,
+      priority: 'high',
+    });
+  }
+
+  // 2. Copy the full-site fix prompt and paste it into an AI tool
+  if (copyToLlm?.fullPrompt) {
+    steps.push({
+      icon: <Copy className="h-5 w-5" />,
+      title: 'Copy fix prompt into ChatGPT or Claude',
+      description: 'Use the full-site fix prompt with an AI assistant to get step-by-step implementation guidance tailored to your site.',
+      priority: 'high',
+      action: {
+        label: copiedPromptKey === 'action-full' ? 'Copied!' : 'Copy fix prompt',
+        onClick: () => onCopyPrompt('action-full', copyToLlm.fullPrompt),
+      },
+    });
+  }
+
+  // 3. AI Mentions — if low, suggest improving
+  if (mentions) {
+    const mentionScore = mentions.overallScore;
+    if (mentionScore < 50) {
+      const engineCount = Object.values(mentions.engineBreakdown).filter((e) => e.mentioned > 0).length;
+      const totalEngines = Object.keys(mentions.engineBreakdown).length;
+      steps.push({
+        icon: <Search className="h-5 w-5" />,
+        title: 'Increase your AI mentions',
+        description: `You're only visible on ${engineCount}/${totalEngines} AI engines. Add structured data, improve your content authority, and ensure your brand name appears in relevant industry contexts to get mentioned more.`,
+        priority: mentionScore < 25 ? 'high' : 'medium',
+      });
+    }
+  }
+
+  // 4. Website quality issues
+  if (qualityPillar?.percentage !== null && qualityPillar?.percentage !== undefined && qualityPillar.percentage < 70) {
+    const failedChecks = qualityPillar.checks?.filter((c) => c.verdict === 'fail') ?? [];
+    steps.push({
+      icon: <Gauge className="h-5 w-5" />,
+      title: 'Fix website quality issues',
+      description: failedChecks.length > 0
+        ? `Fix these issues: ${failedChecks.slice(0, 3).map((c) => c.label).join(', ')}${failedChecks.length > 3 ? ` and ${failedChecks.length - 3} more` : ''}.`
+        : 'Improve your site quality score by fixing Open Graph tags, meta descriptions, and heading structure.',
+      priority: qualityPillar.percentage < 50 ? 'high' : 'medium',
+    });
+  }
+
+  // 5. Security / trust issues
+  if (securityPillar?.percentage !== null && securityPillar?.percentage !== undefined && securityPillar.percentage < 70) {
+    steps.push({
+      icon: <Shield className="h-5 w-5" />,
+      title: 'Strengthen trust & security',
+      description: 'Add security headers, ensure HTTPS is enforced, and implement a Content Security Policy to improve your trust signals.',
+      priority: 'medium',
+    });
+  }
+
+  // 6. Performance issues
+  if (perfPillar?.percentage !== null && perfPillar?.percentage !== undefined && perfPillar.percentage < 70) {
+    steps.push({
+      icon: <Gauge className="h-5 w-5" />,
+      title: 'Improve page speed',
+      description: 'Optimize images, reduce JavaScript blocking, and improve Largest Contentful Paint to boost performance scores.',
+      priority: 'medium',
+    });
+  }
+
+  // 7. Top repair queue items
+  if (fixes.length > 0 && steps.length < 5) {
+    const topFix = fixes[0];
+    steps.push({
+      icon: <Zap className="h-5 w-5" />,
+      title: `Quick win: ${topFix.label}`,
+      description: `${topFix.instruction} (estimated +${topFix.estimatedLift} points, ${topFix.effortBand} effort)`,
+      priority: 'medium',
+    });
+  }
+
+  if (steps.length === 0) return null;
+
+  // Sort by priority
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  steps.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+  return (
+    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-6">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
+          <Zap className="h-4 w-4 text-emerald-400" />
+        </div>
+        <div>
+          <h3 className="text-[15px] font-semibold text-white">Take Action</h3>
+          <p className="text-xs text-zinc-400">
+            {overallScore >= 80
+              ? 'Great score! Here are ways to stay ahead.'
+              : overallScore >= 60
+                ? 'Good start. These steps will push your score higher.'
+                : 'Your site needs attention. Follow these steps to improve.'}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {steps.slice(0, 5).map((step, index) => (
+          <div
+            key={`action-${index}`}
+            className="flex items-start gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-zinc-400">
+              <span className="text-xs font-bold text-zinc-300">{index + 1}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  'text-zinc-400',
+                  step.priority === 'high' && 'text-emerald-400',
+                )}>
+                  {step.icon}
+                </span>
+                <p className="text-sm font-medium text-white">{step.title}</p>
+                {step.priority === 'high' && (
+                  <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-400">
+                    Priority
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">{step.description}</p>
+              {step.action && (
+                <div className="mt-2">
+                  {step.action.href ? (
+                    <a
+                      href={step.action.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+                    >
+                      {step.action.label}
+                      <ArrowUpRight className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={step.action.onClick}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+                    >
+                      {step.action.label}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

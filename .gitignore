@@ -45,3 +45,10 @@ next-env.d.ts
 
 # local smoke checks
 /scripts/live-audit-smoke.cjs
+
+# Ruflo / Claude Flow generated artifacts
+/.claude/
+/.claude-flow/
+/.swarm/
+/.tmp-npm-cache/
+/.mcp.json

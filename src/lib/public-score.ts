@@ -1,8 +1,30 @@
 import { getDatabase } from '@/lib/services/registry';
 import { ScoreResult } from '@/types/score';
-import { MentionSummary } from '@/types/ai-mentions';
+import { MentionSummary, AIEngine } from '@/types/ai-mentions';
 import { getDomain } from '@/lib/url-utils';
 import { normalizeMentionSummary } from '@/lib/ai-mentions/summary';
+
+export interface PublicEngineResult {
+  engine: AIEngine;
+  label: string;
+  mentioned: number;
+  total: number;
+  sentiment: string;
+  status: 'complete' | 'not_configured' | 'not_backfilled' | 'error';
+}
+
+export interface PublicTopFix {
+  label: string;
+  instruction: string;
+  estimatedLift: number;
+  effortBand: string;
+}
+
+export interface PublicPillarScore {
+  key: string;
+  label: string;
+  percentage: number | null;
+}
 
 export interface PublicScoreSummary {
   id: string;
@@ -23,6 +45,9 @@ export interface PublicScoreSummary {
     min: number;
     max: number;
   };
+  engines: PublicEngineResult[];
+  topFixes: PublicTopFix[];
+  pillars: PublicPillarScore[];
 }
 
 export async function getPublicScoreSummary(scanId: string): Promise<PublicScoreSummary | null> {
@@ -35,6 +60,42 @@ export async function getPublicScoreSummary(scanId: string): Promise<PublicScore
 
   const scoreResult = scan.scoreResult as ScoreResult;
   const mentionSummary = normalizeMentionSummary(scan.mentionSummary as MentionSummary | undefined);
+
+  // Build engine breakdown for public display
+  const engineOrder: AIEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude'];
+  const engineLabels: Record<AIEngine, string> = {
+    chatgpt: 'ChatGPT',
+    perplexity: 'Perplexity',
+    gemini: 'Gemini',
+    claude: 'Claude',
+  };
+  const engines: PublicEngineResult[] = engineOrder.map((engine) => {
+    const eb = mentionSummary?.engineBreakdown?.[engine];
+    const es = mentionSummary?.engineStatus?.[engine];
+    return {
+      engine,
+      label: engineLabels[engine],
+      mentioned: eb?.mentioned ?? 0,
+      total: eb?.total ?? 0,
+      sentiment: eb?.sentiment ?? 'not-found',
+      status: es?.status ?? 'not_configured',
+    };
+  });
+
+  // Top 3 fixes for public display
+  const topFixes: PublicTopFix[] = (scoreResult.fixes ?? []).slice(0, 3).map((f) => ({
+    label: f.label,
+    instruction: f.instruction,
+    estimatedLift: f.estimatedLift,
+    effortBand: f.effortBand,
+  }));
+
+  // Web health pillars
+  const pillars: PublicPillarScore[] = (scoreResult.webHealth?.pillars ?? []).map((p) => ({
+    key: p.key,
+    label: p.label ?? p.key,
+    percentage: p.percentage,
+  }));
 
   return {
     id: scan.id,
@@ -49,5 +110,8 @@ export async function getPublicScoreSummary(scanId: string): Promise<PublicScore
     maxTotal: scoreResult.maxTotal,
     band: scoreResult.overallBand,
     bandInfo: scoreResult.overallBandInfo,
+    engines,
+    topFixes,
+    pillars,
   };
 }

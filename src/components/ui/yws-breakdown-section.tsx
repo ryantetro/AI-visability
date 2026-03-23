@@ -9,10 +9,14 @@ import { AI_ENGINE_META } from '@/lib/ai-engines';
 
 export type EngineKey = 'chatgpt' | 'perplexity' | 'gemini' | 'claude';
 
+export type VerdictQuality = 'strong' | 'normal' | 'low';
+
 export interface CheckItem {
   label: string;
   detail?: string;
   verdict?: 'pass' | 'fail' | 'unknown';
+  /** Quality tier for pass verdicts: strong (>=50%), normal (>=25%), low (<25%) */
+  verdictQuality?: VerdictQuality;
   points?: number;
   maxPoints?: number;
   fixContent?: CheckFixContent;
@@ -191,8 +195,25 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
       fail: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', Icon: XCircle },
       unknown: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', Icon: HelpCircle },
     };
-    const style = verdictStyles[check.verdict!];
+
+    // Quality-tiered pass styling
+    const getPassStyle = (quality?: VerdictQuality) => {
+      if (quality === 'low') return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', Icon: CheckCircle2 };
+      if (quality === 'strong') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', Icon: CheckCircle2 };
+      return verdictStyles.pass;
+    };
+
+    const style = check.verdict === 'pass' && check.verdictQuality
+      ? getPassStyle(check.verdictQuality)
+      : verdictStyles[check.verdict!];
     const VerdictIcon = style.Icon;
+
+    // Display label for the verdict badge
+    const verdictLabel = check.verdict === 'pass' && check.verdictQuality === 'low'
+      ? 'low pass'
+      : check.verdict === 'pass' && check.verdictQuality === 'strong'
+        ? 'strong pass'
+        : check.verdict;
 
     const fixContent = check.fixContent;
 
@@ -234,7 +255,7 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
               style.bg
             )}
           >
-            {check.verdict}
+            {verdictLabel}
           </span>
         </div>
 
