@@ -368,8 +368,8 @@ export function LoginPageContent() {
   };
 
   const subtitleByMode: Record<AuthMode, string> = {
-    'sign-in': 'Sign in to access your AI visibility dashboard.',
-    'sign-up': 'Start monitoring how AI search engines see your business.',
+    'sign-in': 'Sign in to see your AI visibility dashboard.',
+    'sign-up': 'Free account. No credit card required. See your score in seconds.',
     'forgot-password': "We'll send a secure reset link to your email.",
     'check-email': 'Your next step is waiting in your inbox.',
     'reset-password': 'Set a new password to regain access.',
@@ -522,8 +522,8 @@ export function LoginPageContent() {
                       </p>
                       <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
                         {checkEmailKind === 'signup'
-                          ? `We sent a confirmation link to ${emailHint || 'your inbox'}. Click it to activate your account.`
-                          : `We sent a secure reset link to ${emailHint || 'your inbox'}. Open it on this device to set a new password.`}
+                          ? `We sent a confirmation link to ${emailHint || 'your inbox'}. Click it to activate your account. Check your spam folder if you don\u2019t see it within a minute.`
+                          : `We sent a secure reset link to ${emailHint || 'your inbox'}. Open it on this device to set a new password. Check your spam folder if you don\u2019t see it.`}
                       </p>
                     </div>
                   </div>

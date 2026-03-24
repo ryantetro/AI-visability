@@ -4,7 +4,16 @@ import type { Ref } from 'react';
 import { ReactNode } from 'react';
 import { Globe2, Zap } from 'lucide-react';
 import { ScoreRing } from '@/components/ui/score-ring';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { cn } from '@/lib/utils';
+
+const SCORE_TOOLTIPS: Record<string, string> = {
+  'Overall Score': 'Combined score based on AI discoverability, website quality, trust & security, and AI mentions. Higher = more likely to be recommended by AI.',
+  'Website Quality': 'How well your site follows web standards — meta tags, Open Graph, structured data, and heading structure.',
+  'Trust & Security': 'HTTPS, security headers, and content security policies that signal trustworthiness to AI systems.',
+  'PageSpeed': 'Core Web Vitals and load performance. Faster sites tend to rank better in both traditional and AI search.',
+  'AI Mentions': 'How often AI engines like ChatGPT and Perplexity mention your brand when asked relevant questions.',
+};
 
 interface ScoreSummaryHeroProps {
   domain: string;
@@ -75,6 +84,13 @@ export function ScoreSummaryHero({
           />
         </div>
 
+        {/* Score band legend */}
+        <div className="mt-4 flex items-center justify-center gap-4 text-[10px] font-medium">
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#ff5252]" />0–59 Needs Work</span>
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#ff8a1e]" />60–79 Getting There</span>
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#25c972]" />80–100 Strong</span>
+        </div>
+
         <div className={cn(
           'mt-8 grid w-full gap-4',
           supporting.length <= 3
@@ -91,6 +107,9 @@ export function ScoreSummaryHero({
                 label={item.label}
                 caption={item.caption}
               />
+              {SCORE_TOOLTIPS[item.label] && (
+                <InfoTooltip text={SCORE_TOOLTIPS[item.label]} className="mt-1" />
+              )}
             </div>
           ))}
         </div>

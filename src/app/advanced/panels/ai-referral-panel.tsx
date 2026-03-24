@@ -54,7 +54,7 @@ export function AIReferralPanel({ domain, trackingReady }: { domain: string; tra
   if (totalVisits === 0 && engineSummaries.length === 0) {
     return (
       <DashboardPanel className="p-6">
-        <SectionTitle eyebrow="AI Referrals" title="AI Referral Traffic" description="Human visitors arriving from AI engines." />
+        <SectionTitle eyebrow="AI Referrals" title="AI Referral Traffic" description="Real visitors finding you through AI engines like ChatGPT and Perplexity." />
         <div className="mt-5 rounded-[1.4rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.015)_100%)] p-5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
@@ -71,7 +71,7 @@ export function AIReferralPanel({ domain, trackingReady }: { domain: string; tra
             Waiting for the first AI referral.
           </h3>
           <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-zinc-400">
-            Your tracking snippet includes referrer detection. When someone clicks through to your site from an AI engine, visits will appear here automatically.
+            When real people find you through ChatGPT, Perplexity, or other AI engines and click through to your site, their visits will show up here automatically.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">

@@ -94,17 +94,17 @@ export function AICrawlerPanel({ domain, trackingReady: trackingReadyProp }: { d
               </span>
               <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-zinc-500">
                 <Sparkles className="h-3 w-3" />
-                Server-side middleware
+                Auto-detection
               </span>
             </div>
 
             <h3 className="mt-4 text-lg font-semibold text-white">
-              {trackingReady ? 'Tracking is armed. Waiting for the first crawler hit.' : 'No tracking snippet installed yet.'}
+              {trackingReady ? 'Tracking installed — waiting for the first AI bot visit.' : 'Install tracking to see AI bot activity.'}
             </h3>
             <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-zinc-400">
               {trackingReady
-                ? 'Your domain already has a tracking key. Once GPTBot, PerplexityBot, ClaudeBot, and other crawlers hit your site, their visits will begin showing up here automatically.'
-                : 'Install the server-side tracking snippet from Settings to detect AI bot crawlers and human visitors arriving from AI engines. One snippet powers both.'}
+                ? 'Your tracking code is deployed. When ChatGPT, Perplexity, Gemini, or Claude bots visit your site, their activity will appear here automatically — usually within 24–48 hours.'
+                : 'Install a simple tracking snippet from Settings to see which AI bots crawl your site and which AI engines send you real visitors. Takes about 5 minutes.'}
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">

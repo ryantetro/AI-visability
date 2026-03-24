@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react';
 import { DashboardPanel } from '@/components/app/dashboard-primitives';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { cn } from '@/lib/utils';
 import { getFaviconUrl } from '@/lib/url-utils';
 import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
@@ -206,7 +207,10 @@ export function DashboardSection({
             <div className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl bg-[#25c972]/10">
               <Eye className="h-4.5 w-4.5 text-[#25c972]" />
             </div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Visibility Score</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              Visibility Score
+              <InfoTooltip text="Your overall AI visibility score (0–100). Combines discoverability, content quality, web health, and AI mentions into one number." className="ml-1 align-middle" />
+            </p>
             <div className="mt-2 flex items-baseline gap-1.5">
               <span className={cn('text-4xl font-bold', scoreColor(scores.aiVisibility))}>
                 {scores.aiVisibility != null ? Math.round(scores.aiVisibility) : '--'}
@@ -252,7 +256,10 @@ export function DashboardSection({
           <div className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl bg-[#3b82f6]/10">
             <Hash className="h-4.5 w-4.5 text-[#3b82f6]" />
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Average Rank</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+            Average Rank
+            <InfoTooltip text="Your average position when AI engines cite your site. Lower is better — #1 means you're the first source cited." className="ml-1 align-middle" />
+          </p>
           <div className="mt-2 flex items-baseline gap-1.5">
             <span className="text-4xl font-bold text-white">
               {avgRank != null ? `#${avgRank}` : '--'}
@@ -272,7 +279,10 @@ export function DashboardSection({
           <div className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl bg-[#a855f7]/10">
             <MessageSquare className="h-4.5 w-4.5 text-[#a855f7]" />
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">AI Mentions</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+            AI Mentions
+            <InfoTooltip text="How many times AI engines mention your brand when asked relevant questions. We test across ChatGPT, Perplexity, Gemini, and Claude." className="ml-1 align-middle" />
+          </p>
           {totalMentions === 0 && totalChecks === 0 ? (
             <div className="mt-2">
               <span className="text-4xl font-bold text-zinc-600">--</span>

@@ -24,7 +24,7 @@ export function UrlInput({
   variant = 'default',
   className,
   placeholder,
-  submitLabel = 'Check My AI Score',
+  submitLabel = 'Free Audit — 30 Seconds',
   loadingLabel = 'Scanning...',
   showGlobeIcon = false,
   initialValue,
@@ -46,11 +46,11 @@ export function UrlInput({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
-      setError('Please enter a URL');
+      setError('Enter your website to scan (e.g., example.com)');
       return;
     }
     if (!isValidUrl(url)) {
-      setError('Please enter a valid URL (e.g., example.com)');
+      setError('That doesn\u2019t look like a valid domain. Try: example.com or your-business.co.uk');
       return;
     }
     setError('');
@@ -82,7 +82,7 @@ export function UrlInput({
               type="text"
               value={url}
               onChange={(e) => { setUrl(e.target.value); setError(''); }}
-              placeholder={placeholder ?? 'yourbusiness.com'}
+              placeholder={placeholder ?? 'example.com or your-site.co.uk'}
               autoFocus={autoFocus}
               className="flex-1 border-0 bg-transparent py-2 text-[13px] text-white outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-muted)]"
               style={{ boxShadow: 'none' }}
@@ -111,7 +111,7 @@ export function UrlInput({
               type="text"
               value={url}
               onChange={(e) => { setUrl(e.target.value); setError(''); }}
-              placeholder={placeholder ?? 'yourbusiness.com'}
+              placeholder={placeholder ?? 'example.com or your-site.co.uk'}
               autoFocus={autoFocus}
               className="aiso-input min-h-[60px] flex-1 px-5 py-4 text-base"
               style={{ boxShadow: 'none' }}
@@ -149,7 +149,7 @@ export function UrlInput({
             disabled={loading}
             className="aiso-button aiso-button-primary px-6 py-3"
           >
-            {loading ? 'Scanning...' : 'Check My AI Score'}
+            {loading ? 'Scanning...' : 'Free Audit — 30 Seconds'}
           </button>
         </div>
         {error && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>}

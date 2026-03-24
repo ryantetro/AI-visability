@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Copy, HelpCircle, Info, Lock, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { CheckFixContent } from '@/lib/analysis-fix-content';
 import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
 import { AI_ENGINE_META } from '@/lib/ai-engines';
@@ -56,6 +57,8 @@ interface YwsBreakdownSectionProps {
   showClickHint?: boolean;
   /** When false, all checks show as Locked until upgrade. When true, show full check details. */
   hasPaid?: boolean;
+  /** Help text shown in an info tooltip next to the section title */
+  tooltip?: string;
 }
 
 export function YwsBreakdownSection({
@@ -75,6 +78,7 @@ export function YwsBreakdownSection({
   defaultExpanded = false,
   showClickHint = false,
   hasPaid = false,
+  tooltip,
 }: YwsBreakdownSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const displayScore = score !== null ? score : 0;
@@ -89,7 +93,7 @@ export function YwsBreakdownSection({
         </div>
       )}
 
-      <section className="overflow-hidden rounded-xl border border-white/[0.06] bg-[#0f0f0f]">
+      <section className="overflow-visible rounded-xl border border-white/[0.06] bg-[#0f0f0f]">
         <div
           role="button"
           tabIndex={0}
@@ -106,7 +110,9 @@ export function YwsBreakdownSection({
           {/* Left: Title + Score */}
           <div className="min-w-0 flex-1">
             <h3 className="text-[15px] font-semibold text-white">
-              {title}{' '}
+              {title}
+              {tooltip && <InfoTooltip text={tooltip} className="ml-1.5 align-middle" />}
+              {' '}
               <span style={{ color: scoreColor }} className="tabular-nums">{displayScore}</span>
               <span className="text-[13px] font-normal text-zinc-500 tabular-nums">/{maxScore}</span>
             </h3>

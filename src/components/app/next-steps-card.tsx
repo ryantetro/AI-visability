@@ -26,10 +26,10 @@ export function NextStepsCard() {
       key: 'report',
       icon: FileText,
       iconColor: '#3b82f6',
-      title: 'View your full report',
-      description: 'See your AI visibility score breakdown and fix recommendations.',
+      title: 'See your score & fixes',
+      description: 'View your full AI visibility breakdown and what to fix to rank higher with ChatGPT and Perplexity.',
       href: '/report',
-      cta: 'View Report',
+      cta: 'See Your Score',
     });
   }
 
@@ -39,10 +39,10 @@ export function NextStepsCard() {
       key: 'tracking',
       icon: Code2,
       iconColor: '#a855f7',
-      title: 'Install tracking script',
-      description: 'See which AI bots crawl your site and which AI engines send you visitors.',
+      title: 'Track AI bot visits',
+      description: 'See which AI crawlers visit your site (ChatGPT, Perplexity, etc.) and which send you real visitors. Takes ~5 min to install.',
       href: '/dashboard#tracking',
-      cta: 'Set Up Tracking',
+      cta: 'Install Tracking (5 min)',
     });
   }
 
@@ -52,10 +52,10 @@ export function NextStepsCard() {
       key: 'monitoring',
       icon: Radio,
       iconColor: '#25c972',
-      title: 'Enable monitoring',
-      description: 'Get weekly scans and alerts when your score changes.',
+      title: 'Get weekly score updates',
+      description: 'Automatic weekly scans so you know when your AI visibility improves or drops.',
       href: '/dashboard#monitoring',
-      cta: 'Enable Now',
+      cta: 'Enable Weekly Scans',
     });
   }
 

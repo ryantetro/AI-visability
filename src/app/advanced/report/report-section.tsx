@@ -253,8 +253,10 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           const mentionFail = engines.filter((e) => mentions.engineStatus[e]?.status === 'complete' && (engineBd[e]?.mentioned ?? 0) === 0 && (engineBd[e]?.total ?? 0) > 0).length;
 
           return (
+            <div id="section-ai-mentions" className="scroll-mt-4 rounded-xl transition-all duration-500">
             <YwsBreakdownSection
               title="AI Mentions"
+              tooltip="How often AI engines mention your brand when users ask relevant questions. Based on live queries to ChatGPT, Perplexity, Gemini, and Claude."
               score={mentions.overallScore}
               scoreColor={scoreColor(mentions.overallScore)}
               passCount={mentionPass}
@@ -329,13 +331,15 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               showClickHint={false}
               hasPaid={hasPaid}
             />
+            </div>
           );
         })()}
 
         {/* ─── Repair Queue ─── */}
         {fixes.length > 0 && (
+          <div id="section-repair-queue" className="scroll-mt-4 rounded-xl transition-all duration-500">
           <YwsBreakdownSection
-            title="Repair Queue"
+            title="Priority Fixes"
             score={null}
             maxScore={fixes.length}
             scoreColor={scoreColor(null)}
@@ -350,6 +354,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
             defaultExpanded={false}
             hasPaid={hasPaid}
           />
+          </div>
         )}
 
         {/* ─── AI Readiness (File Presence + Structured Data + AI Registration) ─── */}
@@ -361,14 +366,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           const avgScore = Math.round(readinessDims.reduce((s, d) => s + d.percentage, 0) / readinessDims.length);
           const readinessPrompt = copyToLlm?.sectionPrompts.aiReadiness?.prompt;
           return (
+            <div id="section-ai-readiness" className="scroll-mt-4 rounded-xl transition-all duration-500">
             <YwsBreakdownSection
-              title="AI Readiness"
+              title="AI Discoverability"
+              tooltip="Whether AI crawlers can find and understand your site. Checks robots.txt, structured data, schema markup, and AI-specific registration files."
               score={avgScore}
               scoreColor={scoreColor(avgScore)}
               onCopyToLlm={readinessPrompt ? () => handleCopyPrompt('aiReadiness', readinessPrompt) : undefined}
               copied={copiedPromptKey === 'aiReadiness'}
-              copyLabel="Copy section fix prompt"
-              copiedLabel="Copied section prompt"
+              copyLabel="Copy AI discoverability fixes to ChatGPT"
+              copiedLabel="Copied!"
               passCount={allChecks.filter((c) => c.verdict === 'pass').length}
               failCount={allChecks.filter((c) => c.verdict === 'fail').length}
               unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
@@ -381,6 +388,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               showClickHint={true}
               hasPaid={hasPaid}
             />
+            </div>
           );
         })()}
 
@@ -393,14 +401,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           const avgScore = Math.round(contentDims.reduce((s, d) => s + d.percentage, 0) / contentDims.length);
           const contentPrompt = copyToLlm?.sectionPrompts.contentAuthority?.prompt;
           return (
+            <div id="section-content-authority" className="scroll-mt-4 rounded-xl transition-all duration-500">
             <YwsBreakdownSection
-              title="Content & Authority"
+              title="Content & Expertise"
+              tooltip="How well your content demonstrates expertise and authority. Includes content quality signals, topical depth, and clear brand identity."
               score={avgScore}
               scoreColor={scoreColor(avgScore)}
               onCopyToLlm={contentPrompt ? () => handleCopyPrompt('contentAuthority', contentPrompt) : undefined}
               copied={copiedPromptKey === 'contentAuthority'}
-              copyLabel="Copy section fix prompt"
-              copiedLabel="Copied section prompt"
+              copyLabel="Copy content fixes to ChatGPT"
+              copiedLabel="Copied!"
               passCount={allChecks.filter((c) => c.verdict === 'pass').length}
               failCount={allChecks.filter((c) => c.verdict === 'fail').length}
               unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
@@ -412,6 +422,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               defaultExpanded={false}
               hasPaid={hasPaid}
             />
+            </div>
           );
         })()}
 
@@ -436,14 +447,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
           const qualityPrompt = copyToLlm?.sectionPrompts.websiteQuality?.prompt;
 
           return (
+            <div id="section-website-quality" className="scroll-mt-4 rounded-xl transition-all duration-500">
             <YwsBreakdownSection
               title="Website Quality"
+              tooltip="Core web standards that affect how AI and search engines perceive your site — meta tags, Open Graph, favicons, heading structure, and more."
               score={qualityPillar?.percentage ?? webHealth?.percentage ?? null}
               scoreColor={scoreColor(qualityPillar?.percentage ?? webHealth?.percentage ?? null)}
               onCopyToLlm={qualityPrompt ? () => handleCopyPrompt('websiteQuality', qualityPrompt) : undefined}
               copied={copiedPromptKey === 'websiteQuality'}
-              copyLabel="Copy section fix prompt"
-              copiedLabel="Copied section prompt"
+              copyLabel="Copy quality fixes to ChatGPT"
+              copiedLabel="Copied!"
               passCount={qualityPass}
               failCount={qualityFail}
               unknownCount={qualityUnknown}
@@ -457,6 +470,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               defaultExpanded={false}
               hasPaid={hasPaid}
             />
+            </div>
           );
         })()}
 
@@ -475,14 +489,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
             : secScore ?? perfScore;
           const performancePrompt = copyToLlm?.sectionPrompts.performanceSecurity?.prompt;
           return (
+            <div id="section-performance-security" className="scroll-mt-4 rounded-xl transition-all duration-500">
             <YwsBreakdownSection
               title="Performance & Security"
+              tooltip="Page speed (Core Web Vitals) and security signals (HTTPS, headers, CSP). Fast, secure sites are more trusted by AI systems."
               score={avgScore}
               scoreColor={scoreColor(avgScore)}
               onCopyToLlm={performancePrompt ? () => handleCopyPrompt('performanceSecurity', performancePrompt) : undefined}
               copied={copiedPromptKey === 'performanceSecurity'}
-              copyLabel="Copy section fix prompt"
-              copiedLabel="Copied section prompt"
+              copyLabel="Copy security fixes to ChatGPT"
+              copiedLabel="Copied!"
               passCount={totalPass}
               failCount={totalFail}
               unknownCount={totalUnknown}
@@ -494,6 +510,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               defaultExpanded={false}
               hasPaid={hasPaid}
             />
+            </div>
           );
         })()}
       </div>
@@ -508,6 +525,7 @@ interface ActionStep {
   title: string;
   description: string;
   priority: 'high' | 'medium' | 'low';
+  scrollTarget?: string;
   action?: { label: string; onClick?: () => void; href?: string };
 }
 
@@ -544,6 +562,7 @@ function TakeActionSection({
       title: 'Install generated fix files on your site',
       description: `We generated ${files.files.length} file${files.files.length > 1 ? 's' : ''} to improve your AI visibility. Download and add ${files.files.length > 1 ? 'them' : 'it'} to your website root directory.`,
       priority: 'high',
+      scrollTarget: 'section-ai-readiness',
     });
   }
 
@@ -554,6 +573,7 @@ function TakeActionSection({
       title: 'Copy fix prompt into ChatGPT or Claude',
       description: 'Use the full-site fix prompt with an AI assistant to get step-by-step implementation guidance tailored to your site.',
       priority: 'high',
+      scrollTarget: 'section-repair-queue',
       action: {
         label: copiedPromptKey === 'action-full' ? 'Copied!' : 'Copy fix prompt',
         onClick: () => onCopyPrompt('action-full', copyToLlm.fullPrompt),
@@ -572,6 +592,7 @@ function TakeActionSection({
         title: 'Increase your AI mentions',
         description: `You're only visible on ${engineCount}/${totalEngines} AI engines. Add structured data, improve your content authority, and ensure your brand name appears in relevant industry contexts to get mentioned more.`,
         priority: mentionScore < 25 ? 'high' : 'medium',
+        scrollTarget: 'section-ai-mentions',
       });
     }
   }
@@ -586,6 +607,7 @@ function TakeActionSection({
         ? `Fix these issues: ${failedChecks.slice(0, 3).map((c) => c.label).join(', ')}${failedChecks.length > 3 ? ` and ${failedChecks.length - 3} more` : ''}.`
         : 'Improve your site quality score by fixing Open Graph tags, meta descriptions, and heading structure.',
       priority: qualityPillar.percentage < 50 ? 'high' : 'medium',
+      scrollTarget: 'section-website-quality',
     });
   }
 
@@ -596,6 +618,7 @@ function TakeActionSection({
       title: 'Strengthen trust & security',
       description: 'Add security headers, ensure HTTPS is enforced, and implement a Content Security Policy to improve your trust signals.',
       priority: 'medium',
+      scrollTarget: 'section-performance-security',
     });
   }
 
@@ -606,6 +629,7 @@ function TakeActionSection({
       title: 'Improve page speed',
       description: 'Optimize images, reduce JavaScript blocking, and improve Largest Contentful Paint to boost performance scores.',
       priority: 'medium',
+      scrollTarget: 'section-performance-security',
     });
   }
 
@@ -617,6 +641,7 @@ function TakeActionSection({
       title: `Quick win: ${topFix.label}`,
       description: `${topFix.instruction} (estimated +${topFix.estimatedLift} points, ${topFix.effortBand} effort)`,
       priority: 'medium',
+      scrollTarget: 'section-repair-queue',
     });
   }
 
@@ -646,9 +671,24 @@ function TakeActionSection({
 
       <div className="space-y-3">
         {steps.slice(0, 5).map((step, index) => (
-          <div
+          <button
             key={`action-${index}`}
-            className="flex items-start gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4"
+            type="button"
+            onClick={() => {
+              if (step.scrollTarget) {
+                const el = document.getElementById(step.scrollTarget);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  // Briefly highlight the target section
+                  el.classList.add('ring-2', 'ring-emerald-500/40');
+                  setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-500/40'), 2000);
+                }
+              }
+            }}
+            className={cn(
+              'flex w-full items-start gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 text-left transition-colors',
+              step.scrollTarget && 'cursor-pointer hover:border-emerald-500/20 hover:bg-emerald-500/[0.03]',
+            )}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-zinc-400">
               <span className="text-xs font-bold text-zinc-300">{index + 1}</span>
@@ -667,6 +707,9 @@ function TakeActionSection({
                     Priority
                   </span>
                 )}
+                {step.scrollTarget && (
+                  <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 text-zinc-600" />
+                )}
               </div>
               <p className="mt-1 text-xs leading-relaxed text-zinc-400">{step.description}</p>
               {step.action && (
@@ -676,24 +719,27 @@ function TakeActionSection({
                       href={step.action.href}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
                     >
                       {step.action.label}
                       <ArrowUpRight className="h-3 w-3" />
                     </a>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={step.action.onClick}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); step.action?.onClick?.(); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); step.action?.onClick?.(); } }}
                       className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
                     >
                       {step.action.label}
-                    </button>
+                    </span>
                   )}
                 </div>
               )}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

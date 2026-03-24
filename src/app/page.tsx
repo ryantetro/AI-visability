@@ -67,7 +67,7 @@ export default function Home() {
           <div className="mb-8 flex justify-center animate-hero-fade" style={{ animationDelay: '0ms' }}>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-1.5 text-[12px] font-medium tracking-wide text-white/40 uppercase">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-primary-400)] animate-pulse" />
-              AI Search Optimization
+              See How AI Finds Your Business
             </span>
           </div>
 
@@ -75,14 +75,14 @@ export default function Home() {
             className="text-4xl font-bold leading-[1.08] tracking-tight animate-hero-fade sm:text-5xl lg:text-6xl text-text-primary"
             style={{ animationDelay: '80ms' }}
           >
-            Is your business visible
+            Can ChatGPT and Perplexity
             <br />
-            <span className="bg-gradient-to-r from-[var(--color-primary-300)] to-[var(--color-primary-500)] bg-clip-text text-transparent">to AI search?</span>
+            <span className="bg-gradient-to-r from-[var(--color-primary-300)] to-[var(--color-primary-500)] bg-clip-text text-transparent">find your business?</span>
           </h1>
 
           <p className="mx-auto mt-5 max-w-lg text-[17px] leading-relaxed animate-hero-fade text-white/45" style={{ animationDelay: '160ms' }}>
-            ChatGPT, Perplexity, and Gemini are replacing Google for millions of searches.
-            See if they can find and recommend your business.
+            Your customers are asking AI for recommendations.
+            Find out if AI can find and recommend you — in 30 seconds.
           </p>
 
           <div className="mt-10 flex justify-center animate-hero-fade" style={{ animationDelay: '240ms' }}>
@@ -141,9 +141,9 @@ export default function Home() {
           </p>
           <div className="mt-14 grid gap-8 sm:grid-cols-3 stagger-children">
             {[
-              { step: '1', title: 'Enter your URL', desc: 'We crawl your site with real browser rendering — checking 19 factors across files, schema, content, and AI bot access.' },
-              { step: '2', title: 'See your score', desc: 'Get a 0-100 AI visibility score across 6 dimensions with a prioritized list of what to fix, sorted by ROI.' },
-              { step: '3', title: 'Fix everything', desc: 'Download ready-to-install files: llms.txt, robots.txt directives, JSON-LD schema, and sitemap — customized for your site.' },
+              { step: '1', title: 'Enter your URL', desc: 'We crawl your site the same way AI bots do — checking 19 factors across content, structure, and AI crawler access.' },
+              { step: '2', title: 'See your score', desc: 'Get a 0–100 score with a clear breakdown of what AI engines can (and can\u2019t) find, plus a prioritized fix list.' },
+              { step: '3', title: 'Fix everything', desc: 'Download ready-to-install files customized for your site — plus copy-paste prompts for ChatGPT or Claude to guide you step by step.' },
             ].map((item) => (
               <div key={item.step} className="text-center">
                 <div
@@ -191,12 +191,12 @@ export default function Home() {
           </p>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
             {[
-              { title: 'File Presence', desc: 'robots.txt, sitemap.xml, llms.txt — the files AI crawlers look for first.', pts: '20 pts' },
-              { title: 'Structured Data', desc: 'JSON-LD schema markup that tells AI who you are and what you do.', pts: '20 pts' },
-              { title: 'Content Signals', desc: 'About pages, service depth, freshness, and contact information.', pts: '20 pts' },
-              { title: 'Topical Authority', desc: 'Keyword focus, internal linking, and content depth across your site.', pts: '20 pts' },
-              { title: 'Entity Clarity', desc: 'Brand consistency, social proof links, and authority signals.', pts: '10 pts' },
-              { title: 'AI Registration', desc: 'GPTBot, PerplexityBot, ClaudeBot access and llms.txt references.', pts: '10 pts' },
+              { title: 'Crawler Access', desc: 'Can AI bots find your key files? We check robots.txt, sitemap, and llms.txt.', pts: '20 pts' },
+              { title: 'Structured Data', desc: 'Does your site tell AI who you are? We check for schema markup that describes your business.', pts: '20 pts' },
+              { title: 'Content Quality', desc: 'Can AI pull useful info from your pages? We check about pages, service descriptions, and freshness.', pts: '20 pts' },
+              { title: 'Your Expertise', desc: 'Do you publish consistently about what you offer? We check topic focus, linking, and depth.', pts: '20 pts' },
+              { title: 'Your Identity', desc: 'Are you recognizable across the web? We check brand consistency and authority signals.', pts: '10 pts' },
+              { title: 'AI Access', desc: 'Have you given AI engines explicit permission to crawl? We check bot access rules and AI-specific files.', pts: '10 pts' },
             ].map((dim) => (
               <div
                 key={dim.title}
@@ -230,12 +230,12 @@ export default function Home() {
           <div className="mt-10">
             <Accordion type="single" collapsible className="w-full">
               {[
-                { q: 'What is AI search optimization?', a: 'AI search engines like ChatGPT, Perplexity, and Gemini are increasingly used to find businesses. Unlike traditional SEO, AI search relies on structured data, llms.txt files, and entity clarity to recommend your business. AISO audits how well your site is optimized for these AI crawlers.' },
-                { q: 'What is an llms.txt file?', a: 'llms.txt is a proposed standard (like robots.txt for AI). It\'s a markdown file at your site root that describes your organization, key pages, and services in a format AI models can easily parse. AISO generates a custom llms.txt from your actual site content.' },
-                { q: 'How does the scoring work?', a: 'We crawl your site using a real browser (same as AI crawlers), then run 19 checks across 6 dimensions: File Presence, Structured Data, Content Signals, Topical Authority, Entity Clarity, and AI Registration. Each check returns PASS, FAIL, or UNKNOWN. Total score is 0-100.' },
-                { q: 'Is the audit really free?', a: 'Yes. The full audit with score breakdown is free. You only pay if you want auto-generated fix files (llms.txt, robots.txt, JSON-LD schema, sitemap) with step-by-step install instructions.' },
-                { q: 'How long does the scan take?', a: 'About 30 seconds. We crawl up to 10 pages using real browser rendering, check robots.txt, sitemap.xml, and llms.txt, extract structured data, and score everything in real time.' },
-                { q: 'Will you crawl my site safely?', a: 'Yes. We respect robots.txt, crawl at 1 request per second, limit to 10 pages, and use standard browser rendering. We don\'t store your content beyond the audit duration.' },
+                { q: 'Is the audit really free?', a: 'Yes. The full audit with score breakdown is completely free — no credit card required. You only pay if you want auto-generated fix files and ongoing monitoring.' },
+                { q: 'How long does the scan take?', a: 'About 30 seconds. We crawl up to 10 pages, check your key files, extract structured data, and score everything in real time.' },
+                { q: 'Will you crawl my site safely?', a: 'Yes. We respect robots.txt, crawl at 1 request per second, limit to 10 pages, and use standard browser rendering. We don\'t store your content beyond the audit.' },
+                { q: 'What is AI search optimization?', a: 'AI search engines like ChatGPT, Perplexity, and Gemini are increasingly used to find businesses. Unlike traditional SEO, AI search relies on structured data, special files, and clear content to recommend your business. AISO audits how well your site is optimized for these AI platforms.' },
+                { q: 'How does the scoring work?', a: 'We check 19 factors across 6 categories: Crawler Access, Structured Data, Content Quality, Your Expertise, Your Identity, and AI Access. Higher score means AI engines can find and recommend you more easily. Scores range from 0–100.' },
+                { q: 'What is an llms.txt file?', a: 'llms.txt is a new standard (like robots.txt, but for AI). It\'s a file on your site that describes your business in a format AI models can easily read. AISO generates a custom one from your actual site content.' },
               ].map((item, index) => (
                 <AccordionItem key={index} value={`item-${index}`}>
                   <AccordionTrigger className="text-left text-lg hover:no-underline" style={{ color: 'var(--text-primary)' }}>
@@ -254,10 +254,10 @@ export default function Home() {
       {/* Bottom CTA */}
       <section className="relative px-4 py-24 text-center">
         <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-          Ready to check your AI visibility?
+          Most businesses aren&apos;t optimized for AI search yet
         </h2>
         <p className="mx-auto mt-3 max-w-md text-white/40">
-          Free audit. Real crawling. Actionable fixes. One login, then you&apos;re set.
+          See what ChatGPT knows about you — takes 30 seconds, completely free.
         </p>
         <UrlInput onSubmit={handleSubmit} loading={loading} variant="elevated" className="mx-auto mt-8" />
       </section>
