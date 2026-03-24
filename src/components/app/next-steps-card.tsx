@@ -40,8 +40,8 @@ export function NextStepsCard() {
       icon: Code2,
       iconColor: '#a855f7',
       title: 'Install tracking script',
-      description: 'See which AI bots crawl your site in real time.',
-      href: '/settings#tracking',
+      description: 'See which AI bots crawl your site and which AI engines send you visitors.',
+      href: '/dashboard#tracking',
       cta: 'Set Up Tracking',
     });
   }
@@ -74,6 +74,16 @@ export function NextStepsCard() {
             <p className="mt-1 text-[12px] leading-5 text-zinc-500">{card.description}</p>
             <Link
               href={card.href}
+              onClick={(e) => {
+                const hash = card.href.split('#')[1];
+                if (hash) {
+                  const el = document.getElementById(hash);
+                  if (el) {
+                    e.preventDefault();
+                    el.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }
+              }}
               className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#356df4] transition-colors hover:text-[#5b8af7]"
             >
               {card.cta}

@@ -18,12 +18,12 @@ interface ProviderTimelineRow {
   [provider: string]: string | number;
 }
 
-export function AICrawlerPanel({ domain }: { domain: string }) {
+export function AICrawlerPanel({ domain, trackingReady: trackingReadyProp }: { domain: string; trackingReady?: boolean }) {
   const searchParams = useSearchParams();
   const [providerTimeline, setProviderTimeline] = useState<ProviderTimelineRow[]>([]);
   const [providerSummaries, setProviderSummaries] = useState<ProviderTrafficSummary[]>([]);
   const [totalVisits, setTotalVisits] = useState(0);
-  const [trackingReady, setTrackingReady] = useState(false);
+  const [internalTrackingReady, setInternalTrackingReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
   const reportParam = searchParams.get('report');
@@ -31,15 +31,23 @@ export function AICrawlerPanel({ domain }: { domain: string }) {
     ? `/settings?report=${encodeURIComponent(reportParam)}`
     : '/settings';
 
+  // Use prop when provided (dashboard lifts state), otherwise fetch internally (brand page)
+  const trackingReady = trackingReadyProp ?? internalTrackingReady;
+
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [crawlerRes, trackingRes] = await Promise.all([
+        const fetches: Promise<Response>[] = [
           fetch(`/api/crawler-visits?domain=${encodeURIComponent(domain)}&days=${days}`),
-          fetch(`/api/user/tracking-key?domain=${encodeURIComponent(domain)}`),
-        ]);
+        ];
+        // Only fetch tracking key if not provided via prop
+        if (trackingReadyProp === undefined) {
+          fetches.push(fetch(`/api/user/tracking-key?domain=${encodeURIComponent(domain)}`));
+        }
 
+        const results = await Promise.all(fetches);
+        const crawlerRes = results[0];
         if (crawlerRes.ok) {
           const data = await crawlerRes.json();
           setProviderTimeline(data.providerTimeline ?? []);
@@ -47,13 +55,13 @@ export function AICrawlerPanel({ domain }: { domain: string }) {
           setTotalVisits(data.totalVisits ?? 0);
         }
 
-        if (trackingRes.ok) {
-          const data = await trackingRes.json();
-          setTrackingReady(Boolean(data.siteKey));
+        if (trackingReadyProp === undefined && results[1]?.ok) {
+          const data = await results[1].json();
+          setInternalTrackingReady(Boolean(data.siteKey));
         }
       } catch { /* silently fail */ } finally { setLoading(false); }
     })();
-  }, [domain, days]);
+  }, [domain, days, trackingReadyProp]);
 
   if (loading) {
     return (
@@ -96,7 +104,7 @@ export function AICrawlerPanel({ domain }: { domain: string }) {
             <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-zinc-400">
               {trackingReady
                 ? 'Your domain already has a tracking key. Once GPTBot, PerplexityBot, ClaudeBot, and other crawlers hit your site, their visits will begin showing up here automatically.'
-                : 'AI bots do not run browser JavaScript, so this panel stays empty until you install the server-side middleware snippet from Settings. Once it is live on your site, visits will flow into this chart automatically.'}
+                : 'Install the server-side tracking snippet from Settings to detect AI bot crawlers and human visitors arriving from AI engines. One snippet powers both.'}
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -121,7 +129,7 @@ export function AICrawlerPanel({ domain }: { domain: string }) {
                   ? 'Open Settings if you want to review, copy, or regenerate the existing site key.'
                   : 'Generate a tracking key in Settings for this domain.',
                 'Paste the server-side middleware snippet into your Next.js or Express app.',
-                'Deploy the change, then wait for the next AI crawler request to populate this panel.',
+                'Deploy the change, then wait for the first AI crawler or referral visit to populate these charts.',
               ].map((step, index) => (
                 <div key={step} className="flex gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-3">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[11px] font-semibold text-zinc-300">

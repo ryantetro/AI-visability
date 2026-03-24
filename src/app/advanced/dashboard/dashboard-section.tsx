@@ -70,6 +70,23 @@ export function DashboardSection({
   const [platformPeriod, setPlatformPeriod] = useState<'7d' | '30d' | '3m'>('30d');
   const [renderedAt] = useState(() => Date.now());
 
+  // Lift tracking-ready state so both panels share one API call
+  const [trackingReady, setTrackingReady] = useState(false);
+  const [trackingLoading, setTrackingLoading] = useState(true);
+  useEffect(() => {
+    if (!domain) return;
+    let cancelled = false;
+    setTrackingLoading(true);
+    fetch(`/api/user/tracking-key?domain=${encodeURIComponent(domain)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setTrackingReady(Boolean(data.siteKey));
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setTrackingLoading(false); });
+    return () => { cancelled = true; };
+  }, [domain]);
+
   // Platform performance — include configured, unavailable, and backfill states.
   const mentionResults = mentions?.results ?? [];
   const platformCards = AI_ENGINES.map((engine) => {
@@ -551,10 +568,12 @@ export function DashboardSection({
       />
 
       {/* AI Crawler Traffic */}
-      <AICrawlerPanel domain={domain} />
+      <div id="tracking" className="scroll-mt-6">
+        <AICrawlerPanel domain={domain} trackingReady={trackingReady} />
+      </div>
 
-      {/* AI Referral Traffic */}
-      <AIReferralPanel domain={domain} />
+      {/* AI Referral Traffic — only render when tracking is configured */}
+      {trackingReady && <AIReferralPanel domain={domain} trackingReady={trackingReady} />}
 
       {/* Recent Scans removed — redundant with sidebar domain list */}
     </div>

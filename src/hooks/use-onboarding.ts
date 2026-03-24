@@ -74,7 +74,7 @@ export function useOnboarding() {
       key: 'install_tracking',
       label: 'Install tracking script',
       completed: trackingInstalled,
-      href: '/settings#tracking',
+      href: '/dashboard#tracking',
     },
     {
       key: 'enable_monitoring',

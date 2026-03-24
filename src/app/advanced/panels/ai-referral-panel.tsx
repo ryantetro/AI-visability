@@ -1,12 +1,10 @@
 'use client';
 
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { ArrowRight, CheckCircle2, Code2, ExternalLink, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { CheckCircle2, ExternalLink, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import { cn } from '@/lib/utils';
 import { REFERRER_ENGINE_ORDER, REFERRER_ENGINE_LABELS, ENGINE_COLORS } from '../lib/constants';
@@ -18,38 +16,23 @@ interface EngineTimelineRow {
   [engine: string]: string | number;
 }
 
-export function AIReferralPanel({ domain }: { domain: string }) {
-  const searchParams = useSearchParams();
+export function AIReferralPanel({ domain, trackingReady }: { domain: string; trackingReady: boolean }) {
   const [engineTimeline, setEngineTimeline] = useState<EngineTimelineRow[]>([]);
   const [engineSummaries, setEngineSummaries] = useState<ReferralTrafficSummary[]>([]);
   const [totalVisits, setTotalVisits] = useState(0);
-  const [trackingReady, setTrackingReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
-  const reportParam = searchParams.get('report');
-  const settingsHref = reportParam
-    ? `/settings?report=${encodeURIComponent(reportParam)}`
-    : '/settings';
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [referralRes, trackingRes] = await Promise.all([
-          fetch(`/api/referral-visits?domain=${encodeURIComponent(domain)}&days=${days}`),
-          fetch(`/api/user/tracking-key?domain=${encodeURIComponent(domain)}`),
-        ]);
-
+        const referralRes = await fetch(`/api/referral-visits?domain=${encodeURIComponent(domain)}&days=${days}`);
         if (referralRes.ok) {
           const data = await referralRes.json();
           setEngineTimeline(data.engineTimeline ?? []);
           setEngineSummaries(data.engineSummaries ?? []);
           setTotalVisits(data.totalVisits ?? 0);
-        }
-
-        if (trackingRes.ok) {
-          const data = await trackingRes.json();
-          setTrackingReady(Boolean(data.siteKey));
         }
       } catch { /* silently fail */ } finally { setLoading(false); }
     })();
@@ -72,57 +55,35 @@ export function AIReferralPanel({ domain }: { domain: string }) {
     return (
       <DashboardPanel className="p-6">
         <SectionTitle eyebrow="AI Referrals" title="AI Referral Traffic" description="Human visitors arriving from AI engines." />
-        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_320px]">
-          <div className="rounded-[1.4rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.015)_100%)] p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={cn(
-                'inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]',
-                trackingReady
-                  ? 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                  : 'border border-amber-500/20 bg-amber-500/10 text-amber-300'
-              )}>
-                {trackingReady ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Code2 className="h-3.5 w-3.5" />}
-                {trackingReady ? 'Tracking configured' : 'Setup required'}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-zinc-500">
-                <ExternalLink className="h-3 w-3" />
-                Referrer detection
-              </span>
-            </div>
-
-            <h3 className="mt-4 text-lg font-semibold text-white">
-              {trackingReady ? 'Tracking is armed. Waiting for the first AI referral.' : 'No tracking snippet installed yet.'}
-            </h3>
-            <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-zinc-400">
-              {trackingReady
-                ? 'Your snippet includes referrer detection. When someone clicks through to your site from ChatGPT, Perplexity, Gemini, or Claude, visits will appear here.'
-                : 'Install the latest tracking snippet from Settings to detect human visitors arriving from AI engines. This requires updating your existing snippet to the latest version.'}
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link
-                href={settingsHref}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                {trackingReady ? 'Open Tracking Setup' : 'Set Up Referral Tracking'}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-              <div className="inline-flex items-center rounded-xl border border-white/8 bg-white/[0.025] px-4 py-2.5 text-[11px] text-zinc-500">
-                Referrals will appear here after a visitor clicks through from an AI engine.
-              </div>
-            </div>
+        <div className="mt-5 rounded-[1.4rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.015)_100%)] p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Tracking active
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-zinc-500">
+              <ExternalLink className="h-3 w-3" />
+              Referrer detection
+            </span>
           </div>
 
-          <div className="rounded-[1.4rem] border border-white/8 bg-[#0b0b0d] p-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Supported Engines</p>
-            <div className="mt-4 space-y-3">
-              {REFERRER_ENGINE_ORDER.map((engine) => (
-                <div key={engine} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-3">
-                  <EngineIcon engine={engine} className="size-5" style={{ color: ENGINE_COLORS[engine] }} />
-                  <p className="text-[12px] leading-5 text-zinc-400">{REFERRER_ENGINE_LABELS[engine]}</p>
-                </div>
-              ))}
-            </div>
+          <h3 className="mt-4 text-lg font-semibold text-white">
+            Waiting for the first AI referral.
+          </h3>
+          <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-zinc-400">
+            Your tracking snippet includes referrer detection. When someone clicks through to your site from an AI engine, visits will appear here automatically.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {REFERRER_ENGINE_ORDER.map((engine) => (
+              <span
+                key={engine}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1"
+              >
+                <EngineIcon engine={engine} className="size-3.5" style={{ color: ENGINE_COLORS[engine] }} />
+                <span className="text-[11px] font-medium text-zinc-400">{REFERRER_ENGINE_LABELS[engine]}</span>
+              </span>
+            ))}
           </div>
         </div>
       </DashboardPanel>

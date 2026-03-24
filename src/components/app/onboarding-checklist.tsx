@@ -47,6 +47,16 @@ export function OnboardingChecklist() {
             <Link
               key={step.key}
               href={step.href}
+              onClick={(e) => {
+                const hash = step.href.split('#')[1];
+                if (hash) {
+                  const el = document.getElementById(hash);
+                  if (el) {
+                    e.preventDefault();
+                    el.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }
+              }}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors',
                 isNext ? 'bg-[#356df4]/8' : 'hover:bg-white/[0.03]'
