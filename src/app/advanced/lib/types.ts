@@ -206,6 +206,13 @@ export interface ProviderTrafficSummary {
   uniquePaths: number;
 }
 
+export interface ReferralTrafficSummary {
+  engine: string;
+  visits: number;
+  trend: number;
+  uniquePages: number;
+}
+
 export interface ContentGap {
   promptText: string;
   category: string;

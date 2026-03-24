@@ -123,6 +123,23 @@ export interface CrawlerVisitService {
   listVisitSummaries(domain: string, days?: number): Promise<CrawlerVisitSummary[]>;
 }
 
+export type SourceEngine = 'chatgpt' | 'perplexity' | 'gemini' | 'claude';
+
+export interface ReferralVisit {
+  id: string;
+  domain: string;
+  sourceEngine: SourceEngine;
+  referrerUrl: string | null;
+  landingPage: string;
+  userAgent: string | null;
+  visitedAt: string;
+}
+
+export interface ReferralVisitService {
+  logVisit(visit: Omit<ReferralVisit, 'id' | 'visitedAt'>): Promise<void>;
+  listVisits(domain: string, days?: number): Promise<ReferralVisit[]>;
+}
+
 export interface AlertService {
   sendScoreAlert(params: {
     domain: string;

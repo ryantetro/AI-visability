@@ -44,6 +44,14 @@ const BOT_TRACKING_SNIPPET_BOTS = `{
   'Google-Extended': 'training',
 }`;
 
+const BOT_TRACKING_SNIPPET_REFERRERS = `{
+  'chat.openai.com': 'chatgpt',
+  'chatgpt.com': 'chatgpt',
+  'perplexity.ai': 'perplexity',
+  'gemini.google.com': 'gemini',
+  'claude.ai': 'claude',
+}`;
+
 const REPORT_PROMPT_SECTION_META: Record<ReportPromptSectionKey, {
   label: string;
   dimensions?: DimensionKey[];
@@ -369,9 +377,12 @@ function buildNextBotTrackingSnippet(appUrl: string, siteKey: string): string {
 
 const AI_BOTS = ${BOT_TRACKING_SNIPPET_BOTS};
 
+const AI_REFERRERS = ${BOT_TRACKING_SNIPPET_REFERRERS};
+
 export function middleware(request) {
   const ua = request.headers.get('user-agent') || '';
 
+  // Check for AI bot crawlers
   for (const [bot, cat] of Object.entries(AI_BOTS)) {
     if (ua.includes(bot)) {
       fetch('${appUrl}/api/track', {
@@ -389,6 +400,31 @@ export function middleware(request) {
     }
   }
 
+  // Check for human visitors arriving from AI engines
+  const referer = request.headers.get('referer') || '';
+  if (referer) {
+    try {
+      const refHost = new URL(referer).hostname;
+      for (const [host, engine] of Object.entries(AI_REFERRERS)) {
+        if (refHost === host || refHost.endsWith('.' + host)) {
+          fetch('${appUrl}/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sk: '${siteKey}',
+              t: 'ref',
+              se: engine,
+              ref: referer.slice(0, 2048),
+              p: request.nextUrl.pathname,
+              ua,
+            }),
+          }).catch(() => {});
+          break;
+        }
+      }
+    } catch {}
+  }
+
   return NextResponse.next();
 }`;
 }
@@ -396,9 +432,12 @@ export function middleware(request) {
 function buildExpressBotTrackingSnippet(appUrl: string, siteKey: string): string {
   return `const BOTS = ${BOT_TRACKING_SNIPPET_BOTS};
 
+const AI_REFERRERS = ${BOT_TRACKING_SNIPPET_REFERRERS};
+
 app.use((req, res, next) => {
   const ua = req.headers['user-agent'] || '';
 
+  // Check for AI bot crawlers
   for (const [bot, cat] of Object.entries(BOTS)) {
     if (ua.includes(bot)) {
       fetch('${appUrl}/api/track', {
@@ -414,6 +453,31 @@ app.use((req, res, next) => {
       }).catch(() => {});
       break;
     }
+  }
+
+  // Check for human visitors arriving from AI engines
+  const referer = req.headers['referer'] || '';
+  if (referer) {
+    try {
+      const refHost = new URL(referer).hostname;
+      for (const [host, engine] of Object.entries(AI_REFERRERS)) {
+        if (refHost === host || refHost.endsWith('.' + host)) {
+          fetch('${appUrl}/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sk: '${siteKey}',
+              t: 'ref',
+              se: engine,
+              ref: referer.slice(0, 2048),
+              p: req.path,
+              ua,
+            }),
+          }).catch(() => {});
+          break;
+        }
+      }
+    } catch {}
   }
 
   next();

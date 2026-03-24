@@ -1,4 +1,4 @@
-import { DatabaseService, PaymentService, AIService, AlertService, PromptMonitoringService, CrawlerVisitService } from '@/types/services';
+import { DatabaseService, PaymentService, AIService, AlertService, PromptMonitoringService, CrawlerVisitService, ReferralVisitService } from '@/types/services';
 import { mockDb } from './mock-db';
 import { mockPayment } from './mock-payment';
 import { mockAi } from './mock-ai';
@@ -13,6 +13,8 @@ import { supabasePromptMonitoring } from './supabase-prompt-monitoring';
 import { mockPromptMonitoring } from './mock-prompt-monitoring';
 import { supabaseCrawlerVisits } from './supabase-crawler-visits';
 import { mockCrawlerVisits } from './mock-crawler-visits';
+import { supabaseReferralVisits } from './supabase-referral-visits';
+import { mockReferralVisits } from './mock-referral-visits';
 import type { MentionTesterService } from '@/lib/ai-mentions/engine-tester';
 
 const FORCE_MOCKS = process.env.USE_MOCKS === 'true';
@@ -57,4 +59,10 @@ export function getCrawlerVisits(): CrawlerVisitService {
   if (FORCE_MOCKS) return mockCrawlerVisits;
   if (canUseSupabase()) return supabaseCrawlerVisits;
   return mockCrawlerVisits;
+}
+
+export function getReferralVisits(): ReferralVisitService {
+  if (FORCE_MOCKS) return mockReferralVisits;
+  if (canUseSupabase()) return supabaseReferralVisits;
+  return mockReferralVisits;
 }

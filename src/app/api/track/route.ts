@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCrawlerVisits } from '@/lib/services/registry';
+import { getCrawlerVisits, getReferralVisits } from '@/lib/services/registry';
 import { getSupabaseClient } from '@/lib/supabase';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DOMAIN_LIMIT_PER_HOUR = 500;
 const TOUCH_INTERVAL_MS = HOUR_MS;
 const VALID_CATEGORIES = new Set(['indexing', 'citation', 'training', 'unknown']);
+const VALID_ENGINES = new Set(['chatgpt', 'perplexity', 'gemini', 'claude']);
 
 type RateWindow = {
   count: number;
@@ -84,12 +85,75 @@ async function maybeTouchTrackingKey(params: { id: string; lastUsedAt: string | 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const siteKey = typeof body?.sk === 'string' ? body.sk.trim() : '';
+
+  if (!siteKey) {
+    return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+  }
+
+  // Referral event branch
+  const isReferral = body?.t === 'ref';
+
+  if (isReferral) {
+    const sourceEngine = typeof body?.se === 'string' ? body.se.trim() : '';
+    if (!sourceEngine || !VALID_ENGINES.has(sourceEngine)) {
+      return NextResponse.json({ error: 'Invalid source engine.' }, { status: 400 });
+    }
+
+    const supabase = getSupabaseClient();
+    const { data: trackingKey, error } = await supabase
+      .from('site_tracking_keys')
+      .select('id, domain, last_used_at')
+      .eq('site_key', siteKey)
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to validate tracking key.' }, { status: 500 });
+    }
+    if (!trackingKey) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const domain = normalizeDomain(trackingKey.domain);
+    if (!isValidDomain(domain)) {
+      return NextResponse.json({ error: 'Tracking key is misconfigured.' }, { status: 500 });
+    }
+
+    const rateLimit = checkDomainRateLimit(domain);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec) } }
+      );
+    }
+
+    const referrerUrl = typeof body?.ref === 'string' ? body.ref.trim().slice(0, 2048) : null;
+    const landingPage = normalizePath(body?.p);
+    const userAgent = typeof body?.ua === 'string' ? body.ua.trim() : '';
+
+    const referralVisits = getReferralVisits();
+    await referralVisits.logVisit({
+      domain,
+      sourceEngine: sourceEngine as 'chatgpt' | 'perplexity' | 'gemini' | 'claude',
+      referrerUrl: referrerUrl || null,
+      landingPage,
+      userAgent: userAgent || null,
+    });
+
+    void maybeTouchTrackingKey({
+      id: trackingKey.id,
+      lastUsedAt: trackingKey.last_used_at ?? null,
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  // Bot event branch (existing logic)
   const botName = typeof body?.bn === 'string' ? body.bn.trim() : '';
   const botCategory = coerceCategory(body?.bc);
   const pagePath = normalizePath(body?.p);
   const userAgent = typeof body?.ua === 'string' ? body.ua.trim() : '';
 
-  if (!siteKey || !botName) {
+  if (!botName) {
     return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
   }
 

@@ -151,6 +151,15 @@ export const PROVIDER_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
+export const REFERRER_ENGINE_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude'] as const;
+
+export const REFERRER_ENGINE_LABELS: Record<string, string> = {
+  chatgpt: 'ChatGPT',
+  perplexity: 'Perplexity',
+  gemini: 'Gemini',
+  claude: 'Claude',
+};
+
 export const CHART_COLORS = { pass: '#25c972', fail: '#ff5252', unknown: '#ff8a1e' } as const;
 
 export const SENTIMENT_COLORS = { positive: '#25c972', neutral: '#ffbb00', negative: '#ff5252' } as const;

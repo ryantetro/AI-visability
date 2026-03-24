@@ -22,6 +22,7 @@ import { ENGINE_COLORS } from '../lib/constants';
 import { AI_ENGINES, AI_ENGINE_META, getAIEngineLabel } from '@/lib/ai-engines';
 import { MonitoringTrendsPanel } from '../panels/monitoring-trends-panel';
 import { AICrawlerPanel } from '../panels/ai-crawler-panel';
+import { AIReferralPanel } from '../panels/ai-referral-panel';
 import { EmptyStateCard } from './empty-state-card';
 import { QuickWinsSection } from './quick-wins-section';
 import { OnboardingChecklist } from '@/components/app/onboarding-checklist';
@@ -551,6 +552,9 @@ export function DashboardSection({
 
       {/* AI Crawler Traffic */}
       <AICrawlerPanel domain={domain} />
+
+      {/* AI Referral Traffic */}
+      <AIReferralPanel domain={domain} />
 
       {/* Recent Scans removed — redundant with sidebar domain list */}
     </div>

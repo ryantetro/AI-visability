@@ -505,9 +505,9 @@ export function SettingsSection({
           <div className="px-5 py-4">
             <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">How it works</p>
             <ol className="mt-2.5 space-y-1.5 text-[12px] leading-5 text-zinc-500">
-              <li>1. Checks <code className="text-zinc-400">User-Agent</code> in server middleware before responding.</li>
+              <li>1. Checks <code className="text-zinc-400">User-Agent</code> for AI bots and <code className="text-zinc-400">Referer</code> for AI engine click-throughs.</li>
               <li>2. Posts to AISO with your site key — domain is resolved server-side.</li>
-              <li>3. Bot visits appear in your AI Crawler Traffic panel.</li>
+              <li>3. Bot visits appear in AI Crawler Traffic; human referrals appear in AI Referral Traffic.</li>
             </ol>
             <p className="mt-2 text-[11px] text-zinc-600">
               Regenerating the key invalidates the previous snippet.
