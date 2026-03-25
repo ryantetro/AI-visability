@@ -52,7 +52,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
     ? sectionParam as ActiveSection
     : 'dashboard';
 
-  const { tier } = usePlan();
+  const { tier, loading: planLoading } = usePlan();
 
   const {
     monitoredSites,
@@ -83,6 +83,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
     unlockModalOpen,
     setUnlockModalOpen,
     handleUnlockComplete,
+    unlockLoading,
     pendingDomain,
     debugPaidPreview,
     checkoutBanner,
@@ -90,7 +91,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
   } = useDomainContext();
 
   // --- Render ---
-  if (recentLoading) return <CenteredLoading label="Preparing your advanced workspace..." />;
+  if (recentLoading || planLoading) return <CenteredLoading label="Preparing your advanced workspace..." />;
 
   if (roadmapTab) {
     return (
@@ -98,7 +99,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
         <main className="mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
             <span className="inline-block rounded-full border border-[#a855f7]/30 bg-[#a855f7]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#a855f7]">Internal Roadmap</span>
-            <a href="/dashboard" className="text-[12px] font-medium text-zinc-400 transition-colors hover:text-white">Exit roadmap &rarr;</a>
+            <Link href="/dashboard" className="text-[12px] font-medium text-zinc-400 transition-colors hover:text-white">Exit roadmap &rarr;</Link>
           </div>
           <RoadmapView />
         </main>
@@ -166,7 +167,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
         )}
       </main>
       <FloatingFeedback />
-      <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} />
+      <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
     </div>
   );
 }

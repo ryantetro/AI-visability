@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { buildBotTrackingInstallPrompt, buildBotTrackingSnippet, type BotTrackingRuntime } from '@/lib/llm-prompts';
 import { formatRelativeTime } from '@/app/advanced/lib/utils';
 import { usePlan } from '@/hooks/use-plan';
+import { useAuth } from '@/hooks/use-auth';
 import { PLANS } from '@/lib/pricing';
 import { useDomainContext } from '@/contexts/domain-context';
 
@@ -94,8 +95,10 @@ export function SettingsSection({
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [appUrl, setAppUrl] = useState(() => normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL || ''));
   const { tier, plan, email, maxDomains, maxPrompts } = usePlan();
+  const { user } = useAuth();
   const planConfig = PLANS[tier];
   const { monitoredSites } = useDomainContext();
+  const displayEmail = user?.email ?? email;
 
   const billingCycle = plan.includes('annual') ? 'Annual' : plan.includes('monthly') ? 'Monthly' : '';
   const trackedDomainsValue = isUnlimitedPlanLimit(maxDomains)
@@ -381,7 +384,7 @@ export function SettingsSection({
             action={
               <span className="flex items-center gap-2 text-[13px] text-zinc-300">
                 <Mail className="h-3.5 w-3.5 text-zinc-500" />
-                {email || '—'}
+                {displayEmail || '—'}
               </span>
             }
           />
@@ -523,7 +526,7 @@ export function SettingsSection({
         <p className="mt-1 text-[12px] text-zinc-500">Your account details.</p>
 
         <Card className="mt-4">
-          <FieldRow label="Email" value={email || '—'} />
+          <FieldRow label="Email" value={displayEmail || '—'} />
           <FieldRow label="Workspace domain" value={domain} />
           <FieldRow
             label="Monitoring status"

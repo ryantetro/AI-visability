@@ -89,7 +89,6 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grouped' | 'timeline'>('grouped');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [showOnLeaderboard, setShowOnLeaderboard] = useState(false);
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
 
   useEffect(() => {
@@ -516,39 +515,26 @@ export default function HistoryPage() {
 
               <div className="mt-6 space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                  <label
-                    htmlFor="leaderboard-toggle"
-                    className="text-sm font-medium text-[var(--text-primary)]"
-                  >
-                    Show new reports on leaderboard
-                  </label>
-                  <button
-                    id="leaderboard-toggle"
-                    type="button"
-                    role="switch"
-                    aria-checked={showOnLeaderboard}
-                    onClick={() => setShowOnLeaderboard(!showOnLeaderboard)}
-                    className={cn(
-                      'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-                      showOnLeaderboard ? 'bg-[#25c972]' : 'bg-white/20'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-all',
-                        showOnLeaderboard ? 'left-[calc(100%-1.25rem)]' : 'left-1'
-                      )}
-                    />
-                  </button>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      Default leaderboard visibility
+                    </p>
+                    <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+                      Workspace-level defaults are not configurable yet.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium text-[var(--text-muted)]">
+                    Coming soon
+                  </span>
                 </div>
 
                 <p className="text-[13px] text-[var(--text-muted)]">
-                  New reports will automatically appear on the public leaderboard. You can change this per domain anytime.
+                  We removed the inactive toggle here so this panel only shows settings that are currently wired up.
                 </p>
 
                 <div className="rounded-lg bg-[#3d281a] px-4 py-3">
                   <p className="text-[13px] text-amber-400/95">
-                    Only manual reports can appear on the leaderboard. Monitoring reports are always private.
+                    When leaderboard defaults ship, they should apply to future reports only. Existing public listings will stay domain-specific.
                   </p>
                 </div>
               </div>

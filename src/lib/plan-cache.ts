@@ -1,0 +1,94 @@
+import { type PlanTier, planStringToTier } from '@/lib/pricing';
+
+export interface PlanCacheSnapshot {
+  tier: PlanTier | null;
+  plan: string | null;
+  isPaid: boolean | null;
+  maxDomains: number | null;
+  maxPrompts: number | null;
+  email: string | null;
+}
+
+interface AuthMePayload {
+  plan?: string;
+  isPaid?: boolean;
+  maxDomains?: number;
+  maxPrompts?: number;
+  reason?: string;
+  user?: {
+    email?: string | null;
+    plan?: string;
+  } | null;
+}
+
+const EMPTY_PLAN_CACHE: PlanCacheSnapshot = {
+  tier: null,
+  plan: null,
+  isPaid: null,
+  maxDomains: null,
+  maxPrompts: null,
+  email: null,
+};
+
+let snapshot: PlanCacheSnapshot = { ...EMPTY_PLAN_CACHE };
+let refreshPromise: Promise<PlanCacheSnapshot> | null = null;
+
+function isAuthMePayload(value: unknown): value is AuthMePayload {
+  if (!value || typeof value !== 'object') return false;
+  return (
+    'user' in value
+    || 'plan' in value
+    || 'reason' in value
+    || 'isPaid' in value
+    || 'maxDomains' in value
+    || 'maxPrompts' in value
+  );
+}
+
+export function getPlanCacheSnapshot(): PlanCacheSnapshot {
+  return { ...snapshot };
+}
+
+export function clearPlanCache() {
+  snapshot = { ...EMPTY_PLAN_CACHE };
+  refreshPromise = null;
+}
+
+export function hydratePlanCache(payload: AuthMePayload | null | undefined): PlanCacheSnapshot {
+  const userPlan = payload?.plan ?? payload?.user?.plan ?? 'free';
+  const resolvedTier = planStringToTier(userPlan);
+
+  snapshot = {
+    tier: resolvedTier,
+    plan: userPlan,
+    isPaid: payload?.isPaid ?? resolvedTier !== 'free',
+    maxDomains: payload?.maxDomains ?? 1,
+    maxPrompts: payload?.maxPrompts ?? 5,
+    email: payload?.user?.email ?? '',
+  };
+
+  return getPlanCacheSnapshot();
+}
+
+export async function refreshPlanCache(fetcher: typeof fetch = fetch): Promise<PlanCacheSnapshot> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const res = await fetcher('/api/auth/me', { cache: 'no-store' });
+        const payload = await res.json().catch(() => null);
+
+        if (isAuthMePayload(payload)) {
+          return hydratePlanCache(payload);
+        }
+      } catch {
+        // Keep the current cache on transient failures.
+      }
+
+      return getPlanCacheSnapshot();
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+}

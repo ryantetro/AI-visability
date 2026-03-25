@@ -190,8 +190,8 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
   };
 
   const handleSubmitDomain = async () => {
-    await handleAddDomain();
-    if (!addError) {
+    const result = await handleAddDomain();
+    if (result.ok) {
       setShowAddInput(false);
     }
   };
@@ -354,12 +354,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
 }
 
 function SidebarOnboardingProgress() {
-  let onboarding: ReturnType<typeof useOnboarding> | null = null;
-  try {
-    onboarding = useOnboarding();
-  } catch {
-    return null;
-  }
+  const onboarding = useOnboarding();
 
   if (!onboarding || onboarding.allComplete || onboarding.dismissed) return null;
 
@@ -400,7 +395,7 @@ export function DashboardSidebar() {
   const section = searchParams.get('section');
   const reportParam = searchParams.get('report');
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { tier } = usePlan();
+  const { tier, loading: planLoading } = usePlan();
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -413,7 +408,7 @@ export function DashboardSidebar() {
     hasDomainContext = false;
   }
 
-  const isFree = tier === 'free';
+  const isFree = !planLoading && tier === 'free';
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -444,7 +439,7 @@ export function DashboardSidebar() {
       <nav className="mt-2 flex-1 space-y-0.5 px-3">
         {NAV_ITEMS.map((item) => {
           const requiredTier = NAV_GATES[item.key] ?? 'free';
-          const isLocked = !canAccess(tier, requiredTier);
+          const isLocked = !planLoading && !canAccess(tier, requiredTier);
           const href = WORKSPACE_KEYS.has(item.key)
             ? buildNavHref(item.href, reportParam)
             : item.href;
@@ -462,12 +457,12 @@ export function DashboardSidebar() {
         {/* Separator */}
         <div className="!my-3 border-t border-white/[0.06]" />
 
-        <NavItem
-          item={{ ...SETTINGS_ITEM, href: buildNavHref(SETTINGS_ITEM.href, reportParam) }}
-          active={SETTINGS_ITEM.matchFn(pathname, section)}
-          locked={!canAccess(tier, NAV_GATES.settings ?? 'free')}
-          onClick={closeMobile}
-        />
+          <NavItem
+            item={{ ...SETTINGS_ITEM, href: buildNavHref(SETTINGS_ITEM.href, reportParam) }}
+            active={SETTINGS_ITEM.matchFn(pathname, section)}
+            locked={!planLoading && !canAccess(tier, NAV_GATES.settings ?? 'free')}
+            onClick={closeMobile}
+          />
 
         {/* Pricing link — visible for free users */}
         {isFree && (

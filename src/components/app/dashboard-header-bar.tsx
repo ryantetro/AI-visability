@@ -76,6 +76,10 @@ export function DashboardHeaderBar() {
       if (!res.ok) throw new Error('Checkout failed');
       const session = await res.json();
       setDropdownOpen(false);
+      if (typeof session.url === 'string' && /^https?:\/\//i.test(session.url)) {
+        window.location.href = session.url;
+        return;
+      }
       router.push(session.url);
     } catch {
       setDropdownOpen(false);

@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AuthSessionState, AuthUser } from '@/types/auth';
+import { invalidatePlanCache } from '@/hooks/use-plan';
 
 const REFRESH_INTERVAL_MS = 45 * 60 * 1000; // 45 minutes (before 1hr token expiry)
 const BROADCAST_CHANNEL_NAME = 'aiso_auth';
+let lastKnownAuthEmail: string | null = null;
 
 interface AuthState {
   user: AuthUser | null;
@@ -33,10 +35,17 @@ export function useAuth(): AuthState {
       }
 
       if (payload.reason === 'no_session' || payload.reason === 'refresh_failed') {
+        lastKnownAuthEmail = null;
+        invalidatePlanCache();
         setUser(null);
         return;
       }
 
+      const nextEmail = payload.user?.email ?? null;
+      if (nextEmail !== lastKnownAuthEmail) {
+        invalidatePlanCache();
+      }
+      lastKnownAuthEmail = nextEmail;
       setUser(payload.user ?? null);
     } catch {
       // Network/fetch error — transient, keep current user
@@ -48,6 +57,8 @@ export function useAuth(): AuthState {
 
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    lastKnownAuthEmail = null;
+    invalidatePlanCache();
     setUser(null);
 
     // Broadcast logout to other tabs
@@ -87,6 +98,8 @@ export function useAuth(): AuthState {
       channel.onmessage = (event) => {
         const { type } = event.data ?? {};
         if (type === 'logout') {
+          lastKnownAuthEmail = null;
+          invalidatePlanCache();
           setUser(null);
           router.push('/login');
         } else if (type === 'login') {

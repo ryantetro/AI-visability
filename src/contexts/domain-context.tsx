@@ -4,8 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ensureProtocol, getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
-import { planStringToTier, PLANS } from '@/lib/pricing';
-import { usePlan } from '@/hooks/use-plan';
+import { invalidatePlanCache, usePlan } from '@/hooks/use-plan';
 import {
   loadStoredDomains,
   saveStoredDomains,
@@ -17,6 +16,10 @@ import {
   getLatestScanByDomain,
   getLatestPaidScanByDomain,
 } from '@/app/advanced/lib/utils';
+import {
+  addPendingDomainToManualDomains,
+  reconcileHiddenDomains,
+} from '@/lib/workspace-ui';
 
 import type { DashboardReportData, FilesData, RecentScanData, SiteSummary, ApiErrorPayload } from '@/app/advanced/lib/types';
 
@@ -31,7 +34,7 @@ interface DomainContextValue {
   // Add domain
   addDomainInput: string;
   setAddDomainInput: (v: string) => void;
-  handleAddDomain: () => Promise<void>;
+  handleAddDomain: () => Promise<{ ok: boolean; error?: string }>;
   addTrackedDomain: (domain: string) => Promise<{ ok: boolean; error?: string }>;
   handleRemoveDomain: (domain: string) => void;
   addError: string | null;
@@ -62,6 +65,7 @@ interface DomainContextValue {
   unlockModalOpen: boolean;
   setUnlockModalOpen: (v: boolean) => void;
   handleUnlockComplete: (plan?: string) => void;
+  unlockLoading: boolean;
   pendingDomain: string | null;
   paidOverride: boolean;
   debugPaidPreview: boolean;
@@ -70,6 +74,7 @@ interface DomainContextValue {
 }
 
 const DomainContext = createContext<DomainContextValue | null>(null);
+const PENDING_DOMAIN_STORAGE_KEY = 'aiso_pending_domain_upgrade';
 
 export function useDomainContext() {
   const ctx = useContext(DomainContext);
@@ -88,7 +93,7 @@ export function DomainContextProvider({
   const searchParams = useSearchParams();
   const initialReportId = reportId ?? '';
   const debugPaidPreview = process.env.NODE_ENV === 'development' && searchParams.get('debugPaid') === '1';
-  const { tier: planTier, isPaid: planIsPaid } = usePlan();
+  const { isPaid: planIsPaid } = usePlan();
 
   const [recentScans, setRecentScans] = useState<RecentScanData[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
@@ -101,6 +106,7 @@ export function DomainContextProvider({
   const [files, setFiles] = useState<FilesData | null>(null);
   const [report, setReport] = useState<DashboardReportData | null>(null);
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [unlockLoading, setUnlockLoading] = useState(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(Boolean(initialReportId));
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -111,6 +117,20 @@ export function DomainContextProvider({
   const [addDomainInput, setAddDomainInput] = useState('');
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+
+  // Persist selected domain in URL so refresh restores it
+  const setSelectedDomain = useCallback((domain: string | null) => {
+    setSelectedDomainRaw(domain);
+    const params = new URLSearchParams(window.location.search);
+    if (domain) {
+      params.set('domain', domain);
+    } else {
+      params.delete('domain');
+    }
+    const qs = params.toString();
+    const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, '', nextUrl);
+  }, []);
 
   // Caches for instant domain switching
   const [reportCache, setReportCache] = useState<Record<string, DashboardReportData>>({});
@@ -137,8 +157,9 @@ export function DomainContextProvider({
           // DB wins — update local state and localStorage cache
           setManualDomains(dbDomains);
           saveStoredDomains(dbDomains);
-          setHiddenDomains([]);
-          saveHiddenDomains([]);
+          const nextHiddenDomains = reconcileHiddenDomains(loadHiddenDomains(), dbDomains);
+          setHiddenDomains(nextHiddenDomains);
+          saveHiddenDomains(nextHiddenDomains);
         } else if (!dbMigrationDone.current) {
           // One-time migration: push localStorage domains to DB
           dbMigrationDone.current = true;
@@ -256,13 +277,26 @@ export function DomainContextProvider({
         if (!res.ok) return;
         const data = await res.json();
         if (active && data.paid) {
+          setPaidOverride(true);
+          invalidatePlanCache();
+          const pendingDomainFromStorage = typeof window !== 'undefined'
+            ? window.sessionStorage.getItem(PENDING_DOMAIN_STORAGE_KEY)
+            : null;
+          if (pendingDomainFromStorage) {
+            const nextManualDomains = addPendingDomainToManualDomains(manualDomains, pendingDomainFromStorage);
+            setManualDomains(nextManualDomains);
+            saveStoredDomains(nextManualDomains);
+            setSelectedDomain(pendingDomainFromStorage);
+            setPendingDomain(null);
+            window.sessionStorage.removeItem(PENDING_DOMAIN_STORAGE_KEY);
+          }
           const domain = initialReportId ? recentScans.find((s) => s.id === initialReportId)?.url : null;
           setCheckoutBanner(`Payment confirmed. Here\u2019s your fix plan${domain ? ` for ${getDomain(domain)}` : ''}.`);
         }
       } catch { /* silently fail */ }
     })();
     return () => { active = false; };
-  }, [searchParams, initialReportId, recentScans]);
+  }, [searchParams, initialReportId, manualDomains, recentScans, setSelectedDomain]);
 
   // --- Computed values ---
   const paidDomains = useMemo(() => {
@@ -309,20 +343,6 @@ export function DomainContextProvider({
     () => monitoredSites.filter((site) => site.source === 'scan'),
     [monitoredSites]
   );
-
-  // Persist selected domain in URL so refresh restores it
-  const setSelectedDomain = useCallback((domain: string | null) => {
-    setSelectedDomainRaw(domain);
-    const params = new URLSearchParams(window.location.search);
-    if (domain) {
-      params.set('domain', domain);
-    } else {
-      params.delete('domain');
-    }
-    const qs = params.toString();
-    const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState(null, '', nextUrl);
-  }, []);
 
   // Auto-select domain when none selected (or URL param domain not in list)
   useEffect(() => {
@@ -419,7 +439,7 @@ export function DomainContextProvider({
       }
     }, 2500);
     return () => clearInterval(interval);
-  }, [loadError, activeWorkspaceReportId]);
+  }, [loadError, activeWorkspaceReportId, refreshScanEntry]);
 
   // Use plan tier for paid access instead of scan-level flags
   const hasPaidAccess = debugPaidPreview || planIsPaid || paidOverride || Boolean(report?.hasPaid) || recentScans.some((s) => s.hasPaid);
@@ -454,7 +474,13 @@ export function DomainContextProvider({
       });
       if (!res.ok) {
         const data = await res.json();
-        if (res.status === 403) setUnlockModalOpen(true);
+        if (res.status === 403) {
+          setPendingDomain(normalized);
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem(PENDING_DOMAIN_STORAGE_KEY, normalized);
+          }
+          setUnlockModalOpen(true);
+        }
         return { ok: false, error: data.error || 'Failed to add domain' };
       }
     } catch {
@@ -470,13 +496,19 @@ export function DomainContextProvider({
     const matchingPaidScan = getLatestPaidScanByDomain(recentScans, normalized);
     if (matchingPaidScan) {
       try {
-        await fetch('/api/monitoring', {
+        const res = await fetch('/api/monitoring', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scanId: matchingPaidScan.id, alertThreshold: 5 }),
         });
-        setMonitoringConnected((c) => ({ ...c, [normalized]: true }));
+        if (res.ok) {
+          setMonitoringConnected((c) => ({ ...c, [normalized]: true }));
+        }
       } catch { /* silently fail */ }
+    }
+    setPendingDomain(null);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(PENDING_DOMAIN_STORAGE_KEY);
     }
     setSelectedDomain(normalized);
     return { ok: true };
@@ -484,19 +516,36 @@ export function DomainContextProvider({
 
   const handleAddDomain = useCallback(async () => {
     setAddError(null);
-    if (!normalizedDomain) { setAddError('Please enter a domain'); return; }
-    if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(normalizedDomain)) { setAddError('Please enter a valid domain (e.g. example.com)'); return; }
-    if (manualDomains.includes(normalizedDomain)) { setAddError('This domain is already being monitored'); return; }
-    if (!confirmChecked) { setAddError('Please confirm domain ownership'); return; }
+    if (!normalizedDomain) {
+      const error = 'Please enter a domain';
+      setAddError(error);
+      return { ok: false, error };
+    }
+    if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(normalizedDomain)) {
+      const error = 'Please enter a valid domain (e.g. example.com)';
+      setAddError(error);
+      return { ok: false, error };
+    }
+    if (manualDomains.includes(normalizedDomain)) {
+      const error = 'This domain is already being monitored';
+      setAddError(error);
+      return { ok: false, error };
+    }
+    if (!confirmChecked) {
+      const error = 'Please confirm domain ownership';
+      setAddError(error);
+      return { ok: false, error };
+    }
 
     const result = await addTrackedDomain(normalizedDomain);
     if (!result.ok) {
       setAddError(result.error || 'Failed to add domain');
-      return;
+      return result;
     }
 
     setAddDomainInput('');
     setConfirmChecked(false);
+    return result;
   }, [normalizedDomain, manualDomains, confirmChecked, addTrackedDomain]);
 
   const handleRemoveDomain = useCallback((domain: string) => {
@@ -511,48 +560,64 @@ export function DomainContextProvider({
     const nextHidden = hiddenDomains.includes(domain) ? hiddenDomains : [...hiddenDomains, domain];
     setManualDomains(nextManual); saveStoredDomains(nextManual); setHiddenDomains(nextHidden); saveHiddenDomains(nextHidden);
     if (selectedDomain === domain) setSelectedDomain(null);
-  }, [manualDomains, hiddenDomains, selectedDomain]);
+  }, [manualDomains, hiddenDomains, selectedDomain, setSelectedDomain]);
 
   const handleUnlockComplete = useCallback((plan?: string) => {
     const selectedPlan = plan || 'starter_monthly';
     const scanId = pendingDomain ? `upgrade_${pendingDomain}` : `upgrade_direct`;
     (async () => {
+      setUnlockLoading(true);
+      setActionError('');
       try {
+        if (pendingDomain && typeof window !== 'undefined') {
+          window.sessionStorage.setItem(PENDING_DOMAIN_STORAGE_KEY, pendingDomain);
+        }
         const res = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scanId, plan: selectedPlan }),
         });
         if (!res.ok) {
-          setPaidOverride(true);
-          if (pendingDomain && !manualDomains.includes(pendingDomain)) { const next = [pendingDomain, ...manualDomains]; setManualDomains(next); saveStoredDomains(next); }
-          if (pendingDomain) setSelectedDomain(pendingDomain);
-          setPendingDomain(null); setUnlockModalOpen(false); setAddDomainInput('');
-          return;
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload.error || 'Unable to start checkout right now.');
         }
         const session = await res.json();
         if (session.url) {
           if (session.url.startsWith('/checkout/')) {
             const verifyRes = await fetch('/api/checkout/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: session.id }) });
-            if (verifyRes.ok) {
-              setPaidOverride(true);
-              if (pendingDomain && !manualDomains.includes(pendingDomain)) { const next = [pendingDomain, ...manualDomains]; setManualDomains(next); saveStoredDomains(next); }
-              if (pendingDomain) setSelectedDomain(pendingDomain);
-              setPendingDomain(null); setUnlockModalOpen(false); setAddDomainInput('');
-              setCheckoutBanner('Payment confirmed! Your plan has been upgraded.');
+            const verifyPayload = await verifyRes.json().catch(() => ({}));
+            if (!verifyRes.ok || !verifyPayload.paid) {
+              throw new Error(verifyPayload.error || 'Unable to confirm your payment right now.');
             }
-          } else {
-            window.location.href = session.url;
+
+            setPaidOverride(true);
+            invalidatePlanCache();
+            const nextManual = addPendingDomainToManualDomains(manualDomains, pendingDomain);
+            setManualDomains(nextManual);
+            saveStoredDomains(nextManual);
+            if (pendingDomain) setSelectedDomain(pendingDomain);
+            setPendingDomain(null);
+            if (typeof window !== 'undefined') {
+              window.sessionStorage.removeItem(PENDING_DOMAIN_STORAGE_KEY);
+            }
+            setUnlockModalOpen(false);
+            setAddDomainInput('');
+            setCheckoutBanner('Payment confirmed! Your plan has been upgraded.');
+            return;
           }
+
+          window.location.href = session.url;
+          return;
         }
-      } catch {
-        setPaidOverride(true);
-        if (pendingDomain && !manualDomains.includes(pendingDomain)) { const next = [pendingDomain, ...manualDomains]; setManualDomains(next); saveStoredDomains(next); }
-        if (pendingDomain) setSelectedDomain(pendingDomain);
-        setPendingDomain(null); setUnlockModalOpen(false); setAddDomainInput('');
+
+        throw new Error('Checkout session did not include a redirect URL.');
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Unable to start checkout right now.');
+      } finally {
+        setUnlockLoading(false);
       }
     })();
-  }, [pendingDomain, manualDomains]);
+  }, [pendingDomain, manualDomains, setSelectedDomain]);
 
   const handleRunFirstScan = useCallback(async (site: SiteSummary) => {
     setActionError('');
@@ -632,6 +697,7 @@ export function DomainContextProvider({
     unlockModalOpen,
     setUnlockModalOpen,
     handleUnlockComplete,
+    unlockLoading,
     pendingDomain,
     paidOverride,
     debugPaidPreview,
@@ -642,7 +708,7 @@ export function DomainContextProvider({
     addError, confirmChecked, hasPaidAccess, report, files, workspaceLoading, loadError, recentScans,
     recentLoading, expandedSite, actionError, reauditLoading, handleReaudit, handleRunFirstScan,
     monitoringConnected, monitoringLoading, handleEnableMonitoring, handleDisableMonitoring, unlockModalOpen, handleUnlockComplete,
-    pendingDomain, paidOverride, debugPaidPreview, checkoutBanner, inputFaviconUrl,
+    unlockLoading, pendingDomain, paidOverride, debugPaidPreview, checkoutBanner, inputFaviconUrl,
   ]);
 
   return (

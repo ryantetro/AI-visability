@@ -7,8 +7,9 @@ import { Clock3, Diamond, Loader2, LogOut, Megaphone, Trophy, Zap } from 'lucide
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { planStringToTier, PLANS } from '@/lib/pricing';
+import { detectAppShellSection } from '@/lib/workspace-ui';
 
-type AppSection = 'history' | 'leaderboard' | 'advanced' | 'featured' | 'dashboard';
+type AppSection = 'history' | 'leaderboard' | 'featured' | 'dashboard';
 
 const navItems: { key: AppSection; label: string; href: string; icon: typeof Diamond }[] = [
   { key: 'history', label: 'History', href: '/history', icon: Clock3 },
@@ -45,18 +46,10 @@ function AisoLogo({ className }: { className?: string }) {
   );
 }
 
-function detectActiveSection(pathname: string): AppSection {
-  if (pathname.startsWith('/dashboard') || pathname.startsWith('/report') || pathname.startsWith('/brand') || pathname.startsWith('/competitors') || pathname.startsWith('/settings') || pathname.startsWith('/advanced')) return 'advanced';
-  if (pathname.startsWith('/history')) return 'history';
-  if (pathname.startsWith('/leaderboard')) return 'leaderboard';
-  if (pathname.startsWith('/featured')) return 'featured';
-  return 'dashboard';
-}
-
 export function AppShellNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const active = detectActiveSection(pathname);
+  const active = detectAppShellSection(pathname);
   const { user, loading, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [usageData, setUsageData] = useState<{ plan: string; isPaid: boolean } | null>(null);
@@ -104,6 +97,10 @@ export function AppShellNav() {
       if (!res.ok) throw new Error('Checkout failed');
       const session = await res.json();
       setDropdownOpen(false);
+      if (typeof session.url === 'string' && /^https?:\/\//i.test(session.url)) {
+        window.location.href = session.url;
+        return;
+      }
       router.push(session.url);
     } catch {
       setDropdownOpen(false);

@@ -52,7 +52,7 @@ export function WorkspaceShell({
 }) {
   const router = useRouter();
   const { user: authUser, loading: authLoading } = useAuth();
-  const { tier } = usePlan();
+  const { tier, loading: planLoading } = usePlan();
 
   // Client-side auth guard — redirect to login if no authenticated user
   useEffect(() => {
@@ -83,6 +83,7 @@ export function WorkspaceShell({
     unlockModalOpen,
     setUnlockModalOpen,
     handleUnlockComplete,
+    unlockLoading,
     debugPaidPreview,
     checkoutBanner,
   } = useDomainContext();
@@ -94,7 +95,7 @@ export function WorkspaceShell({
   const platformLabel = files ? formatPlatformLabel(files.detectedPlatform) : null;
 
   // Block rendering until auth check completes — prevents flash of content for unauthenticated users
-  if (authLoading || (!authUser && !authLoading)) {
+  if (authLoading || planLoading || (!authUser && !authLoading)) {
     return <CenteredLoading label="Loading workspace..." />;
   }
 
@@ -113,7 +114,7 @@ export function WorkspaceShell({
             onUpgrade={() => setUnlockModalOpen(true)}
           />
         </main>
-        <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} />
+        <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
       </div>
     );
   }
@@ -126,7 +127,7 @@ export function WorkspaceShell({
           <NoDomainState sectionKey={sectionKey} onOpenUnlock={() => setUnlockModalOpen(true)} />
         </main>
         <FloatingFeedback />
-        <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} />
+        <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
       </div>
     );
   }
@@ -210,7 +211,7 @@ export function WorkspaceShell({
         {children(ctx)}
       </main>
       <FloatingFeedback />
-      <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} />
+      <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
     </div>
   );
 }

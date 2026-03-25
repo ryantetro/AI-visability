@@ -1,7 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { type PlanTier, planStringToTier } from '@/lib/pricing';
+import { type PlanTier } from '@/lib/pricing';
+import {
+  clearPlanCache,
+  getPlanCacheSnapshot,
+  refreshPlanCache,
+} from '@/lib/plan-cache';
 
 interface PlanState {
   tier: PlanTier;
@@ -14,71 +19,79 @@ interface PlanState {
   refresh: () => Promise<void>;
 }
 
-let cachedTier: PlanTier | null = null;
-let cachedPlan: string | null = null;
-let cachedIsPaid: boolean | null = null;
-let cachedMaxDomains: number | null = null;
-let cachedMaxPrompts: number | null = null;
-let cachedEmail: string | null = null;
+const PLAN_CACHE_INVALIDATED_EVENT = 'aiso:plan-cache-invalidated';
+
+function readPlanSnapshot() {
+  const snapshot = getPlanCacheSnapshot();
+
+  return {
+    tier: snapshot.tier ?? 'free',
+    plan: snapshot.plan ?? 'free',
+    isPaid: snapshot.isPaid ?? false,
+    maxDomains: snapshot.maxDomains ?? 1,
+    maxPrompts: snapshot.maxPrompts ?? 5,
+    email: snapshot.email ?? '',
+    loading: snapshot.tier === null,
+  };
+}
 
 export function usePlan(): PlanState {
-  const [tier, setTier] = useState<PlanTier>(cachedTier ?? 'free');
-  const [plan, setPlan] = useState<string>(cachedPlan ?? 'free');
-  const [isPaid, setIsPaid] = useState<boolean>(cachedIsPaid ?? false);
-  const [maxDomains, setMaxDomains] = useState<number>(cachedMaxDomains ?? 1);
-  const [maxPrompts, setMaxPrompts] = useState<number>(cachedMaxPrompts ?? 5);
-  const [email, setEmail] = useState<string>(cachedEmail ?? '');
-  const [loading, setLoading] = useState(cachedTier === null);
+  const [tier, setTier] = useState<PlanTier>(() => readPlanSnapshot().tier);
+  const [plan, setPlan] = useState<string>(() => readPlanSnapshot().plan);
+  const [isPaid, setIsPaid] = useState<boolean>(() => readPlanSnapshot().isPaid);
+  const [maxDomains, setMaxDomains] = useState<number>(() => readPlanSnapshot().maxDomains);
+  const [maxPrompts, setMaxPrompts] = useState<number>(() => readPlanSnapshot().maxPrompts);
+  const [email, setEmail] = useState<string>(() => readPlanSnapshot().email);
+  const [loading, setLoading] = useState(() => readPlanSnapshot().loading);
+
+  const syncFromCache = useCallback(() => {
+    const snapshot = readPlanSnapshot();
+
+    setTier(snapshot.tier);
+    setPlan(snapshot.plan);
+    setIsPaid(snapshot.isPaid);
+    setMaxDomains(snapshot.maxDomains);
+    setMaxPrompts(snapshot.maxPrompts);
+    setEmail(snapshot.email);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      const userPlan = data.plan ?? data.user?.plan ?? 'free';
-      const resolved = planStringToTier(userPlan);
-
-      cachedTier = resolved;
-      cachedPlan = userPlan;
-      const resolvedIsPaid: boolean = data.isPaid ?? resolved !== 'free';
-      const resolvedMaxDomains: number = data.maxDomains ?? 1;
-      const resolvedMaxPrompts: number = data.maxPrompts ?? 5;
-
-      const resolvedEmail: string = data.user?.email ?? '';
-
-      cachedIsPaid = resolvedIsPaid;
-      cachedMaxDomains = resolvedMaxDomains;
-      cachedMaxPrompts = resolvedMaxPrompts;
-      cachedEmail = resolvedEmail;
-
-      setTier(resolved);
-      setPlan(userPlan);
-      setIsPaid(resolvedIsPaid);
-      setMaxDomains(resolvedMaxDomains);
-      setMaxPrompts(resolvedMaxPrompts);
-      setEmail(resolvedEmail);
+      await refreshPlanCache();
     } catch {
       // keep current values
     } finally {
+      syncFromCache();
       setLoading(false);
     }
-  }, []);
+  }, [syncFromCache]);
 
   useEffect(() => {
-    if (cachedTier === null) {
+    const handleInvalidation = () => {
+      const snapshot = readPlanSnapshot();
+      syncFromCache();
+      setLoading(snapshot.loading);
       void refresh();
-    }
-  }, [refresh]);
+    };
+
+    void refresh();
+
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener(PLAN_CACHE_INVALIDATED_EVENT, handleInvalidation);
+    return () => {
+      window.removeEventListener(PLAN_CACHE_INVALIDATED_EVENT, handleInvalidation);
+    };
+  }, [refresh, syncFromCache]);
 
   return { tier, plan, isPaid, maxDomains, maxPrompts, email, loading, refresh };
 }
 
 /** Invalidate the plan cache (e.g., after a successful upgrade) */
 export function invalidatePlanCache() {
-  cachedTier = null;
-  cachedPlan = null;
-  cachedIsPaid = null;
-  cachedMaxDomains = null;
-  cachedMaxPrompts = null;
-  cachedEmail = null;
+  clearPlanCache();
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(PLAN_CACHE_INVALIDATED_EVENT));
+  }
 }
