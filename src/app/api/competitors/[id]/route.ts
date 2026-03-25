@@ -12,7 +12,7 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const competitor = await getCompetitor(id);
+  const competitor = await getCompetitor(id, user.id);
 
   if (!competitor) {
     return NextResponse.json({ error: 'Competitor not found' }, { status: 404 });
@@ -23,7 +23,7 @@ export async function DELETE(
   }
 
   try {
-    await deleteCompetitor(id);
+    await deleteCompetitor(id, user.id);
     return NextResponse.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to delete competitor';

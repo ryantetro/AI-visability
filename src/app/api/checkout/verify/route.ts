@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPayment, getDatabase } from '@/lib/services/registry';
+import { canUseStripe } from '@/lib/services/stripe-payment';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { upgradeUserPlan } from '@/lib/user-profile';
 
@@ -35,10 +36,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    try {
-      await upgradeUserPlan(user.id, plan);
-    } catch {
-      // Non-blocking: scan unlock still succeeds even if plan upgrade fails
+    // Only upgrade plan in mock mode. In real Stripe mode the webhook owns the upgrade.
+    if (!canUseStripe()) {
+      try {
+        await upgradeUserPlan(user.id, plan);
+      } catch {
+        // Non-blocking: scan unlock still succeeds even if plan upgrade fails
+      }
     }
   }
 

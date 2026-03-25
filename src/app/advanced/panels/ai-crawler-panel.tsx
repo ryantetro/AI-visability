@@ -6,10 +6,11 @@ import { useEffect, useState } from 'react';
 import {
   Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { ArrowRight, CheckCircle2, Code2, Sparkles, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import { cn } from '@/lib/utils';
 import { ENGINE_COLORS, PROVIDER_DISPLAY_ORDER, PROVIDER_LABELS } from '../lib/constants';
+import { formatRelativeTime } from '../lib/utils';
 import { EngineIcon } from './shared';
 import type { ProviderTrafficSummary } from '../lib/types';
 
@@ -18,12 +19,21 @@ interface ProviderTimelineRow {
   [provider: string]: string | number;
 }
 
-export function AICrawlerPanel({ domain, trackingReady: trackingReadyProp }: { domain: string; trackingReady?: boolean }) {
+export function AICrawlerPanel({
+  domain,
+  trackingReady: trackingReadyProp,
+  trackingLastUsedAt: trackingLastUsedAtProp,
+}: {
+  domain: string;
+  trackingReady?: boolean;
+  trackingLastUsedAt?: string | null;
+}) {
   const searchParams = useSearchParams();
   const [providerTimeline, setProviderTimeline] = useState<ProviderTimelineRow[]>([]);
   const [providerSummaries, setProviderSummaries] = useState<ProviderTrafficSummary[]>([]);
   const [totalVisits, setTotalVisits] = useState(0);
   const [internalTrackingReady, setInternalTrackingReady] = useState(false);
+  const [internalLastUsedAt, setInternalLastUsedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
   const reportParam = searchParams.get('report');
@@ -31,8 +41,10 @@ export function AICrawlerPanel({ domain, trackingReady: trackingReadyProp }: { d
     ? `/settings?report=${encodeURIComponent(reportParam)}`
     : '/settings';
 
-  // Use prop when provided (dashboard lifts state), otherwise fetch internally (brand page)
+  // Use props when provided (dashboard lifts state), otherwise fetch internally (brand page)
   const trackingReady = trackingReadyProp ?? internalTrackingReady;
+  const trackingLastUsedAt =
+    trackingLastUsedAtProp !== undefined ? trackingLastUsedAtProp : internalLastUsedAt;
 
   useEffect(() => {
     (async () => {
@@ -58,6 +70,7 @@ export function AICrawlerPanel({ domain, trackingReady: trackingReadyProp }: { d
         if (trackingReadyProp === undefined && results[1]?.ok) {
           const data = await results[1].json();
           setInternalTrackingReady(Boolean(data.siteKey));
+          setInternalLastUsedAt(typeof data.lastUsedAt === 'string' ? data.lastUsedAt : null);
         }
       } catch { /* silently fail */ } finally { setLoading(false); }
     })();
@@ -79,32 +92,48 @@ export function AICrawlerPanel({ domain, trackingReady: trackingReadyProp }: { d
   if (totalVisits === 0 && providerSummaries.length === 0) {
     return (
       <DashboardPanel className="p-6">
-        <SectionTitle eyebrow="AI Crawlers" title="Traffic Analysis" description="Monitor AI bot activity on your site." />
+        <SectionTitle
+          eyebrow="AI Crawlers"
+          title="Traffic Analysis"
+          description="Crawler visits: when AI bots (e.g. ChatGPT, Perplexity) load pages on your site."
+        />
         <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_320px]">
           <div className="rounded-[1.4rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.015)_100%)] p-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className={cn(
-                'inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]',
+                'inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]',
                 trackingReady
-                  ? 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                  : 'border border-amber-500/20 bg-amber-500/10 text-amber-300'
+                  ? 'border border-zinc-600/40 bg-white/[0.04] text-zinc-400'
+                  : 'border border-amber-500/25 bg-amber-500/10 text-amber-300'
               )}>
-                {trackingReady ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Code2 className="h-3.5 w-3.5" />}
-                {trackingReady ? 'Tracking configured' : 'Setup required'}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-zinc-500">
-                <Sparkles className="h-3 w-3" />
-                Auto-detection
+                {trackingReady ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Code2 className="h-3.5 w-3.5" />}
+                {trackingReady ? 'Snippet saved · waiting for crawler visits' : 'Tracking not set up'}
               </span>
             </div>
 
             <h3 className="mt-4 text-lg font-semibold text-white">
-              {trackingReady ? 'Tracking installed — waiting for the first AI bot visit.' : 'Install tracking to see AI bot activity.'}
+              {!trackingReady
+                ? 'Connect your site to see crawler traffic'
+                : trackingLastUsedAt
+                  ? `No crawler visits in the last ${days} days`
+                  : 'Waiting for your first signal'}
             </h3>
-            <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-zinc-400">
-              {trackingReady
-                ? 'Your tracking code is deployed. When ChatGPT, Perplexity, Gemini, or Claude bots visit your site, their activity will appear here automatically — usually within 24–48 hours.'
-                : 'Install a simple tracking snippet from Settings to see which AI bots crawl your site and which AI engines send you real visitors. Takes about 5 minutes.'}
+            <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-zinc-400">
+              {!trackingReady ? (
+                'Create a site key in Settings, add the middleware snippet to your app, and deploy. This chart only shows data after crawlers request your pages.'
+              ) : trackingLastUsedAt ? (
+                <>
+                  Last contact from your site:{' '}
+                  <span className="font-medium text-zinc-300">
+                    {formatRelativeTime(new Date(trackingLastUsedAt).getTime())}
+                  </span>
+                  . Crawlers may be quiet for stretches. Try a longer range (90d) or check again after bots revisit your domain.
+                </>
+              ) : (
+                <>
+                  You’re set up on our side. We’re waiting for your live site to send its first event (a bot crawl or a visitor from an AI product). Until then this chart stays empty. If it’s been more than a day, confirm the snippet is on the <span className="text-zinc-300">same domain</span> as this report and that production is deployed.
+                </>
+              )}
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -112,24 +141,23 @@ export function AICrawlerPanel({ domain, trackingReady: trackingReadyProp }: { d
                 href={settingsHref}
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
               >
-                {trackingReady ? 'Open Bot Tracking Setup' : 'Set Up Bot Tracking'}
+                {trackingReady ? 'Tracking settings' : 'Set up tracking'}
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
-              <div className="inline-flex items-center rounded-xl border border-white/8 bg-white/[0.025] px-4 py-2.5 text-[11px] text-zinc-500">
-                Visits will appear here after installation and the first bot crawl.
-              </div>
             </div>
           </div>
 
           <div className="rounded-[1.4rem] border border-white/8 bg-[#0b0b0d] p-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">What To Do</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">At a glance</p>
             <div className="mt-4 space-y-3">
               {[
                 trackingReady
-                  ? 'Open Settings if you want to review, copy, or regenerate the existing site key.'
-                  : 'Generate a tracking key in Settings for this domain.',
-                'Paste the server-side middleware snippet into your Next.js or Express app.',
-                'Deploy the change, then wait for the first AI crawler or referral visit to populate these charts.',
+                  ? 'This block = automated AI bots hitting your pages.'
+                  : 'Add tracking in Settings for this domain.',
+                'Human clicks from ChatGPT-style products are in AI Referrals below — not here.',
+                trackingReady
+                  ? 'No graph yet = no crawler hits recorded for this period (or no signal from your site yet).'
+                  : 'After setup, data appears when crawlers visit.',
               ].map((step, index) => (
                 <div key={step} className="flex gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-3">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[11px] font-semibold text-zinc-300">

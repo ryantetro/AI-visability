@@ -8,14 +8,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  const domain = request.nextUrl.searchParams.get('domain');
-  if (!domain) {
+  const rawDomain = request.nextUrl.searchParams.get('domain');
+  if (!rawDomain) {
     return NextResponse.json({ error: 'domain query parameter is required.' }, { status: 400 });
+  }
+  const domain = rawDomain.trim().toLowerCase();
+  if (domain.length > 253) {
+    return NextResponse.json({ error: 'Invalid domain.' }, { status: 400 });
   }
 
   const pm = getPromptMonitoring();
-  const prompts = await pm.listPrompts(domain);
-  const results = await pm.listPromptResults(domain, 200);
+  const prompts = await pm.listPrompts(domain, user.id);
+  const results = await pm.listPromptResults(domain, 200, user.id);
 
   return NextResponse.json({ prompts, results });
 }
@@ -26,7 +30,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  const body = await request.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
+  }
   const { domain, promptText, category, industry } = body ?? {};
 
   if (!domain || !promptText) {
@@ -35,6 +45,18 @@ export async function POST(request: NextRequest) {
 
   if (typeof promptText !== 'string' || promptText.trim().length < 5) {
     return NextResponse.json({ error: 'Prompt text must be at least 5 characters.' }, { status: 400 });
+  }
+  if (promptText.length > 500) {
+    return NextResponse.json({ error: 'promptText must be 500 characters or fewer.' }, { status: 400 });
+  }
+  if (typeof domain === 'string' && domain.length > 253) {
+    return NextResponse.json({ error: 'domain must be 253 characters or fewer.' }, { status: 400 });
+  }
+  if (category !== undefined && category !== null && String(category).length > 50) {
+    return NextResponse.json({ error: 'category must be 50 characters or fewer.' }, { status: 400 });
+  }
+  if (industry !== undefined && industry !== null && String(industry).length > 50) {
+    return NextResponse.json({ error: 'industry must be 50 characters or fewer.' }, { status: 400 });
   }
 
   const pm = getPromptMonitoring();

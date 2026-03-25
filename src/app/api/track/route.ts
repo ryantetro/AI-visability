@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCrawlerVisits, getReferralVisits } from '@/lib/services/registry';
 import { getSupabaseClient } from '@/lib/supabase';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 const HOUR_MS = 60 * 60 * 1000;
 const DOMAIN_LIMIT_PER_HOUR = 500;
 const TOUCH_INTERVAL_MS = HOUR_MS;
@@ -87,7 +97,7 @@ export async function POST(request: NextRequest) {
   const siteKey = typeof body?.sk === 'string' ? body.sk.trim() : '';
 
   if (!siteKey) {
-    return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    return NextResponse.json({ error: 'Missing required fields.' }, { status: 400, headers: CORS_HEADERS });
   }
 
   // Referral event branch
@@ -96,7 +106,7 @@ export async function POST(request: NextRequest) {
   if (isReferral) {
     const sourceEngine = typeof body?.se === 'string' ? body.se.trim() : '';
     if (!sourceEngine || !VALID_ENGINES.has(sourceEngine)) {
-      return NextResponse.json({ error: 'Invalid source engine.' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid source engine.' }, { status: 400, headers: CORS_HEADERS });
     }
 
     const supabase = getSupabaseClient();
@@ -107,28 +117,28 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (error) {
-      return NextResponse.json({ error: 'Failed to validate tracking key.' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to validate tracking key.' }, { status: 500, headers: CORS_HEADERS });
     }
     if (!trackingKey) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
     }
 
     const domain = normalizeDomain(trackingKey.domain);
     if (!isValidDomain(domain)) {
-      return NextResponse.json({ error: 'Tracking key is misconfigured.' }, { status: 500 });
+      return NextResponse.json({ error: 'Tracking key is misconfigured.' }, { status: 500, headers: CORS_HEADERS });
     }
 
     const rateLimit = checkDomainRateLimit(domain);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Rate limit exceeded.' },
-        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec) } }
+        { status: 429, headers: { ...CORS_HEADERS, 'Retry-After': String(rateLimit.retryAfterSec) } }
       );
     }
 
     const referrerUrl = typeof body?.ref === 'string' ? body.ref.trim().slice(0, 2048) : null;
-    const landingPage = normalizePath(body?.p);
-    const userAgent = typeof body?.ua === 'string' ? body.ua.trim() : '';
+    const landingPage = normalizePath(body?.p).slice(0, 2048);
+    const userAgent = typeof body?.ua === 'string' ? body.ua.trim().slice(0, 500) : '';
 
     const referralVisits = getReferralVisits();
     await referralVisits.logVisit({
@@ -144,7 +154,7 @@ export async function POST(request: NextRequest) {
       lastUsedAt: trackingKey.last_used_at ?? null,
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { headers: CORS_HEADERS });
   }
 
   // Bot event branch (existing logic)
@@ -154,7 +164,7 @@ export async function POST(request: NextRequest) {
   const userAgent = typeof body?.ua === 'string' ? body.ua.trim() : '';
 
   if (!botName) {
-    return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    return NextResponse.json({ error: 'Missing required fields.' }, { status: 400, headers: CORS_HEADERS });
   }
 
   const supabase = getSupabaseClient();
@@ -165,23 +175,23 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: 'Failed to validate tracking key.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to validate tracking key.' }, { status: 500, headers: CORS_HEADERS });
   }
 
   if (!trackingKey) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
   }
 
   const domain = normalizeDomain(trackingKey.domain);
   if (!isValidDomain(domain)) {
-    return NextResponse.json({ error: 'Tracking key is misconfigured.' }, { status: 500 });
+    return NextResponse.json({ error: 'Tracking key is misconfigured.' }, { status: 500, headers: CORS_HEADERS });
   }
 
   const rateLimit = checkDomainRateLimit(domain);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded.' },
-      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec) } }
+      { status: 429, headers: { ...CORS_HEADERS, 'Retry-After': String(rateLimit.retryAfterSec) } }
     );
   }
 
@@ -200,5 +210,5 @@ export async function POST(request: NextRequest) {
     lastUsedAt: trackingKey.last_used_at ?? null,
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true }, { headers: CORS_HEADERS });
 }

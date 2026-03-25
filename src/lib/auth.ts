@@ -201,8 +201,10 @@ export function _clearTestAuth() {
 }
 
 async function getUserFromAccessToken(accessToken: string): Promise<AuthUser | null> {
-  const testUser = _testTokens.get(accessToken);
-  if (testUser) return testUser;
+  if (process.env.NODE_ENV === 'test') {
+    const testUser = _testTokens.get(accessToken);
+    if (testUser) return testUser;
+  }
 
   try {
     const supabase = getSupabaseClient();

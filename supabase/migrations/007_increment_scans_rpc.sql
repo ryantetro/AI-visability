@@ -7,6 +7,11 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  -- Only service_role may call this function
+  IF auth.role() != 'service_role' THEN
+    RAISE EXCEPTION 'permission denied: only service_role may increment scan count';
+  END IF;
+
   UPDATE user_profiles
   SET scans_used = scans_used + 1,
       updated_at = now()

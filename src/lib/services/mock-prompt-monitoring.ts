@@ -7,8 +7,8 @@ const results: PromptResult[] = [];
 const competitorAppearances: CompetitorAppearance[] = [];
 
 export const mockPromptMonitoring: PromptMonitoringService = {
-  async listPrompts(domain) {
-    return [...prompts.values()].filter((p) => p.domain === domain);
+  async listPrompts(domain, userId?) {
+    return [...prompts.values()].filter((p) => p.domain === domain && (!userId || p.userId === userId));
   },
 
   async createPrompt(prompt) {
@@ -23,14 +23,17 @@ export const mockPromptMonitoring: PromptMonitoringService = {
     return record;
   },
 
-  async updatePrompt(id, updates) {
+  async updatePrompt(id, updates, userId?) {
     const existing = prompts.get(id);
     if (!existing) throw new Error('Prompt not found');
+    if (userId && existing.userId !== userId) throw new Error('Forbidden');
     const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
     prompts.set(id, updated as MonitoredPrompt);
   },
 
-  async deletePrompt(id) {
+  async deletePrompt(id, userId?) {
+    const existing = prompts.get(id);
+    if (userId && (!existing || existing.userId !== userId)) throw new Error('Forbidden');
     prompts.delete(id);
   },
 
@@ -38,9 +41,12 @@ export const mockPromptMonitoring: PromptMonitoringService = {
     results.push({ id: randomUUID(), ...result });
   },
 
-  async listPromptResults(domain, limit = 100) {
+  async listPromptResults(domain, limit = 100, userId?) {
+    const allowedPromptIds = userId
+      ? new Set([...prompts.values()].filter((p) => p.userId === userId).map((p) => p.id))
+      : null;
     return results
-      .filter((r) => r.domain === domain)
+      .filter((r) => r.domain === domain && (!allowedPromptIds || allowedPromptIds.has(r.promptId)))
       .sort((a, b) => new Date(b.testedAt).getTime() - new Date(a.testedAt).getTime())
       .slice(0, limit);
   },

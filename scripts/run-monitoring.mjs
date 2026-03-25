@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 
-const APP_URL = process.env.APP_URL;
+const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
 const MONITORING_SECRET = process.env.MONITORING_SECRET;
 
-if (!APP_URL || !MONITORING_SECRET) {
-  console.error('Missing APP_URL or MONITORING_SECRET environment variables.');
+const normalizedAppUrl = APP_URL ? APP_URL.replace(/\/$/, '') : '';
+
+if (!normalizedAppUrl || !MONITORING_SECRET) {
+  console.error('Missing APP_URL/NEXT_PUBLIC_APP_URL or MONITORING_SECRET environment variables.');
   process.exit(1);
 }
 
 async function main() {
-  console.log(`[Monitoring] Triggering re-scan at ${APP_URL}/api/cron/monitor`);
+  console.log(`[Monitoring] Triggering re-scan at ${normalizedAppUrl}/api/cron/monitor`);
 
-  const res = await fetch(`${APP_URL}/api/cron/monitor`, {
+  const res = await fetch(`${normalizedAppUrl}/api/cron/monitor`, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${MONITORING_SECRET}`,

@@ -68,23 +68,23 @@ export function DashboardSection({
 }: DashboardSectionProps) {
   const scores = report.score.scores;
   const mentions = report.mentionSummary;
-  const [platformPeriod, setPlatformPeriod] = useState<'7d' | '30d' | '3m'>('30d');
   const [renderedAt] = useState(() => Date.now());
 
-  // Lift tracking-ready state so both panels share one API call
+  // Lift tracking key + last signal so both panels share one API call
   const [trackingReady, setTrackingReady] = useState(false);
-  const [trackingLoading, setTrackingLoading] = useState(true);
+  const [trackingLastUsedAt, setTrackingLastUsedAt] = useState<string | null>(null);
   useEffect(() => {
     if (!domain) return;
     let cancelled = false;
-    setTrackingLoading(true);
     fetch(`/api/user/tracking-key?domain=${encodeURIComponent(domain)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!cancelled && data) setTrackingReady(Boolean(data.siteKey));
+        if (!cancelled && data) {
+          setTrackingReady(Boolean(data.siteKey));
+          setTrackingLastUsedAt(typeof data.lastUsedAt === 'string' ? data.lastUsedAt : null);
+        }
       })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setTrackingLoading(false); });
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [domain]);
 
@@ -265,7 +265,7 @@ export function DashboardSection({
               {avgRank != null ? `#${avgRank}` : '--'}
             </span>
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">When mentioned by a model</p>
+          <p className="mt-2 text-[11px] text-zinc-500">{avgRank != null ? 'When mentioned by a model' : 'No citations detected yet'}</p>
           {domain && (
             <p className="mt-3 text-[11px] text-zinc-600">
               Tracking: <span className="text-zinc-400">{domain}</span>
@@ -286,7 +286,7 @@ export function DashboardSection({
           {totalMentions === 0 && totalChecks === 0 ? (
             <div className="mt-2">
               <span className="text-4xl font-bold text-zinc-600">--</span>
-              <p className="mt-1.5 text-[11px] font-medium text-zinc-500">Awaiting scan</p>
+              <p className="mt-1.5 text-[11px] font-medium text-zinc-500">{report?.mentionSummary ? 'No prompts configured yet' : 'Awaiting first scan'}</p>
             </div>
           ) : (
           <div className="mt-2 flex items-baseline gap-1.5">
@@ -323,26 +323,9 @@ export function DashboardSection({
       {/* Platform Performance */}
       {platformCards.length > 0 ? (
         <DashboardPanel className="p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Platform Performance</p>
-              <p className="mt-1 text-[13px] text-zinc-500">Real-time visibility across different AI platforms</p>
-            </div>
-            <div className="flex rounded-lg border border-white/[0.06] p-0.5">
-              {(['7d', '30d', '3m'] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPlatformPeriod(p)}
-                  className={cn(
-                    'px-3 py-1 text-[11px] font-medium rounded-md transition-colors',
-                    platformPeriod === p ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'
-                  )}
-                >
-                  {p.toUpperCase()}
-                </button>
-              ))}
-            </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Platform Performance</p>
+            <p className="mt-1 text-[13px] text-zinc-500">Real-time visibility across different AI platforms</p>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -579,11 +562,11 @@ export function DashboardSection({
 
       {/* AI Crawler Traffic */}
       <div id="tracking" className="scroll-mt-6">
-        <AICrawlerPanel domain={domain} trackingReady={trackingReady} />
+        <AICrawlerPanel domain={domain} trackingReady={trackingReady} trackingLastUsedAt={trackingLastUsedAt} />
       </div>
 
-      {/* AI Referral Traffic — only render when tracking is configured */}
-      {trackingReady && <AIReferralPanel domain={domain} trackingReady={trackingReady} />}
+      {/* AI Referral Traffic */}
+      <AIReferralPanel domain={domain} trackingLastUsedAt={trackingLastUsedAt} />
 
       {/* Recent Scans removed — redundant with sidebar domain list */}
     </div>

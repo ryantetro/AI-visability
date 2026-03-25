@@ -5,8 +5,8 @@ export interface DatabaseService {
   getScan(id: string): Promise<ScanJob | null>;
   saveScan(scan: ScanJob): Promise<void>;
   findScanByUrl(normalizedUrl: string, maxAgeMs?: number): Promise<ScanJob | null>;
-  listCompletedScans(limit?: number): Promise<ScanJob[]>;
-  findLatestScanByDomain(domain: string): Promise<ScanJob | null>;
+  listCompletedScans(limit?: number, email?: string): Promise<ScanJob[]>;
+  findLatestScanByDomain(domain: string, email?: string): Promise<ScanJob | null>;
 }
 
 export interface CheckoutSession {
@@ -86,12 +86,12 @@ export interface CompetitorSummary {
 }
 
 export interface PromptMonitoringService {
-  listPrompts(domain: string): Promise<MonitoredPrompt[]>;
+  listPrompts(domain: string, userId?: string): Promise<MonitoredPrompt[]>;
   createPrompt(prompt: Omit<MonitoredPrompt, 'id' | 'createdAt' | 'updatedAt'>): Promise<MonitoredPrompt>;
-  updatePrompt(id: string, updates: { active?: boolean; promptText?: string; category?: string }): Promise<void>;
-  deletePrompt(id: string): Promise<void>;
+  updatePrompt(id: string, updates: { active?: boolean; promptText?: string; category?: string }, userId?: string): Promise<void>;
+  deletePrompt(id: string, userId?: string): Promise<void>;
   savePromptResult(result: Omit<PromptResult, 'id'>): Promise<void>;
-  listPromptResults(domain: string, limit?: number): Promise<PromptResult[]>;
+  listPromptResults(domain: string, limit?: number, userId?: string): Promise<PromptResult[]>;
   listResultsByPrompt(promptId: string, limit?: number): Promise<PromptResult[]>;
   listActiveDomainsWithPrompts(): Promise<string[]>;
   saveCompetitorAppearance(appearance: Omit<CompetitorAppearance, 'id' | 'detectedAt'>): Promise<void>;

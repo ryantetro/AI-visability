@@ -26,15 +26,16 @@ function detectAiBot(userAgent: string): { botName: string; category: 'indexing'
 
 async function logBotVisit(domain: string, botName: string, category: string, pagePath: string, userAgent: string) {
   // Fire-and-forget POST to internal API to avoid importing service layer in edge middleware
+  const secret = process.env.MONITORING_SECRET;
+  if (!secret) return; // No secret configured — skip bot logging silently
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     await fetch(`${baseUrl}/api/crawler-visits`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-internal-secret': process.env.MONITORING_SECRET || '',
+        'x-internal-secret': secret,
       },
       body: JSON.stringify({ domain, botName, botCategory: category, pagePath, userAgent }),
     });
@@ -93,7 +94,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Allow static files
-  if (pathname.includes('.')) {
+  if (/\.(ico|png|jpg|jpeg|gif|svg|webp|css|js|woff2?|map|txt|xml|json|webmanifest)$/i.test(pathname)) {
     return NextResponse.next();
   }
 

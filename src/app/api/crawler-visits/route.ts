@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getCrawlerVisits } from '@/lib/services/registry';
+import { getSupabaseClient } from '@/lib/supabase';
 
 const BOT_TO_PROVIDER: Record<string, string> = {
   GPTBot: 'chatgpt',
@@ -26,6 +27,22 @@ export async function GET(request: NextRequest) {
   const domain = request.nextUrl.searchParams.get('domain');
   if (!domain) {
     return NextResponse.json({ error: 'domain query parameter is required.' }, { status: 400 });
+  }
+
+  // Verify the user has deployed a tracking script for this domain
+  const supabase = getSupabaseClient();
+  const { data: trackingKey } = await supabase
+    .from('site_tracking_keys')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('domain', domain.toLowerCase())
+    .maybeSingle();
+
+  if (!trackingKey) {
+    return NextResponse.json(
+      { error: 'No tracking script found for this domain. Generate and deploy your tracking script first.' },
+      { status: 403 }
+    );
   }
 
   const days = parseInt(request.nextUrl.searchParams.get('days') ?? '30', 10);
@@ -162,11 +179,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
   }
 
+  if (typeof domain === 'string' && domain.length > 253) {
+    return NextResponse.json({ error: 'domain must be 253 characters or fewer.' }, { status: 400 });
+  }
+  if (typeof botName === 'string' && botName.length > 100) {
+    return NextResponse.json({ error: 'botName must be 100 characters or fewer.' }, { status: 400 });
+  }
+  if (typeof pagePath === 'string' && pagePath.length > 2048) {
+    return NextResponse.json({ error: 'pagePath must be 2048 characters or fewer.' }, { status: 400 });
+  }
+  if (userAgent !== undefined && userAgent !== null && typeof userAgent === 'string' && userAgent.length > 500) {
+    return NextResponse.json({ error: 'userAgent must be 500 characters or fewer.' }, { status: 400 });
+  }
+
+  const VALID_BOT_CATEGORIES = ['indexing', 'citation', 'training', 'unknown'];
+  const resolvedBotCategory = VALID_BOT_CATEGORIES.includes(botCategory) ? botCategory : 'unknown';
+
   const cv = getCrawlerVisits();
   await cv.logVisit({
     domain,
     botName,
-    botCategory: botCategory || 'unknown',
+    botCategory: resolvedBotCategory,
     pagePath,
     userAgent: userAgent || null,
     responseCode: null,

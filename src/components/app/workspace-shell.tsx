@@ -146,7 +146,7 @@ export function WorkspaceShell({
     }
     return (
       <CenteredWorkspaceState
-        label={loadError}
+        label="Something went wrong loading your workspace. Please try refreshing the page."
         tone="error"
       />
     );

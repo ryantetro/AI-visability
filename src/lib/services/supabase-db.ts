@@ -134,25 +134,32 @@ export const supabaseDb: DatabaseService = {
     return match ? fromRow(match) : null;
   },
 
-  async listCompletedScans(limit = 50) {
+  async listCompletedScans(limit = 50, email?: string) {
     if (!hasSupabaseConfig()) {
       throw new Error('Supabase is not configured.');
     }
 
-    const rows = await queryRows(
-      `status=eq.complete&order=completed_at.desc.nullslast,created_at.desc&limit=${Math.max(1, Math.min(limit, 200))}&select=*`
-    );
+    let query = `status=eq.complete&order=completed_at.desc.nullslast,created_at.desc&limit=${Math.max(1, Math.min(limit, 200))}&select=*`;
+    if (email) {
+      query += `&email=eq.${encodeURIComponent(email)}`;
+    }
 
+    const rows = await queryRows(query);
     return rows.map(fromRow);
   },
 
-  async findLatestScanByDomain(domain: string) {
+  async findLatestScanByDomain(domain: string, email?: string) {
     if (!hasSupabaseConfig()) {
       throw new Error('Supabase is not configured.');
     }
 
     const normalizedDomain = domain.toLowerCase();
-    const rows = await queryRows('status=eq.complete&order=completed_at.desc.nullslast,created_at.desc&limit=200&select=*');
+    let query = `status=eq.complete&order=completed_at.desc.nullslast,created_at.desc&limit=50&select=*&url=ilike.*${encodeURIComponent(normalizedDomain)}*`;
+    if (email) {
+      query += `&email=eq.${encodeURIComponent(email)}`;
+    }
+
+    const rows = await queryRows(query);
     const match = rows.find((row) => getDomain(row.url) === normalizedDomain);
     return match ? fromRow(match) : null;
   },

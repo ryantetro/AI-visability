@@ -79,11 +79,16 @@ function resultFromRow(row: ResultRow): PromptResult {
 // ── Service implementation ───────────────────────────────────────
 
 export const supabasePromptMonitoring: PromptMonitoringService = {
-  async listPrompts(domain: string) {
+  async listPrompts(domain: string, userId?: string) {
     if (!hasSupabaseConfig()) throw new Error('Supabase is not configured.');
 
+    let query = `monitored_prompts?domain=eq.${encodeURIComponent(domain)}&order=created_at.asc&select=*`;
+    if (userId) {
+      query += `&user_id=eq.${encodeURIComponent(userId)}`;
+    }
+
     const res = await fetch(
-      supabaseUrl(`monitored_prompts?domain=eq.${encodeURIComponent(domain)}&order=created_at.asc&select=*`),
+      supabaseUrl(query),
       { headers: supabaseHeaders(), cache: 'no-store' }
     );
     if (!res.ok) throw new Error(`Failed to list prompts: ${res.status}`);
@@ -113,7 +118,7 @@ export const supabasePromptMonitoring: PromptMonitoringService = {
     return promptFromRow(rows[0]);
   },
 
-  async updatePrompt(id, updates) {
+  async updatePrompt(id, updates, userId?) {
     if (!hasSupabaseConfig()) throw new Error('Supabase is not configured.');
 
     const body: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -121,8 +126,13 @@ export const supabasePromptMonitoring: PromptMonitoringService = {
     if (updates.promptText !== undefined) body.prompt_text = updates.promptText;
     if (updates.category !== undefined) body.category = updates.category;
 
+    let query = `monitored_prompts?id=eq.${encodeURIComponent(id)}`;
+    if (userId) {
+      query += `&user_id=eq.${encodeURIComponent(userId)}`;
+    }
+
     const res = await fetch(
-      supabaseUrl(`monitored_prompts?id=eq.${encodeURIComponent(id)}`),
+      supabaseUrl(query),
       {
         method: 'PATCH',
         headers: supabaseHeaders({ Prefer: 'return=minimal' }),
@@ -135,11 +145,16 @@ export const supabasePromptMonitoring: PromptMonitoringService = {
     }
   },
 
-  async deletePrompt(id) {
+  async deletePrompt(id, userId?) {
     if (!hasSupabaseConfig()) throw new Error('Supabase is not configured.');
 
+    let query = `monitored_prompts?id=eq.${encodeURIComponent(id)}`;
+    if (userId) {
+      query += `&user_id=eq.${encodeURIComponent(userId)}`;
+    }
+
     const res = await fetch(
-      supabaseUrl(`monitored_prompts?id=eq.${encodeURIComponent(id)}`),
+      supabaseUrl(query),
       { method: 'DELETE', headers: supabaseHeaders({ Prefer: 'return=minimal' }) }
     );
     if (!res.ok) {
@@ -173,8 +188,23 @@ export const supabasePromptMonitoring: PromptMonitoringService = {
     }
   },
 
-  async listPromptResults(domain, limit = 100) {
+  async listPromptResults(domain, limit = 100, userId?) {
     if (!hasSupabaseConfig()) throw new Error('Supabase is not configured.');
+
+    if (userId) {
+      // Fetch user's prompt IDs first, then filter results to those prompts
+      const prompts = await this.listPrompts(domain, userId);
+      if (prompts.length === 0) return [];
+
+      const promptIds = prompts.map(p => p.id);
+      const inFilter = `(${promptIds.map(id => encodeURIComponent(id)).join(',')})`;
+      const res = await fetch(
+        supabaseUrl(`prompt_results?domain=eq.${encodeURIComponent(domain)}&prompt_id=in.${inFilter}&order=tested_at.desc&limit=${limit}&select=*`),
+        { headers: supabaseHeaders(), cache: 'no-store' }
+      );
+      if (!res.ok) throw new Error(`Failed to list results: ${res.status}`);
+      return ((await res.json()) as ResultRow[]).map(resultFromRow);
+    }
 
     const res = await fetch(
       supabaseUrl(`prompt_results?domain=eq.${encodeURIComponent(domain)}&order=tested_at.desc&limit=${limit}&select=*`),

@@ -14,7 +14,7 @@ function getStripe(): Stripe {
 }
 
 function hasStripeConfig() {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
+  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET);
 }
 
 export function canUseStripe() {
@@ -123,46 +123,8 @@ export async function createPortalSession(userId: string, email: string): Promis
 }
 
 export const stripePayment: PaymentService = {
-  async createCheckout(scanId: string, plan: PaymentPlan = 'starter_monthly'): Promise<CheckoutSession> {
-    if (!hasStripeConfig()) {
-      throw new Error('STRIPE_SECRET_KEY is not configured.');
-    }
-
-    const stripe = getStripe();
-    const appUrl = getAppUrl();
-    const priceId = getPriceId(plan);
-
-    const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = priceId
-      ? { price: priceId, quantity: 1 }
-      : {
-          price_data: {
-            currency: 'usd',
-            unit_amount: getPlanPriceCents(plan),
-            product_data: {
-              name: `AISO ${getPlanDisplayName(plan)}`,
-              description: 'AI visibility dashboard, monitoring, and fix tools access.',
-            },
-            recurring: { interval: plan.endsWith('_annual') ? 'year' : 'month' },
-          },
-          quantity: 1,
-        };
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [lineItem],
-      success_url: `${appUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/pricing`,
-      metadata: { scanId, plan },
-      subscription_data: { metadata: { plan } },
-    });
-
-    return {
-      id: session.id,
-      scanId,
-      amount: session.amount_total ?? getPlanPriceCents(plan),
-      currency: 'usd',
-      url: session.url || '',
-    };
+  async createCheckout(): Promise<CheckoutSession> {
+    throw new Error('Use createSubscriptionCheckout() for Stripe payments. Legacy createCheckout does not support userId metadata.');
   },
 
   async verifyPayment(sessionId: string) {

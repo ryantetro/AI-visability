@@ -17,15 +17,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  const domain = request.nextUrl.searchParams.get('domain');
-  if (!domain) {
+  const rawDomain = request.nextUrl.searchParams.get('domain');
+  if (!rawDomain) {
     return NextResponse.json({ error: 'domain query parameter is required.' }, { status: 400 });
+  }
+  const domain = rawDomain.trim().toLowerCase();
+  if (domain.length > 253) {
+    return NextResponse.json({ error: 'Invalid domain.' }, { status: 400 });
   }
 
   const pm = getPromptMonitoring();
 
   try {
-    const results = await pm.listPromptResults(domain, 500);
+    const results = await pm.listPromptResults(domain, 500, user.id);
 
     // Group by week + engine
     const buckets = new Map<string, { positions: number[]; mentioned: number; total: number }>();

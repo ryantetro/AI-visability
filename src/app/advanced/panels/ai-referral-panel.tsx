@@ -1,13 +1,16 @@
 'use client';
 
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { CheckCircle2, ExternalLink, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { CheckCircle2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import { cn } from '@/lib/utils';
 import { REFERRER_ENGINE_ORDER, REFERRER_ENGINE_LABELS, ENGINE_COLORS } from '../lib/constants';
+import { formatRelativeTime } from '../lib/utils';
 import { EngineIcon } from './shared';
 import type { ReferralTrafficSummary } from '../lib/types';
 
@@ -16,7 +19,19 @@ interface EngineTimelineRow {
   [engine: string]: string | number;
 }
 
-export function AIReferralPanel({ domain, trackingReady }: { domain: string; trackingReady: boolean }) {
+export function AIReferralPanel({
+  domain,
+  trackingLastUsedAt,
+}: {
+  domain: string;
+  trackingLastUsedAt?: string | null;
+}) {
+  const searchParams = useSearchParams();
+  const reportParam = searchParams.get('report');
+  const settingsHref = reportParam
+    ? `/settings?report=${encodeURIComponent(reportParam)}`
+    : '/settings';
+
   const [engineTimeline, setEngineTimeline] = useState<EngineTimelineRow[]>([]);
   const [engineSummaries, setEngineSummaries] = useState<ReferralTrafficSummary[]>([]);
   const [totalVisits, setTotalVisits] = useState(0);
@@ -54,25 +69,48 @@ export function AIReferralPanel({ domain, trackingReady }: { domain: string; tra
   if (totalVisits === 0 && engineSummaries.length === 0) {
     return (
       <DashboardPanel className="p-6">
-        <SectionTitle eyebrow="AI Referrals" title="AI Referral Traffic" description="Real visitors finding you through AI engines like ChatGPT and Perplexity." />
+        <SectionTitle
+          eyebrow="AI Referrals"
+          title="AI Referral Traffic"
+          description="Referral visits: real people who opened your site from an AI chat or search product."
+        />
         <div className="mt-5 rounded-[1.4rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.015)_100%)] p-5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Tracking active
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[10px] font-medium text-zinc-500">
-              <ExternalLink className="h-3 w-3" />
-              Referrer detection
+            <span className="inline-flex items-center gap-2 rounded-full border border-zinc-600/40 bg-white/[0.04] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+              {trackingLastUsedAt ? 'Site is talking to us · waiting for referral clicks' : 'Waiting for your site to send data'}
             </span>
           </div>
 
           <h3 className="mt-4 text-lg font-semibold text-white">
-            Waiting for the first AI referral.
+            {trackingLastUsedAt
+              ? `No AI referral visits in the last ${days} days`
+              : 'Waiting for referral traffic'}
           </h3>
-          <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-zinc-400">
-            When real people find you through ChatGPT, Perplexity, or other AI engines and click through to your site, their visits will show up here automatically.
+          <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-zinc-400">
+            {trackingLastUsedAt ? (
+              <>
+                Last contact:{' '}
+                <span className="font-medium text-zinc-300">
+                  {formatRelativeTime(new Date(trackingLastUsedAt).getTime())}
+                </span>
+                . This chart only counts visits where the browser sent an AI product as the referrer. Those are rarer than bot crawls (shown above). An empty graph here can be normal for a while.
+              </>
+            ) : (
+              <>
+                We have not received any hit from your production site yet, so we can’t show referrals or confirm the install. After the first successful event, this section will focus on <span className="text-zinc-300">clicks from AI products</span> only — not bots.
+              </>
+            )}
           </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Link
+              href={settingsHref}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-zinc-400 underline decoration-zinc-600 underline-offset-2 hover:text-zinc-200"
+            >
+              Tracking settings
+            </Link>
+          </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {REFERRER_ENGINE_ORDER.map((engine) => (

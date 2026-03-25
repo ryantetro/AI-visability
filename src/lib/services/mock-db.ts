@@ -28,31 +28,28 @@ export const mockDb: DatabaseService = {
   },
 
   async findScanByUrl(normalizedUrl: string, maxAgeMs = 24 * 60 * 60 * 1000) {
-    const now = Date.now();
-    for (const scan of getStore().values()) {
-      if (
+    const matches = [...getStore().values()]
+      .filter(scan =>
         scan.normalizedUrl === normalizedUrl &&
         scan.status === 'complete' &&
-        now - scan.createdAt < maxAgeMs
-      ) {
-        return scan;
-      }
-    }
-    return null;
+        Date.now() - scan.createdAt < maxAgeMs
+      )
+      .sort((a, b) => b.createdAt - a.createdAt);
+    return matches[0] ?? null;
   },
 
-  async listCompletedScans(limit = 50) {
+  async listCompletedScans(limit = 50, email?: string) {
     return [...getStore().values()]
-      .filter((scan) => scan.status === 'complete')
+      .filter((scan) => scan.status === 'complete' && (!email || scan.email === email))
       .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))
       .slice(0, limit);
   },
 
-  async findLatestScanByDomain(domain: string) {
+  async findLatestScanByDomain(domain: string, email?: string) {
     const normalizedDomain = domain.toLowerCase();
     return (
       [...getStore().values()]
-        .filter((scan) => scan.status === 'complete' && getDomain(scan.url) === normalizedDomain)
+        .filter((scan) => scan.status === 'complete' && getDomain(scan.url) === normalizedDomain && (!email || scan.email === email))
         .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))[0] ?? null
     );
   },

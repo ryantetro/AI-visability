@@ -42,6 +42,13 @@ Displays AI crawler traffic data grouped by **provider** (ChatGPT, Perplexity, G
 }
 ```
 
+## Install signal (empty state)
+
+The dashboard reads `GET /api/user/tracking-key?domain=…` for `siteKey` and **`lastUsedAt`** (mirrors `site_tracking_keys.last_used_at`, updated when `/api/track` accepts an event). The crawler panel empty state explains:
+
+- **Key but no `lastUsedAt`**: no events received from production yet — empty chart is expected until the first bot or referral ping.
+- **`lastUsedAt` set**: install is reaching the API; the crawler chart can still be empty if there were no bot hits in the selected period (referrals are separate).
+
 ## Error handling
 
 - API errors return JSON `{ error: string }` with appropriate HTTP status

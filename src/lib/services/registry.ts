@@ -17,7 +17,11 @@ import { supabaseReferralVisits } from './supabase-referral-visits';
 import { mockReferralVisits } from './mock-referral-visits';
 import type { MentionTesterService } from '@/lib/ai-mentions/engine-tester';
 
-const FORCE_MOCKS = process.env.USE_MOCKS === 'true';
+const FORCE_MOCKS = process.env.USE_MOCKS === 'true' && process.env.NODE_ENV !== 'production';
+
+if (process.env.USE_MOCKS === 'true' && process.env.NODE_ENV === 'production') {
+  console.error('FATAL: USE_MOCKS=true in production is not allowed. Ignoring mock override.');
+}
 
 export function getDatabase(): DatabaseService {
   if (FORCE_MOCKS) return mockDb;

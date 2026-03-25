@@ -74,7 +74,7 @@ async function createOrReplaceTrackingKey(userId: string, domain: string) {
         },
         { onConflict: 'user_id,domain' }
       )
-      .select('site_key, domain, created_at')
+      .select('site_key, domain, created_at, last_used_at')
       .single();
 
     if (!error && data) {
@@ -82,6 +82,7 @@ async function createOrReplaceTrackingKey(userId: string, domain: string) {
         siteKey: data.site_key,
         domain: data.domain,
         createdAt: data.created_at,
+        lastUsedAt: data.last_used_at ?? null,
       };
     }
 
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('site_tracking_keys')
-      .select('site_key, domain, created_at')
+      .select('site_key, domain, created_at, last_used_at')
       .eq('user_id', user.id)
       .eq('domain', domain)
       .maybeSingle();
@@ -124,13 +125,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (!data) {
-      return NextResponse.json({ siteKey: null });
+      return NextResponse.json({ siteKey: null, lastUsedAt: null });
     }
 
     return NextResponse.json({
       siteKey: data.site_key,
       domain: data.domain,
       createdAt: data.created_at,
+      lastUsedAt: data.last_used_at ?? null,
     });
   } catch (error) {
     return NextResponse.json(

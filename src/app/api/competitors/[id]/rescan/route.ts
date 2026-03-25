@@ -14,7 +14,7 @@ export async function POST(
   }
 
   const { id } = await params;
-  const competitor = await getCompetitor(id);
+  const competitor = await getCompetitor(id, user.id);
 
   if (!competitor) {
     return NextResponse.json({ error: 'Competitor not found' }, { status: 404 });

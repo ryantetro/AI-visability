@@ -8,6 +8,7 @@ function SuccessContent() {
   const searchParams = useSearchParams();
   const [resolvedScanId, setResolvedScanId] = useState(searchParams.get('scanId'));
   const [verifying, setVerifying] = useState(Boolean(searchParams.get('session_id')));
+  const [verifyError, setVerifyError] = useState(false);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
@@ -37,6 +38,8 @@ function SuccessContent() {
         if (payload.paid && payload.scanId) {
           setResolvedScanId(payload.scanId);
         }
+      } catch {
+        if (active) setVerifyError(true);
       } finally {
         if (active) {
           setVerifying(false);
@@ -66,15 +69,28 @@ function SuccessContent() {
         <p className="app-body app-measure max-w-md" style={{ color: 'var(--text-tertiary)' }}>
           {verifying
             ? 'Confirming your checkout session and unlocking your advanced implementation tools.'
-            : 'Your AI visibility fix files are ready. Follow the guided install steps to boost your score.'}
+            : resolvedScanId
+              ? 'Your AI visibility fix files are ready. Follow the guided install steps to boost your score.'
+              : 'Your plan has been upgraded. Head to your dashboard to access all features.'}
         </p>
-        {resolvedScanId && !verifying && (
-          <Link
-            href={`/dashboard?report=${resolvedScanId}`}
-            className="aiso-button aiso-button-primary px-6 py-3 text-sm"
-          >
-            Open Advanced Tools
-          </Link>
+        {!verifying && (
+          <>
+            <Link
+              href={resolvedScanId ? `/dashboard?report=${resolvedScanId}` : '/dashboard'}
+              className="aiso-button aiso-button-primary px-6 py-3 text-sm"
+            >
+              {resolvedScanId ? 'Open Advanced Tools' : 'Go to Dashboard'}
+            </Link>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+              Plan upgrades apply within 30 seconds. If your new features aren't visible yet, refresh the page.
+            </p>
+          </>
+        )}
+        {verifyError && (
+          <p className="text-sm mt-2" style={{ color: 'var(--color-error-500, #ef4444)' }}>
+            We couldn't confirm your session automatically.{' '}
+            <Link href="/dashboard" className="underline">Go to dashboard</Link> — your payment was received and your plan will update shortly.
+          </p>
         )}
       </div>
     </div>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { isUnlimitedPlanLimit } from '@/lib/account-access-overrides';
 import { cn } from '@/lib/utils';
 import { buildBotTrackingInstallPrompt, buildBotTrackingSnippet, type BotTrackingRuntime } from '@/lib/llm-prompts';
+import { formatRelativeTime } from '@/app/advanced/lib/utils';
 import { usePlan } from '@/hooks/use-plan';
 import { PLANS } from '@/lib/pricing';
 import { useDomainContext } from '@/contexts/domain-context';
@@ -22,6 +23,7 @@ type TrackingKeyState = {
   siteKey: string | null;
   domain: string;
   createdAt: string | null;
+  lastUsedAt: string | null;
 };
 
 function normalizeAppUrl(url: string) {
@@ -75,13 +77,13 @@ export function SettingsSection({
   onEnableMonitoring,
   onDisableMonitoring,
 }: SettingsSectionProps) {
-  const [notificationAlertsOn, setNotificationAlertsOn] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
   const [trackingRuntime, setTrackingRuntime] = useState<BotTrackingRuntime>('next');
   const [trackingKey, setTrackingKey] = useState<TrackingKeyState>({
     siteKey: null,
     domain,
     createdAt: null,
+    lastUsedAt: null,
   });
   const [trackingKeyLoading, setTrackingKeyLoading] = useState(true);
   const [trackingKeySaving, setTrackingKeySaving] = useState(false);
@@ -100,8 +102,8 @@ export function SettingsSection({
     ? `${monitoredSites.length} / Unlimited`
     : `${monitoredSites.length} / ${maxDomains}`;
   const trackedPromptsValue = isUnlimitedPlanLimit(maxPrompts)
-    ? '0 / Unlimited'
-    : `0 / ${maxPrompts}`;
+    ? '-- / Unlimited'
+    : `-- / ${maxPrompts}`;
   const snippetAppUrl =
     typeof window !== 'undefined' &&
     window.location.origin &&
@@ -162,10 +164,11 @@ export function SettingsSection({
           siteKey: typeof data.siteKey === 'string' ? data.siteKey : null,
           domain,
           createdAt: typeof data.createdAt === 'string' ? data.createdAt : null,
+          lastUsedAt: typeof data.lastUsedAt === 'string' ? data.lastUsedAt : null,
         });
       } catch (error) {
         if (!active) return;
-        setTrackingKey({ siteKey: null, domain, createdAt: null });
+        setTrackingKey({ siteKey: null, domain, createdAt: null, lastUsedAt: null });
         setTrackingError(error instanceof Error ? error.message : 'Failed to load tracking key');
       } finally {
         if (active) {
@@ -199,6 +202,7 @@ export function SettingsSection({
         siteKey: data.siteKey,
         domain: data.domain || domain,
         createdAt: data.createdAt || new Date().toISOString(),
+        lastUsedAt: typeof data.lastUsedAt === 'string' ? data.lastUsedAt : null,
       });
       localStorage.setItem('aiso_onboarding_tracking_installed', '1');
     } catch (error) {
@@ -302,7 +306,11 @@ export function SettingsSection({
                 </button>
                 <button
                   type="button"
-                  onClick={handleOpenBillingPortal}
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to cancel your plan? You\'ll lose access to advanced features at the end of your billing period.')) {
+                      handleOpenBillingPortal();
+                    }
+                  }}
                   disabled={portalLoading}
                   className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
                 >
@@ -363,23 +371,7 @@ export function SettingsSection({
             label="Score change alerts"
             description="Get emailed when your score moves by 2+ points."
             action={
-              <button
-                type="button"
-                role="switch"
-                aria-checked={notificationAlertsOn}
-                onClick={() => setNotificationAlertsOn(!notificationAlertsOn)}
-                className={cn(
-                  'relative h-[22px] w-[42px] shrink-0 rounded-full transition-colors',
-                  notificationAlertsOn ? 'bg-[#25c972]' : 'bg-white/15'
-                )}
-              >
-                <span
-                  className={cn(
-                    'absolute top-[3px] h-4 w-4 rounded-full bg-white shadow-sm transition-all',
-                    notificationAlertsOn ? 'left-[calc(100%-1.19rem)]' : 'left-[3px]'
-                  )}
-                />
-              </button>
+              <span className="text-[12px] text-zinc-500 italic">Coming soon</span>
             }
           />
 
@@ -408,9 +400,18 @@ export function SettingsSection({
           <FieldRow
             label="Site key"
             description={
-              trackingKey.createdAt
-                ? `Issued ${new Date(trackingKey.createdAt).toLocaleDateString()}`
-                : 'No key generated yet'
+              !trackingKey.siteKey
+                ? 'No key generated yet'
+                : [
+                    trackingKey.createdAt
+                      ? `Issued ${new Date(trackingKey.createdAt).toLocaleDateString()}`
+                      : null,
+                    trackingKey.lastUsedAt
+                      ? `Last signal from your site: ${formatRelativeTime(new Date(trackingKey.lastUsedAt).getTime())}`
+                      : 'No signals from your live site yet — deploy the snippet on production, then visits will update this.',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
             }
             action={
               <button

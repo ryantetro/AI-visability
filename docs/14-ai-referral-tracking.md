@@ -52,6 +52,13 @@ Detects human visitors arriving at a customer's site via click-through links fro
 }
 ```
 
+## Empty state vs install signal
+
+The dashboard passes **`lastUsedAt`** from `GET /api/user/tracking-key` (same field as crawler panel). Referral-specific empty copy clarifies:
+
+- **No `lastUsedAt`**: production has not sent any events yet — empty referral chart is expected until deploy/snippet issues are resolved.
+- **`lastUsedAt` set but no referral rows**: the install is live; this chart only counts human visits with an AI `Referer`. Bot crawls update `lastUsedAt` but do not appear here.
+
 ## Error Handling
 
 - Invalid source engine -> 400

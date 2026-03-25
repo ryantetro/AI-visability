@@ -61,13 +61,14 @@ export async function listCompetitors(userId: string, domain: string): Promise<U
   return (data ?? []).map((row: Record<string, unknown>) => rowToCompetitor(row));
 }
 
-export async function getCompetitor(id: string): Promise<UserCompetitor | null> {
+export async function getCompetitor(id: string, userId: string): Promise<UserCompetitor | null> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
     .from('user_competitors')
     .select('*')
     .eq('id', id)
+    .eq('user_id', userId)
     .single();
 
   if (error || !data) return null;
@@ -96,13 +97,14 @@ export async function updateCompetitorScan(
   }
 }
 
-export async function deleteCompetitor(id: string): Promise<void> {
+export async function deleteCompetitor(id: string, userId: string): Promise<void> {
   const supabase = getSupabaseClient();
 
   const { error } = await supabase
     .from('user_competitors')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('user_id', userId);
 
   if (error) {
     throw new Error(`Failed to delete competitor: ${error.message}`);

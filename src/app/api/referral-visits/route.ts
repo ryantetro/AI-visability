@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getReferralVisits } from '@/lib/services/registry';
+import { getSupabaseClient } from '@/lib/supabase';
 import type { SourceEngine } from '@/types/services';
 
 const ENGINE_ORDER: SourceEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude'];
@@ -14,6 +15,22 @@ export async function GET(request: NextRequest) {
   const domain = request.nextUrl.searchParams.get('domain');
   if (!domain) {
     return NextResponse.json({ error: 'domain query parameter is required.' }, { status: 400 });
+  }
+
+  // Verify the user has deployed a tracking script for this domain
+  const supabase = getSupabaseClient();
+  const { data: trackingKey } = await supabase
+    .from('site_tracking_keys')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('domain', domain.toLowerCase())
+    .maybeSingle();
+
+  if (!trackingKey) {
+    return NextResponse.json(
+      { error: 'No tracking script found for this domain. Generate and deploy your tracking script first.' },
+      { status: 403 }
+    );
   }
 
   const days = parseInt(request.nextUrl.searchParams.get('days') ?? '30', 10);

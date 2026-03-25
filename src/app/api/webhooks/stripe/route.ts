@@ -3,6 +3,8 @@ import Stripe from 'stripe';
 import { getSupabaseClient } from '@/lib/supabase';
 import { upgradeUserPlan } from '@/lib/user-profile';
 
+const processedEvents = new Set<string>();
+
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error('STRIPE_SECRET_KEY is not configured.');
@@ -53,39 +55,60 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Webhook signature verification failed: ${message}` }, { status: 400 });
   }
 
+  // Idempotency: skip already-processed events
+  if (processedEvents.has(event.id)) {
+    return NextResponse.json({ received: true });
+  }
+  processedEvents.add(event.id);
+  // Keep set bounded
+  if (processedEvents.size > 10000) {
+    const first = processedEvents.values().next().value as string;
+    if (first) processedEvents.delete(first);
+  }
+
   const supabase = getSupabaseClient();
 
   switch (event.type) {
     case 'checkout.session.completed': {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const userId = session.metadata?.userId;
-      const plan = session.metadata?.plan || 'starter_monthly';
+      try {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const userId = session.metadata?.userId;
+        const plan = session.metadata?.plan || 'starter_monthly';
 
-      if (userId) {
-        await upgradeUserPlan(userId, plan);
+        if (userId) {
+          await upgradeUserPlan(userId, plan);
 
-        // Store subscription ID if present
-        if (session.subscription) {
-          const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
-          await supabase
-            .from('user_profiles')
-            .update({
-              stripe_subscription_id: subId,
-              plan_updated_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', userId);
+          // Store subscription ID if present
+          if (session.subscription) {
+            const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+            await supabase
+              .from('user_profiles')
+              .update({
+                stripe_subscription_id: subId,
+                plan_updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', userId);
+          }
         }
+      } catch (err) {
+        console.error('Error handling checkout.session.completed:', err);
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 });
       }
       break;
     }
 
     case 'customer.subscription.updated': {
-      const subscription = event.data.object as Stripe.Subscription;
-      const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
-      const userId = await findUserByCustomerId(customerId);
+      try {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+        const userId = await findUserByCustomerId(customerId);
 
-      if (userId) {
+        if (!userId) {
+          console.warn('customer.subscription.updated: no user found for customer', customerId, '— acknowledging to prevent retry storm');
+          return NextResponse.json({ received: true });
+        }
+
         // Determine plan from subscription's price ID
         const priceId = subscription.items.data[0]?.price?.id;
         const plan = priceId ? priceIdToPlan(priceId) : subscription.metadata?.plan;
@@ -105,16 +128,24 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', userId);
+      } catch (err) {
+        console.error('Error handling customer.subscription.updated:', err);
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 });
       }
       break;
     }
 
     case 'customer.subscription.deleted': {
-      const subscription = event.data.object as Stripe.Subscription;
-      const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
-      const userId = await findUserByCustomerId(customerId);
+      try {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+        const userId = await findUserByCustomerId(customerId);
 
-      if (userId) {
+        if (!userId) {
+          console.warn('customer.subscription.deleted: no user found for customer', customerId, '— acknowledging to prevent retry storm');
+          return NextResponse.json({ received: true });
+        }
+
         // Downgrade to free
         await upgradeUserPlan(userId, 'free');
         await supabase
@@ -126,6 +157,9 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', userId);
+      } catch (err) {
+        console.error('Error handling customer.subscription.deleted:', err);
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 });
       }
       break;
     }

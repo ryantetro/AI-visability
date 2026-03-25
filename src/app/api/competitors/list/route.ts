@@ -13,9 +13,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const domain = request.nextUrl.searchParams.get('domain');
-  if (!domain) {
+  const rawDomain = request.nextUrl.searchParams.get('domain');
+  if (!rawDomain) {
     return NextResponse.json({ error: 'domain query param is required' }, { status: 400 });
+  }
+
+  const domain = rawDomain.trim().toLowerCase();
+  if (domain.length > 253) {
+    return NextResponse.json({ error: 'domain must be 253 characters or fewer.' }, { status: 400 });
+  }
+  if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(domain)) {
+    return NextResponse.json({ error: 'domain format is invalid.' }, { status: 400 });
   }
 
   try {
@@ -59,8 +67,8 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Get user's own latest scan for the domain
-    const userDomainScan = await db.findLatestScanByDomain(domain);
+    // Get user's own latest scan for the domain (scoped to authenticated user)
+    const userDomainScan = await db.findLatestScanByDomain(domain, user.email);
     const userScoreResult = userDomainScan?.scoreResult as ScoreResult | undefined;
     const userMentionSummary = normalizeMentionSummary(userDomainScan?.mentionSummary as MentionSummary | undefined);
 

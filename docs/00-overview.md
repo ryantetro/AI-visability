@@ -18,6 +18,8 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [12-monitoring-alerts.md](./12-monitoring-alerts.md) | Monitoring, cron rescans, Resend email alerts | `src/lib/services/resend-alerts.ts`, `src/app/api/cron/monitor/route.ts` |
 | [13-onboarding-flow.md](./13-onboarding-flow.md) | Onboarding checklist and guided setup flow | `src/hooks/use-onboarding.ts`, `src/components/app/onboarding-checklist.tsx` |
 | [14-ai-referral-tracking.md](./14-ai-referral-tracking.md) | AI referral attribution — click-through tracking from AI engines | `src/app/advanced/panels/ai-referral-panel.tsx`, `src/app/api/referral-visits/route.ts` |
+| [15-ux-audit-improvements.md](./15-ux-audit-improvements.md) | UX audit — copy fixes, tooltips, score context, interaction fixes | `src/components/ui/info-tooltip.tsx`, `src/components/app/score-summary-hero.tsx` |
+| [16-pre-launch-hardening.md](./16-pre-launch-hardening.md) | Pre-launch security hardening — P0/P1 fixes for auth, payments, API validation | `src/lib/auth.ts`, `src/app/api/webhooks/stripe/route.ts`, `src/middleware.ts` |
 
 ## Architecture Principles
 
