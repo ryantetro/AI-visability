@@ -27,6 +27,12 @@ type TrackingKeyState = {
   lastUsedAt: string | null;
 };
 
+type OpportunityAlertState = {
+  opportunityAlertsEnabled: boolean;
+  lastOpportunityAlertAt: number | null;
+  hydrated: boolean;
+};
+
 function normalizeAppUrl(url: string) {
   return url.replace(/\/$/, '');
 }
@@ -71,6 +77,39 @@ function Card({ children, className }: { children: ReactNode; className?: string
   );
 }
 
+function ToggleSwitch({
+  checked,
+  disabled,
+  onToggle,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={onToggle}
+      className={cn(
+        'relative inline-flex h-6 w-11 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        checked
+          ? 'border-[#25c972]/40 bg-[#25c972]/20'
+          : 'border-white/[0.08] bg-white/[0.06]'
+      )}
+    >
+      <span
+        className={cn(
+          'inline-block h-4 w-4 rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.25)] transition-transform',
+          checked ? 'translate-x-6' : 'translate-x-1'
+        )}
+      />
+    </button>
+  );
+}
+
 export function SettingsSection({
   domain,
   monitoringConnected,
@@ -93,6 +132,13 @@ export function SettingsSection({
   const [trackingPromptCopying, setTrackingPromptCopying] = useState(false);
   const [trackingPromptCopied, setTrackingPromptCopied] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [opportunityAlertState, setOpportunityAlertState] = useState<OpportunityAlertState>({
+    opportunityAlertsEnabled: true,
+    lastOpportunityAlertAt: null,
+    hydrated: false,
+  });
+  const [opportunityAlertSaving, setOpportunityAlertSaving] = useState(false);
+  const [opportunityAlertError, setOpportunityAlertError] = useState<string | null>(null);
   const [appUrl, setAppUrl] = useState(() => normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL || ''));
   const { tier, plan, email, maxDomains, maxPrompts } = usePlan();
   const { user } = useAuth();
@@ -184,6 +230,54 @@ export function SettingsSection({
     return () => { active = false; };
   }, [domain]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadOpportunityAlertState() {
+      setOpportunityAlertError(null);
+      setOpportunityAlertState((prev) => ({ ...prev, hydrated: false }));
+
+      if (!monitoringConnected) {
+        setOpportunityAlertState({
+          opportunityAlertsEnabled: true,
+          lastOpportunityAlertAt: null,
+          hydrated: true,
+        });
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/monitoring');
+        const data = await res.json().catch(() => ({}));
+        if (!active) return;
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to load monitoring settings');
+        }
+
+        const record = Array.isArray(data.domains)
+          ? data.domains.find((entry: { domain: string }) => entry.domain === domain)
+          : null;
+
+        setOpportunityAlertState({
+          opportunityAlertsEnabled: typeof record?.opportunityAlertsEnabled === 'boolean' ? record.opportunityAlertsEnabled : true,
+          lastOpportunityAlertAt: typeof record?.lastOpportunityAlertAt === 'number' ? record.lastOpportunityAlertAt : null,
+          hydrated: true,
+        });
+      } catch (error) {
+        if (!active) return;
+        setOpportunityAlertState({
+          opportunityAlertsEnabled: true,
+          lastOpportunityAlertAt: null,
+          hydrated: true,
+        });
+        setOpportunityAlertError(error instanceof Error ? error.message : 'Failed to load monitoring settings');
+      }
+    }
+
+    void loadOpportunityAlertState();
+    return () => { active = false; };
+  }, [domain, monitoringConnected]);
+
   const handleGenerateTrackingKey = async () => {
     setTrackingKeySaving(true);
     setTrackingError(null);
@@ -251,6 +345,47 @@ export function SettingsSection({
       setTrackingError('Copy failed. Your browser blocked clipboard access.');
     } finally {
       setTrackingPromptCopying(false);
+    }
+  };
+
+  const handleToggleOpportunityAlerts = async () => {
+    if (!monitoringConnected || opportunityAlertSaving) return;
+
+    const previous = opportunityAlertState.opportunityAlertsEnabled;
+    const next = !previous;
+
+    setOpportunityAlertSaving(true);
+    setOpportunityAlertError(null);
+    setOpportunityAlertState((state) => ({
+      ...state,
+      opportunityAlertsEnabled: next,
+    }));
+
+    try {
+      const res = await fetch(`/api/monitoring/${encodeURIComponent(domain)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opportunityAlertsEnabled: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update opportunity alerts');
+      }
+
+      setOpportunityAlertState({
+        opportunityAlertsEnabled: typeof data.opportunityAlertsEnabled === 'boolean' ? data.opportunityAlertsEnabled : next,
+        lastOpportunityAlertAt: typeof data.lastOpportunityAlertAt === 'number' ? data.lastOpportunityAlertAt : null,
+        hydrated: true,
+      });
+    } catch (error) {
+      setOpportunityAlertState((state) => ({
+        ...state,
+        opportunityAlertsEnabled: previous,
+        hydrated: true,
+      }));
+      setOpportunityAlertError(error instanceof Error ? error.message : 'Failed to update opportunity alerts');
+    } finally {
+      setOpportunityAlertSaving(false);
     }
   };
 
@@ -326,7 +461,7 @@ export function SettingsSection({
       </section>
 
       {/* ─── Monitoring & Alerts ─────────────────────────────────── */}
-      <section>
+      <section id="monitoring" className="scroll-mt-6">
         <h2 className="text-[15px] font-semibold text-white">Monitoring</h2>
         <p className="mt-1 text-[12px] text-zinc-500">
           Automated scans and email alerts for {domain}.
@@ -371,12 +506,37 @@ export function SettingsSection({
           />
 
           <FieldRow
-            label="Score change alerts"
-            description="Get emailed when your score moves by 2+ points."
+            label="AI opportunity alerts"
+            description="Email me when AI engines are crawling my site but not sending visitors yet."
             action={
-              <span className="text-[12px] text-zinc-500 italic">Coming soon</span>
+              <>
+                <span className="text-[12px] text-zinc-400">
+                  {opportunityAlertState.opportunityAlertsEnabled ? 'On' : 'Off'}
+                </span>
+                <ToggleSwitch
+                  checked={opportunityAlertState.opportunityAlertsEnabled}
+                  disabled={!monitoringConnected || opportunityAlertSaving || !opportunityAlertState.hydrated}
+                  onToggle={handleToggleOpportunityAlerts}
+                />
+              </>
             }
-          />
+          >
+            {!monitoringConnected ? (
+              <p className="text-[12px] text-zinc-600">
+                Enable automated scans for this domain to turn opportunity alerts on.
+              </p>
+            ) : opportunityAlertError ? (
+              <p className="text-[12px] text-red-400">{opportunityAlertError}</p>
+            ) : opportunityAlertState.lastOpportunityAlertAt ? (
+              <p className="text-[12px] text-zinc-600">
+                Last opportunity email sent {formatRelativeTime(opportunityAlertState.lastOpportunityAlertAt)}.
+              </p>
+            ) : (
+              <p className="text-[12px] text-zinc-600">
+                Alerts are sent to your login email when crawler attention is high and referrals are still low.
+              </p>
+            )}
+          </FieldRow>
 
           <FieldRow
             label="Alert email"

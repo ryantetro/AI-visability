@@ -140,6 +140,26 @@ export interface ReferralVisitService {
   listVisits(domain: string, days?: number): Promise<ReferralVisit[]>;
 }
 
+export interface OpportunityAlertProviderSummary {
+  provider: string;
+  visits: number;
+}
+
+export interface OpportunityAlertPageSummary {
+  path: string;
+  crawlerVisits: number;
+  referralVisits: number;
+}
+
+export interface OpportunityAlertSummary {
+  domain: string;
+  latestScanId: string | null;
+  crawlerVisits: number;
+  referralVisits: number;
+  topProviders: OpportunityAlertProviderSummary[];
+  topPages: OpportunityAlertPageSummary[];
+}
+
 export interface AlertService {
   sendScoreAlert(params: {
     domain: string;
@@ -147,5 +167,9 @@ export interface AlertService {
     currentScore: number;
     threshold: number;
     recipientEmail: string;
+  }): Promise<void>;
+  sendOpportunityAlert(params: {
+    recipientEmail: string;
+    summary: OpportunityAlertSummary;
   }): Promise<void>;
 }

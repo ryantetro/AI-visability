@@ -31,9 +31,22 @@ const {
   addMonitoringDomain,
   removeMonitoringDomain,
   listMonitoringDomains,
+  updateMonitoringDomain,
+  resetMonitoringStore,
 } = require('../src/lib/monitoring.ts');
+const {
+  buildOpportunityAlertSummary,
+  hasOpportunityAlertCooldownElapsed,
+  OPPORTUNITY_ALERT_COOLDOWN_MS,
+} = require('../src/lib/opportunity-alerts.ts');
+const { mockAlertService } = require('../src/lib/monitoring-alerts.ts');
+const { mockCrawlerVisits, resetMockCrawlerVisits } = require('../src/lib/services/mock-crawler-visits.ts');
+const { mockReferralVisits, resetMockReferralVisits } = require('../src/lib/services/mock-referral-visits.ts');
 const archiveRoute = require('../src/app/api/scan/[id]/files/archive/route.ts');
 const reportRoute = require('../src/app/api/scan/[id]/report/route.ts');
+const monitoringDomainRoute = require('../src/app/api/monitoring/[domain]/route.ts');
+const opportunityAlertRoute = require('../src/app/api/opportunity-alert/route.ts');
+const cronMonitorRoute = require('../src/app/api/cron/monitor/route.ts');
 const publicScorePage = require('../src/app/score/[id]/page.tsx');
 const {
   AUTH_COOKIE_NAME,
@@ -46,6 +59,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 test.beforeEach(() => {
   resetMockDb();
   resetScanRateLimitStore();
+  resetMonitoringStore();
+  resetMockCrawlerVisits();
+  resetMockReferralVisits();
   _clearTestAuth();
 });
 
@@ -68,6 +84,49 @@ function createAuthedRequest(url, email = 'owner@example.com') {
     headers: {
       cookie: `${AUTH_COOKIE_NAME}=${token}`,
     },
+  });
+}
+
+function createAuthedJsonRequest(url, method, body, email = 'owner@example.com') {
+  const user = { id: `test-${email}`, email, name: 'Test User', provider: 'email' };
+  const token = `test-token-${email}`;
+  _setTestAuth(token, user);
+  return new NextRequest(url, {
+    method,
+    headers: {
+      cookie: `${AUTH_COOKIE_NAME}=${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+async function seedOpportunityTraffic(domain = 'example.com') {
+  const pages = [
+    ['/pricing', 12],
+    ['/blog/ai-visibility', 8],
+    ['/compare', 5],
+  ];
+
+  for (const [path, count] of pages) {
+    for (let index = 0; index < count; index += 1) {
+      await mockCrawlerVisits.logVisit({
+        domain,
+        botName: index % 2 === 0 ? 'ClaudeBot' : 'GPTBot',
+        botCategory: 'citation',
+        pagePath: path,
+        userAgent: 'test-bot',
+        responseCode: 200,
+      });
+    }
+  }
+
+  await mockReferralVisits.logVisit({
+    domain,
+    sourceEngine: 'chatgpt',
+    referrerUrl: 'https://chat.openai.com',
+    landingPage: '/pricing',
+    userAgent: 'test-browser',
   });
 }
 
@@ -999,14 +1058,279 @@ test('monitoring records can be added and removed for owned scans', async () => 
 
   assert.equal(record.domain, 'example.com');
   assert.equal(record.alertThreshold, 7);
+  assert.equal(record.opportunityAlertsEnabled, true);
+  assert.equal(record.lastOpportunityAlertAt, null);
 
   const activeRecords = await listMonitoringDomains('alerts@example.com');
   assert.equal(activeRecords.length, 1);
   assert.equal(activeRecords[0].scanId, scan.id);
+
+  const updated = await updateMonitoringDomain('example.com', 'alerts@example.com', {
+    opportunityAlertsEnabled: false,
+    lastOpportunityAlertAt: Date.now(),
+  });
+  assert.equal(updated.opportunityAlertsEnabled, false);
+  assert.ok(updated.lastOpportunityAlertAt);
 
   const removed = await removeMonitoringDomain('example.com', 'alerts@example.com');
   assert.equal(removed, true);
 
   const remainingRecords = await listMonitoringDomains('alerts@example.com');
   assert.equal(remainingRecords.length, 0);
+});
+
+test('opportunity summary ranks providers and pages for qualifying traffic', () => {
+  const crawlerVisits = [];
+  const referralVisits = [];
+
+  for (let index = 0; index < 15; index += 1) {
+    crawlerVisits.push({
+      id: `c-${index}`,
+      domain: 'example.com',
+      botName: 'ClaudeBot',
+      botCategory: 'citation',
+      pagePath: '/pricing',
+      userAgent: null,
+      responseCode: 200,
+      visitedAt: new Date().toISOString(),
+    });
+  }
+
+  for (let index = 0; index < 7; index += 1) {
+    crawlerVisits.push({
+      id: `p-${index}`,
+      domain: 'example.com',
+      botName: 'GPTBot',
+      botCategory: 'citation',
+      pagePath: '/blog/ai-visibility',
+      userAgent: null,
+      responseCode: 200,
+      visitedAt: new Date().toISOString(),
+    });
+  }
+
+  for (let index = 0; index < 3; index += 1) {
+    crawlerVisits.push({
+      id: `x-${index}`,
+      domain: 'example.com',
+      botName: 'PerplexityBot',
+      botCategory: 'citation',
+      pagePath: '/compare',
+      userAgent: null,
+      responseCode: 200,
+      visitedAt: new Date().toISOString(),
+    });
+  }
+
+  referralVisits.push({
+    id: 'r-1',
+    domain: 'example.com',
+    sourceEngine: 'chatgpt',
+    referrerUrl: 'https://chat.openai.com',
+    landingPage: '/pricing',
+    userAgent: null,
+    visitedAt: new Date().toISOString(),
+  });
+
+  const summary = buildOpportunityAlertSummary({
+    domain: 'example.com',
+    latestScanId: 'scan-1',
+    crawlerVisits,
+    referralVisits,
+  });
+
+  assert.ok(summary);
+  assert.equal(summary.crawlerVisits, 25);
+  assert.equal(summary.referralVisits, 1);
+  assert.deepEqual(summary.topProviders.map((provider) => provider.provider), ['claude', 'chatgpt', 'perplexity']);
+  assert.deepEqual(summary.topPages.map((page) => page.path), ['/pricing', '/blog/ai-visibility', '/compare']);
+  assert.equal(summary.topPages[0].referralVisits, 1);
+});
+
+test('opportunity summary returns null below threshold and omits sparse pages', () => {
+  const belowThreshold = buildOpportunityAlertSummary({
+    domain: 'example.com',
+    latestScanId: 'scan-1',
+    crawlerVisits: Array.from({ length: 24 }, (_, index) => ({
+      id: `c-${index}`,
+      domain: 'example.com',
+      botName: 'ClaudeBot',
+      botCategory: 'citation',
+      pagePath: `/page-${index}`,
+      userAgent: null,
+      responseCode: 200,
+      visitedAt: new Date().toISOString(),
+    })),
+    referralVisits: [],
+  });
+
+  assert.equal(belowThreshold, null);
+
+  const sparsePages = buildOpportunityAlertSummary({
+    domain: 'example.com',
+    latestScanId: 'scan-2',
+    crawlerVisits: Array.from({ length: 25 }, (_, index) => ({
+      id: `s-${index}`,
+      domain: 'example.com',
+      botName: 'GPTBot',
+      botCategory: 'citation',
+      pagePath: `/page-${index}`,
+      userAgent: null,
+      responseCode: 200,
+      visitedAt: new Date().toISOString(),
+    })),
+    referralVisits: [],
+  });
+
+  assert.ok(sparsePages);
+  assert.deepEqual(sparsePages.topPages, []);
+});
+
+test('opportunity cooldown uses a 7 day window', () => {
+  const now = Date.now();
+  assert.equal(hasOpportunityAlertCooldownElapsed(null, now), true);
+  assert.equal(hasOpportunityAlertCooldownElapsed(now - OPPORTUNITY_ALERT_COOLDOWN_MS + 1000, now), false);
+  assert.equal(hasOpportunityAlertCooldownElapsed(now - OPPORTUNITY_ALERT_COOLDOWN_MS - 1000, now), true);
+});
+
+test('mock alert service logs opportunity alert payload', async () => {
+  const originalLog = console.log;
+  const entries = [];
+  console.log = (message) => { entries.push(String(message)); };
+
+  try {
+    await mockAlertService.sendOpportunityAlert({
+      recipientEmail: 'alerts@example.com',
+      summary: {
+        domain: 'example.com',
+        latestScanId: 'scan-1',
+        crawlerVisits: 25,
+        referralVisits: 1,
+        topProviders: [{ provider: 'claude', visits: 15 }],
+        topPages: [{ path: '/pricing', crawlerVisits: 12, referralVisits: 1 }],
+      },
+    });
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.equal(entries.length, 1);
+  assert.match(entries[0], /Opportunity alert for example\.com: 25 crawler visits vs 1 AI referrals/);
+});
+
+test('PATCH /api/monitoring/[domain] updates opportunity alert preferences', async () => {
+  const scan = await saveCompletedScan('monitoring-patch', {
+    email: 'alerts@example.com',
+  });
+  await addMonitoringDomain({ scanId: scan.id, alertThreshold: 5 });
+
+  const request = createAuthedJsonRequest(
+    'http://localhost/api/monitoring/example.com',
+    'PATCH',
+    { opportunityAlertsEnabled: false },
+    'alerts@example.com'
+  );
+  const response = await monitoringDomainRoute.PATCH(request, {
+    params: Promise.resolve({ domain: 'example.com' }),
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.opportunityAlertsEnabled, false);
+
+  const invalidRequest = createAuthedJsonRequest(
+    'http://localhost/api/monitoring/example.com',
+    'PATCH',
+    { opportunityAlertsEnabled: 'nope' },
+    'alerts@example.com'
+  );
+  const invalidResponse = await monitoringDomainRoute.PATCH(invalidRequest, {
+    params: Promise.resolve({ domain: 'example.com' }),
+  });
+
+  assert.equal(invalidResponse.status, 400);
+});
+
+test('GET /api/opportunity-alert respects auth and monitoring gates', async () => {
+  const unauthResponse = await opportunityAlertRoute.GET(new NextRequest('http://localhost/api/opportunity-alert?domain=example.com'));
+  assert.equal(unauthResponse.status, 401);
+
+  const scan = await saveCompletedScan('opportunity-scan', {
+    email: 'alerts@example.com',
+  });
+  await addMonitoringDomain({ scanId: scan.id, alertThreshold: 5 });
+  await seedOpportunityTraffic();
+
+  const request = createAuthedRequest('http://localhost/api/opportunity-alert?domain=example.com', 'alerts@example.com');
+  const response = await opportunityAlertRoute.GET(request);
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.opportunity.crawlerVisits, 25);
+  assert.equal(payload.opportunity.referralVisits, 1);
+
+  await updateMonitoringDomain('example.com', 'alerts@example.com', {
+    opportunityAlertsEnabled: false,
+  });
+
+  const gatedResponse = await opportunityAlertRoute.GET(
+    createAuthedRequest('http://localhost/api/opportunity-alert?domain=example.com', 'alerts@example.com')
+  );
+  const gatedPayload = await gatedResponse.json();
+  assert.equal(gatedPayload.opportunity, null);
+});
+
+test('cron opportunity alerts send once, then respect cooldown and disablement', async () => {
+  const originalSecret = process.env.MONITORING_SECRET;
+  process.env.MONITORING_SECRET = 'test-monitor-secret';
+
+  const scan = await saveCompletedScan('cron-opportunity', {
+    email: 'alerts@example.com',
+  });
+  await addMonitoringDomain({ scanId: scan.id, alertThreshold: 5 });
+  await seedOpportunityTraffic();
+
+  const originalLog = console.log;
+  const entries = [];
+  console.log = (message) => { entries.push(String(message)); };
+
+  try {
+    const request = new NextRequest('http://localhost/api/cron/monitor', {
+      headers: { authorization: 'Bearer test-monitor-secret' },
+    });
+
+    const firstResponse = await cronMonitorRoute.GET(request);
+    const firstPayload = await firstResponse.json();
+    assert.equal(firstResponse.status, 200);
+    assert.equal(firstPayload.opportunityAlerts[0].status, 'sent');
+    assert.ok(entries.some((entry) => entry.includes('Opportunity alert for example.com')));
+
+    entries.length = 0;
+
+    const cooldownResponse = await cronMonitorRoute.GET(new NextRequest('http://localhost/api/cron/monitor', {
+      headers: { authorization: 'Bearer test-monitor-secret' },
+    }));
+    const cooldownPayload = await cooldownResponse.json();
+    assert.equal(cooldownPayload.opportunityAlerts[0].status, 'cooldown active');
+    assert.equal(entries.length, 0);
+
+    await updateMonitoringDomain('example.com', 'alerts@example.com', {
+      opportunityAlertsEnabled: false,
+      lastOpportunityAlertAt: null,
+    });
+
+    const disabledResponse = await cronMonitorRoute.GET(new NextRequest('http://localhost/api/cron/monitor', {
+      headers: { authorization: 'Bearer test-monitor-secret' },
+    }));
+    const disabledPayload = await disabledResponse.json();
+    assert.equal(disabledPayload.opportunityAlerts[0].status, 'disabled');
+    assert.equal(entries.length, 0);
+  } finally {
+    console.log = originalLog;
+    if (originalSecret === undefined) {
+      delete process.env.MONITORING_SECRET;
+    } else {
+      process.env.MONITORING_SECRET = originalSecret;
+    }
+  }
 });

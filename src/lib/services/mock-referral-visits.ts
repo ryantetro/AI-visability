@@ -3,6 +3,10 @@ import { randomUUID } from 'crypto';
 
 const visits: ReferralVisit[] = [];
 
+export function resetMockReferralVisits() {
+  visits.length = 0;
+}
+
 export const mockReferralVisits: ReferralVisitService = {
   async logVisit(visit) {
     visits.push({

@@ -6,4 +6,9 @@ export const mockAlertService: AlertService = {
       `[Alert] Score change for ${domain}: ${previousScore} → ${currentScore} (threshold: ${threshold}). Would email ${recipientEmail}.`
     );
   },
+  async sendOpportunityAlert({ recipientEmail, summary }) {
+    console.log(
+      `[Alert] Opportunity alert for ${summary.domain}: ${summary.crawlerVisits} crawler visits vs ${summary.referralVisits} AI referrals. Would email ${recipientEmail}.`
+    );
+  },
 };

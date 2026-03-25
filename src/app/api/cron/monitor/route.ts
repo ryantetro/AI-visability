@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase, getAlertService, getMentionTester, getPromptMonitoring } from '@/lib/services/registry';
 import { analyzeResponse } from '@/lib/ai-mentions/mention-analyzer';
-import { listActiveMonitoringDomains } from '@/lib/monitoring';
+import { listActiveMonitoringDomains, updateMonitoringDomain } from '@/lib/monitoring';
+import { getOpportunityAlertSummary, hasOpportunityAlertCooldownElapsed } from '@/lib/opportunity-alerts';
 import { startScan } from '@/lib/scan-workflow';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getDomain } from '@/lib/url-utils';
@@ -147,6 +148,60 @@ export async function GET(request: NextRequest) {
       results.push({ domain: '*', status: 'phase1 error' });
     }
 
+    // ── Phase 1b: AI opportunity alerts ───────────────────────────
+    const opportunityAlerts: Array<{ domain: string; status: string; scanId?: string }> = [];
+
+    try {
+      const monitoredForOpportunities = await listActiveMonitoringDomains();
+
+      for (const record of monitoredForOpportunities) {
+        try {
+          const domain = getDomain(record.url);
+
+          if (!record.opportunityAlertsEnabled) {
+            opportunityAlerts.push({ domain, status: 'disabled' });
+            continue;
+          }
+
+          const summary = await getOpportunityAlertSummary({
+            domain,
+            userEmail: record.email,
+            fallbackScanId: record.scanId,
+          });
+
+          if (!summary) {
+            opportunityAlerts.push({ domain, status: 'below threshold' });
+            continue;
+          }
+
+          if (summary.topPages.length === 0) {
+            opportunityAlerts.push({ domain, status: 'no qualifying pages' });
+            continue;
+          }
+
+          if (!hasOpportunityAlertCooldownElapsed(record.lastOpportunityAlertAt)) {
+            opportunityAlerts.push({ domain, status: 'cooldown active', scanId: summary.latestScanId ?? undefined });
+            continue;
+          }
+
+          await alertService.sendOpportunityAlert({
+            recipientEmail: record.email || 'unknown',
+            summary,
+          });
+
+          await updateMonitoringDomain(domain, record.email, {
+            lastOpportunityAlertAt: Date.now(),
+          });
+
+          opportunityAlerts.push({ domain, status: 'sent', scanId: summary.latestScanId ?? undefined });
+        } catch {
+          opportunityAlerts.push({ domain: record.domain, status: 'error' });
+        }
+      }
+    } catch {
+      opportunityAlerts.push({ domain: '*', status: 'phase1b error' });
+    }
+
     // ── Phase 2: Prompt monitoring loop ──────────────────────────
     const pm = getPromptMonitoring();
     const tester = getMentionTester();
@@ -222,6 +277,7 @@ export async function GET(request: NextRequest) {
       rescans,
       checked: results.length,
       results,
+      opportunityAlerts,
       promptMonitoring: {
         promptsChecked,
         promptErrors,

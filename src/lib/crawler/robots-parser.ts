@@ -26,6 +26,7 @@ function emptyRobots(): RobotsTxtData {
     allowsPerplexityBot: false,
     allowsClaudeBot: false,
     allowsGoogleBot: false,
+    allowsGoogleExtended: false,
     sitemapReferences: [],
   };
 }
@@ -136,6 +137,7 @@ function parseRobotsTxt(raw: string): RobotsTxtData {
     allowsPerplexityBot: isBotAllowed('PerplexityBot'),
     allowsClaudeBot: isBotAllowed(['ClaudeBot', 'Claude-Web', 'anthropic-ai']),
     allowsGoogleBot: isBotAllowed('Googlebot'),
+    allowsGoogleExtended: isBotAllowed('Google-Extended'),
     sitemapReferences,
   };
 }

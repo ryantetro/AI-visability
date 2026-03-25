@@ -48,6 +48,20 @@ export function runAiRegistrationChecks(data: CrawlData): CheckResult[] {
         : 'Anthropic/Claude bots appear to be blocked.',
     },
     {
+      id: 'ar-gemini',
+      dimension: 'ai-registration',
+      category: 'ai',
+      label: 'Google-Extended (Gemini) access allowed',
+      verdict: !robots.exists ? 'unknown' : robots.allowsGoogleExtended ? 'pass' : 'fail',
+      points: robots.allowsGoogleExtended ? 2 : 0,
+      maxPoints: 2,
+      detail: !robots.exists
+        ? 'No robots.txt to check Google-Extended status.'
+        : robots.allowsGoogleExtended
+        ? 'Google-Extended (Gemini) is allowed to crawl your site.'
+        : 'Google-Extended is blocked in robots.txt. Allow it to appear in Gemini.',
+    },
+    {
       id: 'ar-llms-refs',
       dimension: 'ai-registration',
       category: 'ai',

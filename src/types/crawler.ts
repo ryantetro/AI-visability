@@ -69,6 +69,7 @@ export interface RobotsTxtData {
   allowsPerplexityBot: boolean;
   allowsClaudeBot: boolean;
   allowsGoogleBot: boolean;
+  allowsGoogleExtended: boolean;
   sitemapReferences: string[];
 }
 

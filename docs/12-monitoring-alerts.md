@@ -13,8 +13,11 @@ Automated monitoring runs periodic scans on user domains and sends email alerts 
 | `src/lib/services/registry.ts` | `getAlertService()` — returns Resend if `RESEND_API_KEY` set, mock otherwise |
 | `src/lib/monitoring.ts` | CRUD for `monitoring_domains` table (add, remove, list) |
 | `src/app/api/monitoring/route.ts` | POST to enable monitoring, GET to list user's monitored domains |
-| `src/app/api/monitoring/[domain]/route.ts` | DELETE to disable monitoring for a domain |
-| `src/app/api/cron/monitor/route.ts` | Cron job: Phase 0 rescans, Phase 1 score alerts, Phase 2 prompt monitoring |
+| `src/app/api/monitoring/[domain]/route.ts` | PATCH to toggle opportunity alerts, DELETE to disable monitoring |
+| `src/app/api/opportunity-alert/route.ts` | GET opportunity alert summary for a domain |
+| `src/lib/opportunity-alerts.ts` | Opportunity computation: thresholds, summaries, cooldown logic |
+| `src/app/advanced/dashboard/opportunity-alert-banner.tsx` | Dashboard banner for opportunity alerts |
+| `src/app/api/cron/monitor/route.ts` | Cron job: Phase 0 rescans, Phase 1 score alerts, Phase 1b opportunity alerts, Phase 2 prompt monitoring |
 | `src/contexts/domain-context.tsx` | Client-side monitoring state — hydrates from DB, enable/disable handlers |
 | `src/app/advanced/settings/settings-section.tsx` | Settings UI — enable/disable monitoring toggle |
 
@@ -32,6 +35,7 @@ Called with `GET /api/cron/monitor` + `Authorization: Bearer {MONITORING_SECRET}
 
 - **Phase 0**: For each active monitored domain, if last scan is older than 24h, triggers a rescan (max 5 per run)
 - **Phase 1**: For each active monitored domain, checks latest scan score against the domain's `alert_threshold`. If score is below threshold, calls `alertService.sendScoreAlert()`
+- **Phase 1b**: AI Opportunity Alerts — for each active domain with `opportunityAlertsEnabled=true`, computes a 30-day opportunity summary. If crawlerVisits >= 25, referralVisits <= 2, and crawl-to-referral ratio >= 20:1, sends `alertService.sendOpportunityAlert()`. Respects a 7-day cooldown via `lastOpportunityAlertAt`.
 - **Phase 2**: Prompt monitoring — tests active prompts against AI engines
 
 ### Email delivery
@@ -52,8 +56,15 @@ When `RESEND_API_KEY` is not set (or `USE_MOCKS=true`), falls back to `mockAlert
 ### GET /api/monitoring
 **Response:** `{ domains: MonitoringRecord[] }` — user's monitored domains
 
+### PATCH /api/monitoring/{domain}
+**Request:** `{ opportunityAlertsEnabled: boolean }`
+**Response:** Updated `MonitoringRecord` (200) or `{ error: string }` (400/401/404)
+
 ### DELETE /api/monitoring/{domain}
 **Response:** `{ success: true }` (200) or `{ error: string }` (404/401)
+
+### GET /api/opportunity-alert?domain=...
+**Response:** `{ opportunity: OpportunityAlertSummary | null }` — returns null when domain is not monitored, alerts disabled, or threshold not met
 
 ## Error handling
 

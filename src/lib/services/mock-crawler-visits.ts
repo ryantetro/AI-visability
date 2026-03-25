@@ -3,6 +3,10 @@ import { randomUUID } from 'crypto';
 
 const visits: CrawlerVisit[] = [];
 
+export function resetMockCrawlerVisits() {
+  visits.length = 0;
+}
+
 export const mockCrawlerVisits: CrawlerVisitService = {
   async logVisit(visit) {
     visits.push({

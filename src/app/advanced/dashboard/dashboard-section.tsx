@@ -26,10 +26,12 @@ import { AICrawlerPanel } from '../panels/ai-crawler-panel';
 import { AIReferralPanel } from '../panels/ai-referral-panel';
 import { EmptyStateCard } from './empty-state-card';
 import { QuickWinsSection } from './quick-wins-section';
+import { OpportunityAlertBanner } from './opportunity-alert-banner';
 import { OnboardingChecklist } from '@/components/app/onboarding-checklist';
 import { NextStepsCard } from '@/components/app/next-steps-card';
 import type { DashboardReportData, RecentScanData } from '../lib/types';
 import type { CompetitorComparisonData } from '@/types/competitors';
+import type { OpportunityAlertSummary } from '@/types/services';
 
 interface DashboardSectionProps {
   report: DashboardReportData;
@@ -73,6 +75,7 @@ export function DashboardSection({
   // Lift tracking key + last signal so both panels share one API call
   const [trackingReady, setTrackingReady] = useState(false);
   const [trackingLastUsedAt, setTrackingLastUsedAt] = useState<string | null>(null);
+  const [opportunityAlert, setOpportunityAlert] = useState<OpportunityAlertSummary | null>(null);
   useEffect(() => {
     if (!domain) return;
     let cancelled = false;
@@ -85,6 +88,24 @@ export function DashboardSection({
         }
       })
       .catch(() => {});
+    return () => { cancelled = true; };
+  }, [domain]);
+
+  useEffect(() => {
+    if (!domain) return;
+    let cancelled = false;
+
+    fetch(`/api/opportunity-alert?domain=${encodeURIComponent(domain)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) {
+          setOpportunityAlert(data?.opportunity ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setOpportunityAlert(null);
+      });
+
     return () => { cancelled = true; };
   }, [domain]);
 
@@ -175,6 +196,16 @@ export function DashboardSection({
   return (
     <div className="space-y-6">
       <OnboardingChecklist />
+
+      {opportunityAlert && (
+        <OpportunityAlertBanner
+          opportunity={opportunityAlert}
+          reportId={report.id}
+          onSeeTraffic={() => {
+            document.getElementById('tracking')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
+      )}
 
       {/* Scan freshness + rescan (compact, right-aligned) */}
       {onReaudit && (

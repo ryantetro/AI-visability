@@ -9,6 +9,8 @@ export interface MonitoringRecord {
   scanId: string;
   email: string;
   alertThreshold: number;
+  opportunityAlertsEnabled: boolean;
+  lastOpportunityAlertAt: number | null;
   status: 'active' | 'paused';
   createdAt: number;
   updatedAt: number;
@@ -23,6 +25,10 @@ function getMonitoringStore() {
     globalStore.__aisoMonitoring = new Map();
   }
   return globalStore.__aisoMonitoring;
+}
+
+export function resetMonitoringStore() {
+  getMonitoringStore().clear();
 }
 
 function hasSupabaseConfig() {
@@ -60,6 +66,8 @@ function fromRow(row: {
   id: string;
   domain: string;
   alert_threshold: number;
+  opportunity_alerts_enabled?: boolean | null;
+  last_opportunity_alert_at?: string | null;
   created_at: string;
   status?: 'active' | 'paused' | null;
   updated_at?: string | null;
@@ -74,6 +82,8 @@ function fromRow(row: {
     scanId: row.scan_id ?? '',
     email: row.email ?? '',
     alertThreshold: row.alert_threshold,
+    opportunityAlertsEnabled: row.opportunity_alerts_enabled ?? true,
+    lastOpportunityAlertAt: row.last_opportunity_alert_at ? Date.parse(row.last_opportunity_alert_at) : null,
     status: row.status ?? 'active',
     createdAt: Date.parse(row.created_at),
     updatedAt: row.updated_at ? Date.parse(row.updated_at) : Date.parse(row.created_at),
@@ -91,6 +101,8 @@ async function saveRecord(record: MonitoringRecord) {
         id: record.id,
         domain: record.domain,
         alert_threshold: record.alertThreshold,
+        opportunity_alerts_enabled: record.opportunityAlertsEnabled,
+        last_opportunity_alert_at: record.lastOpportunityAlertAt ? new Date(record.lastOpportunityAlertAt).toISOString() : null,
         created_at: new Date(record.createdAt).toISOString(),
         updated_at: new Date(record.updatedAt).toISOString(),
         status: record.status,
@@ -135,6 +147,8 @@ export async function addMonitoringDomain(input: {
     scanId: scan.id,
     email: scan.email,
     alertThreshold: Math.max(1, Math.min(input.alertThreshold ?? 5, 100)),
+    opportunityAlertsEnabled: true,
+    lastOpportunityAlertAt: null,
     status: 'active',
     createdAt: now,
     updatedAt: now,
@@ -152,6 +166,8 @@ export async function listMonitoringDomains(email: string) {
         id: string;
         domain: string;
         alert_threshold: number;
+        opportunity_alerts_enabled?: boolean | null;
+        last_opportunity_alert_at?: string | null;
         created_at: string;
         status?: 'active' | 'paused' | null;
         updated_at?: string | null;
@@ -175,6 +191,8 @@ export async function listActiveMonitoringDomains(): Promise<MonitoringRecord[]>
         id: string;
         domain: string;
         alert_threshold: number;
+        opportunity_alerts_enabled?: boolean | null;
+        last_opportunity_alert_at?: string | null;
         created_at: string;
         status?: 'active' | 'paused' | null;
         updated_at?: string | null;
@@ -219,3 +237,102 @@ export async function removeMonitoringDomain(domain: string, email?: string) {
   return true;
 }
 
+export async function getMonitoringDomain(domain: string, email: string): Promise<MonitoringRecord | null> {
+  const normalizedDomain = domain.toLowerCase();
+
+  if (hasSupabaseConfig()) {
+    const rows = await querySupabase<
+      Array<{
+        id: string;
+        domain: string;
+        alert_threshold: number;
+        opportunity_alerts_enabled?: boolean | null;
+        last_opportunity_alert_at?: string | null;
+        created_at: string;
+        status?: 'active' | 'paused' | null;
+        updated_at?: string | null;
+        scan_id?: string | null;
+        url?: string | null;
+        email?: string | null;
+      }>
+    >(`monitoring_domains?domain=eq.${encodeURIComponent(normalizedDomain)}&email=eq.${encodeURIComponent(email)}&order=updated_at.desc&limit=1&select=*`);
+    return rows[0] ? fromRow(rows[0]) : null;
+  }
+
+  const record = getMonitoringStore().get(normalizedDomain);
+  if (!record || record.email !== email) return null;
+  return record;
+}
+
+export async function updateMonitoringDomain(
+  domain: string,
+  email: string,
+  updates: {
+    opportunityAlertsEnabled?: boolean;
+    lastOpportunityAlertAt?: number | null;
+  }
+): Promise<MonitoringRecord | null> {
+  const normalizedDomain = domain.toLowerCase();
+  const nowIso = new Date().toISOString();
+
+  if (hasSupabaseConfig()) {
+    const payload: Record<string, unknown> = {
+      updated_at: nowIso,
+    };
+
+    if (updates.opportunityAlertsEnabled !== undefined) {
+      payload.opportunity_alerts_enabled = updates.opportunityAlertsEnabled;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'lastOpportunityAlertAt')) {
+      payload.last_opportunity_alert_at = updates.lastOpportunityAlertAt
+        ? new Date(updates.lastOpportunityAlertAt).toISOString()
+        : null;
+    }
+
+    const response = await fetch(
+      supabaseUrl(`monitoring_domains?domain=eq.${encodeURIComponent(normalizedDomain)}&email=eq.${encodeURIComponent(email)}&select=*`),
+      {
+        method: 'PATCH',
+        headers: supabaseHeaders({
+          Prefer: 'return=representation',
+        }),
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Supabase monitoring update failed (${response.status}): ${detail}`);
+    }
+
+    const rows = await response.json() as Array<{
+      id: string;
+      domain: string;
+      alert_threshold: number;
+      opportunity_alerts_enabled?: boolean | null;
+      last_opportunity_alert_at?: string | null;
+      created_at: string;
+      status?: 'active' | 'paused' | null;
+      updated_at?: string | null;
+      scan_id?: string | null;
+      url?: string | null;
+      email?: string | null;
+    }>;
+    return rows[0] ? fromRow(rows[0]) : null;
+  }
+
+  const current = getMonitoringStore().get(normalizedDomain);
+  if (!current || current.email !== email) return null;
+
+  const next: MonitoringRecord = {
+    ...current,
+    opportunityAlertsEnabled: updates.opportunityAlertsEnabled ?? current.opportunityAlertsEnabled,
+    lastOpportunityAlertAt: Object.prototype.hasOwnProperty.call(updates, 'lastOpportunityAlertAt')
+      ? updates.lastOpportunityAlertAt ?? null
+      : current.lastOpportunityAlertAt,
+    updatedAt: Date.now(),
+  };
+  getMonitoringStore().set(normalizedDomain, next);
+  return next;
+}

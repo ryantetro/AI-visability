@@ -83,6 +83,8 @@ create table if not exists monitoring_domains (
   scan_id         text,
   email           text,
   alert_threshold integer not null default 5,
+  opportunity_alerts_enabled boolean not null default true,
+  last_opportunity_alert_at timestamptz,
   status          text not null default 'active'
                     check (status in ('active','paused')),
   created_at      timestamptz not null default now(),
