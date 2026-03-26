@@ -19,7 +19,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { MiniInfoTile } from '@/components/app/dashboard-primitives';
 import { FloatingFeedback } from '@/components/ui/floating-feedback';
 import { UnlockFeaturesModal } from '@/components/ui/unlock-features-modal';
@@ -30,6 +30,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { usePlan } from '@/hooks/use-plan';
 import { canAccess, NAV_GATES, type PlanTier } from '@/lib/pricing';
 import { formatPlatformLabel } from '@/lib/platform-detection';
+import { buildLoginHref } from '@/lib/app-paths';
 
 import { CenteredLoading, CenteredWorkspaceState } from '@/app/advanced/panels/shared';
 import type { SiteSummary } from '@/app/advanced/lib/types';
@@ -51,15 +52,19 @@ export function WorkspaceShell({
   children: (ctx: WorkspaceContext) => React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user: authUser, loading: authLoading } = useAuth();
   const { tier, loading: planLoading } = usePlan();
 
   // Client-side auth guard — redirect to login if no authenticated user
   useEffect(() => {
     if (!authLoading && !authUser) {
-      router.push('/login');
+      const query = searchParams.toString();
+      const nextPath = `${pathname}${query ? `?${query}` : ''}`;
+      router.push(buildLoginHref(nextPath));
     }
-  }, [authLoading, authUser, router]);
+  }, [authLoading, authUser, pathname, router, searchParams]);
 
   const {
     monitoredSites,

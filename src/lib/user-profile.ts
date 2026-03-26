@@ -8,6 +8,9 @@ export interface UserProfile {
   plan: string;
   scans_used: number;
   free_scan_limit: number;
+  plan_expires_at: string | null;
+  plan_cancel_at_period_end: boolean;
+  plan_updated_at: string | null;
   created_at: string;
   updated_at: string;
 }

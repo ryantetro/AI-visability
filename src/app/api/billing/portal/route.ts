@@ -8,12 +8,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
+  let returnPath: string | undefined;
+  try {
+    const body = await request.json();
+    returnPath = typeof body?.returnPath === 'string' ? body.returnPath : undefined;
+  } catch {
+    returnPath = undefined;
+  }
+
   if (!canUseStripe()) {
     return NextResponse.json({ error: 'Billing is not configured' }, { status: 503 });
   }
 
   try {
-    const portalUrl = await createPortalSession(user.id, user.email);
+    const portalUrl = await createPortalSession(user.id, user.email, returnPath);
     return NextResponse.json({ url: portalUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create portal session';

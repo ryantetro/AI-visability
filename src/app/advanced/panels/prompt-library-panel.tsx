@@ -9,7 +9,17 @@ import { PROMPT_CATEGORIES } from '../lib/constants';
 import type { PromptCategory, PromptMonitoringData } from '../lib/types';
 import { AI_ENGINES, getAIEngineLabel } from '@/lib/ai-engines';
 
-export function PromptLibraryPanel({ domain }: { domain: string }) {
+export function PromptLibraryPanel({
+  domain,
+  tier,
+  maxPrompts,
+  onOpenUnlock,
+}: {
+  domain: string;
+  tier?: string;
+  maxPrompts?: number;
+  onOpenUnlock?: () => void;
+}) {
   const [data, setData] = useState<PromptMonitoringData | null>(null);
   const [loading, setLoading] = useState(true);
   const [newPrompt, setNewPrompt] = useState('');
@@ -89,6 +99,46 @@ export function PromptLibraryPanel({ domain }: { domain: string }) {
           />
         </div>
       </div>
+
+      {/* Usage limit bar */}
+      {maxPrompts != null && maxPrompts > 0 && (
+        (() => {
+          const count = prompts.length;
+          const pct = Math.min(Math.round((count / maxPrompts) * 100), 100);
+          const isNearLimit = pct >= 80;
+          const isAtLimit = pct >= 100;
+          const nextTierLimits: Record<string, { limit: number; name: string }> = {
+            free: { limit: 25, name: 'Starter' },
+            starter: { limit: 75, name: 'Pro' },
+            pro: { limit: 200, name: 'Growth' },
+          };
+          const next = tier ? nextTierLimits[tier] : null;
+          return (
+            <div className="mt-4 rounded-lg border border-white/8 bg-white/[0.02] px-3.5 py-2.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className={cn('font-medium', isAtLimit ? 'text-red-400' : isNearLimit ? 'text-amber-400' : 'text-zinc-400')}>
+                  {count} / {maxPrompts} prompts used
+                </span>
+                {isNearLimit && !isAtLimit && next && (
+                  <span className="text-amber-400/80">Running low — upgrade for {next.limit} prompts</span>
+                )}
+                {isAtLimit && next && onOpenUnlock && (
+                  <button type="button" onClick={onOpenUnlock} className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-medium">
+                    Limit reached — upgrade to {next.name}
+                    <Sparkles className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className={cn('h-full rounded-full transition-all duration-500', isAtLimit ? 'bg-red-500' : isNearLimit ? 'bg-amber-500' : 'bg-[#a855f7]')}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })()
+      )}
 
       <div className="mt-5 flex gap-1 border-b border-white/8 pb-px">
         {PROMPT_CATEGORIES.map((cat) => (
@@ -173,7 +223,31 @@ export function PromptLibraryPanel({ domain }: { domain: string }) {
       )}
 
       {prompts.length === 0 && (
-        <p className="mt-5 text-center text-[12px] text-zinc-500">No prompts yet. Add prompts above to start tracking how AI engines mention your brand.</p>
+        <div className="mt-5 rounded-xl border border-white/8 bg-[linear-gradient(180deg,rgba(168,85,247,0.06)_0%,rgba(168,85,247,0.01)_100%)] p-5 text-center">
+          <Sparkles className="mx-auto h-6 w-6 text-[#a855f7]/60" />
+          <h4 className="mt-3 text-sm font-semibold text-white">Track how AI engines mention your brand</h4>
+          <p className="mx-auto mt-2 max-w-[400px] text-[12px] leading-5 text-zinc-400">
+            Add prompts to monitor — we'll check ChatGPT, Perplexity, Gemini, and more for mentions of your brand.
+          </p>
+          {maxPrompts != null && tier && (
+            <p className="mt-3 text-[11px] text-zinc-500">
+              You can track up to <span className="font-medium text-zinc-300">{maxPrompts}</span> prompts on your <span className="font-medium text-zinc-300">{tier.charAt(0).toUpperCase() + tier.slice(1)}</span> plan
+            </p>
+          )}
+          {tier && tier !== 'growth' && (() => {
+            const nextLimits: Record<string, { limit: number; name: string }> = {
+              free: { limit: 25, name: 'Starter' },
+              starter: { limit: 75, name: 'Pro' },
+              pro: { limit: 200, name: 'Growth' },
+            };
+            const next = nextLimits[tier];
+            return next ? (
+              <p className="mt-1.5 text-[11px] text-zinc-600">
+                Need more? Upgrade to track up to {next.limit} prompts
+              </p>
+            ) : null;
+          })()}
+        </div>
       )}
     </DashboardPanel>
   );

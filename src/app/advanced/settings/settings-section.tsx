@@ -1,12 +1,11 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { Copy, CreditCard, KeyRound, Lock, Mail, RefreshCw, Trash2, UserMinus, UserPlus, Users } from 'lucide-react';
-import Link from 'next/link';
+import { AlertTriangle, Copy, CreditCard, ExternalLink, KeyRound, Lock, Mail, RefreshCw, Trash2, UserMinus, UserPlus, Users, Zap } from 'lucide-react';
 import { isUnlimitedPlanLimit } from '@/lib/account-access-overrides';
 import { cn } from '@/lib/utils';
 import { buildBotTrackingInstallPrompt, buildBotTrackingSnippet, type BotTrackingRuntime } from '@/lib/llm-prompts';
-import { formatRelativeTime } from '@/app/advanced/lib/utils';
+import { formatRelativeTime, formatShortDate } from '@/app/advanced/lib/utils';
 import { usePlan } from '@/hooks/use-plan';
 import { useAuth } from '@/hooks/use-auth';
 import { PLANS, AI_PLATFORMS, PLATFORM_LABELS, type AIPlatform, canAccess } from '@/lib/pricing';
@@ -14,6 +13,8 @@ import { useTeam } from '@/hooks/use-team';
 import { invalidatePlanCache } from '@/hooks/use-plan';
 import { REGIONS } from '@/lib/region-gating';
 import { useDomainContext } from '@/contexts/domain-context';
+import { buildLoginHref, getCurrentAppPath } from '@/lib/app-paths';
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 
 interface SettingsSectionProps {
   domain: string;
@@ -38,6 +39,26 @@ type OpportunityAlertState = {
 
 function normalizeAppUrl(url: string) {
   return url.replace(/\/$/, '');
+}
+
+function parseIsoTimestamp(value?: string | null) {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function formatRemainingAccess(timestamp?: number | null) {
+  if (!timestamp) return null;
+
+  const diffMs = timestamp - Date.now();
+  const diffDays = Math.ceil(diffMs / 86400000);
+
+  if (diffDays <= 0) return 'Ends today';
+  if (diffDays === 1) return '1 day left';
+  if (diffDays < 45) return `${diffDays} days left`;
+
+  const diffMonths = Math.round(diffDays / 30);
+  return diffMonths <= 1 ? 'About 1 month left' : `About ${diffMonths} months left`;
 }
 
 /** Convert a 2-letter country code to its flag emoji */
@@ -130,6 +151,8 @@ export function SettingsSection({
   onDisableMonitoring,
 }: SettingsSectionProps) {
   const [portalLoading, setPortalLoading] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [cancelPlanModalOpen, setCancelPlanModalOpen] = useState(false);
   const [trackingRuntime, setTrackingRuntime] = useState<BotTrackingRuntime>('next');
   const [trackingKey, setTrackingKey] = useState<TrackingKeyState>({
     siteKey: null,
@@ -160,7 +183,20 @@ export function SettingsSection({
   const [regionsLoading, setRegionsLoading] = useState(true);
   const [regionsSaving, setRegionsSaving] = useState(false);
   const [regionsError, setRegionsError] = useState<string | null>(null);
-  const { tier, plan, email, maxDomains, maxPrompts, maxPlatforms, maxRegions, maxSeats, teamId, teamRole } = usePlan();
+  const {
+    tier,
+    plan,
+    email,
+    maxDomains,
+    maxPrompts,
+    maxPlatforms,
+    maxRegions,
+    maxSeats,
+    teamId,
+    teamRole,
+    planExpiresAt,
+    planCancelAtPeriodEnd,
+  } = usePlan();
   const { user } = useAuth();
   const planConfig = PLANS[tier];
   const teamData = useTeam();
@@ -287,10 +323,14 @@ export function SettingsSection({
       setTeamActionLoading(false);
     }
   };
-  const { monitoredSites } = useDomainContext();
+  const { monitoredSites, handleUnlockComplete } = useDomainContext();
   const displayEmail = user?.email ?? email;
 
   const billingCycle = plan.includes('annual') ? 'Annual' : plan.includes('monthly') ? 'Monthly' : '';
+  const planExpiresAtTimestamp = parseIsoTimestamp(planExpiresAt);
+  const accessEndsOnLabel = formatShortDate(planExpiresAtTimestamp);
+  const remainingAccessLabel = formatRemainingAccess(planExpiresAtTimestamp);
+  const hasScheduledCancellation = tier !== 'free' && planCancelAtPeriodEnd;
   const trackedDomainsValue = isUnlimitedPlanLimit(maxDomains)
     ? `${monitoredSites.length} / Unlimited`
     : `${monitoredSites.length} / ${maxDomains}`;
@@ -309,25 +349,38 @@ export function SettingsSection({
 
   const handleOpenBillingPortal = async () => {
     setPortalLoading(true);
+    setBillingError(null);
     try {
-      const res = await fetch('/api/billing/portal', { method: 'POST' });
+      const returnPath = getCurrentAppPath('/settings');
+      const res = await fetch('/api/billing/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnPath }),
+      });
+      if (res.status === 401) {
+        window.location.href = buildLoginHref(returnPath);
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        if (res.status === 503) {
-          window.location.href = '/pricing';
-          return;
-        }
         throw new Error(data.error || 'Failed to open billing portal');
       }
       const { url } = await res.json();
       if (url) {
         window.location.href = url;
+        return;
       }
-    } catch {
-      window.location.href = '/pricing';
+      throw new Error('Billing portal session did not include a redirect URL.');
+    } catch (error) {
+      setBillingError(error instanceof Error ? error.message : 'Unable to open billing portal right now.');
     } finally {
       setPortalLoading(false);
     }
+  };
+
+  const handleConfirmCancelPlan = async () => {
+    setCancelPlanModalOpen(false);
+    await handleOpenBillingPortal();
   };
 
   useEffect(() => {
@@ -733,6 +786,32 @@ export function SettingsSection({
             value={tier === 'free' ? 'Free tier' : billingCycle || 'Monthly'}
           />
           <FieldRow
+            label="Billing status"
+            description={
+              hasScheduledCancellation
+                ? accessEndsOnLabel !== '--'
+                  ? `Your subscription has been canceled and will stay active until ${accessEndsOnLabel}.`
+                  : 'Your subscription has been canceled and will stay active through the end of the current billing period.'
+                : tier === 'free'
+                  ? 'No active Stripe subscription.'
+                  : 'Your plan is active and set to renew automatically.'
+            }
+            value={
+              hasScheduledCancellation
+                ? 'Canceled, still active'
+                : tier === 'free'
+                  ? 'No subscription'
+                  : 'Active'
+            }
+          />
+          {hasScheduledCancellation && (
+            <FieldRow
+              label="Access until"
+              description="After this date, your workspace will move to the Free plan unless you reactivate in Stripe."
+              value={accessEndsOnLabel}
+            />
+          )}
+          <FieldRow
             label="Tracked domains"
             value={trackedDomainsValue}
           />
@@ -740,14 +819,90 @@ export function SettingsSection({
             label="Prompts tracked"
             value={trackedPromptsValue}
           />
+          {hasScheduledCancellation && (
+            <div className="border-b border-white/[0.06] px-5 py-4">
+              <div className="rounded-2xl border border-amber-300/15 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),rgba(255,255,255,0.02)_58%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.015)_100%)] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="max-w-xl">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100/80">Cancellation scheduled</p>
+                    <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                      {accessEndsOnLabel !== '--'
+                        ? `Your ${planConfig.name} features stay available until ${accessEndsOnLabel}.`
+                        : 'Your current plan stays available through the end of this billing period.'}
+                    </p>
+                    <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                      You can still use the dashboard normally until access ends, and you can reactivate anytime from Stripe Billing.
+                    </p>
+                  </div>
+                  {remainingAccessLabel && (
+                    <div className="inline-flex items-center rounded-full border border-amber-200/15 bg-black/20 px-3 py-1.5 text-[11px] font-medium text-amber-50/90">
+                      {remainingAccessLabel}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Next-tier feature preview */}
+          {tier === 'free' && (
+            <div className="border-b border-white/[0.06] px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 mb-2">Unlock with Starter</p>
+              <ul className="space-y-1.5 text-[12px] text-zinc-400">
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Weekly automated monitoring</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />25 prompt tracking slots</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Brand section &amp; AI referral tracking</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />All fixes + copy-to-LLM</li>
+              </ul>
+              <button type="button" onClick={() => handleUnlockComplete('starter_monthly')} className={cn(btnAccent, 'mt-3 inline-flex py-2 text-[11px]')}>
+                <Zap className="h-3 w-3" />
+                Upgrade to Starter — $49/mo
+              </button>
+            </div>
+          )}
+          {tier === 'starter' && (
+            <div className="border-b border-white/[0.06] px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 mb-2">Unlock with Pro</p>
+              <ul className="space-y-1.5 text-[12px] text-zinc-400">
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Up to 3 domains</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Competitor tracking (3 competitors)</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Daily monitoring &amp; data export</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />75 prompts &amp; 4 AI platforms</li>
+              </ul>
+              <button type="button" onClick={() => handleUnlockComplete('pro_monthly')} className={cn(btnAccent, 'mt-3 inline-flex py-2 text-[11px]')}>
+                <Zap className="h-3 w-3" />
+                Upgrade to Pro — $99/mo
+              </button>
+            </div>
+          )}
+          {tier === 'pro' && (
+            <div className="border-b border-white/[0.06] px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 mb-2">Unlock with Growth</p>
+              <ul className="space-y-1.5 text-[12px] text-zinc-400">
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Up to 10 domains</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Unlimited platforms, regions &amp; seats</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Full CSV/JSON export &amp; white-label</li>
+                <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />200 prompts &amp; 10 competitors</li>
+              </ul>
+              <button type="button" onClick={() => handleUnlockComplete('growth_monthly')} className={cn(btnAccent, 'mt-3 inline-flex py-2 text-[11px]')}>
+                <Zap className="h-3 w-3" />
+                Upgrade to Growth — $249/mo
+              </button>
+            </div>
+          )}
+          {tier === 'growth' && (
+            <div className="border-b border-white/[0.06] px-5 py-4">
+              <p className="text-[12px] text-[#25c972]">You're on the Growth plan — full access to all features</p>
+            </div>
+          )}
 
           {/* Action row */}
           <div className="flex items-center gap-3 px-5 py-4">
             {tier === 'free' ? (
-              <Link href="/pricing" className={btnPrimary}>
+              <button type="button" onClick={() => handleUnlockComplete('starter_monthly')} className={btnPrimary}>
                 <CreditCard className="h-3.5 w-3.5" />
                 Upgrade Plan
-              </Link>
+              </button>
             ) : (
               <>
                 <button
@@ -757,25 +912,110 @@ export function SettingsSection({
                   className={btnPrimary}
                 >
                   <CreditCard className="h-3.5 w-3.5" />
-                  {portalLoading ? 'Opening...' : 'Manage Billing'}
+                  {portalLoading ? 'Opening...' : hasScheduledCancellation ? 'Manage in Stripe' : 'Manage Billing'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to cancel your plan? You\'ll lose access to advanced features at the end of your billing period.')) {
-                      handleOpenBillingPortal();
-                    }
-                  }}
-                  disabled={portalLoading}
-                  className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
-                >
-                  Cancel Plan
-                </button>
+                {hasScheduledCancellation ? (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/15 bg-amber-300/10 px-3 py-1.5 text-[11px] font-medium text-amber-100/90">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-200" />
+                    Cancellation scheduled
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setCancelPlanModalOpen(true)}
+                    disabled={portalLoading}
+                    className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                  >
+                    Cancel Plan
+                  </button>
+                )}
               </>
             )}
           </div>
+          {billingError && (
+            <div className="border-t border-white/[0.06] px-5 py-3">
+              <p className="text-[12px] text-red-400">{billingError}</p>
+            </div>
+          )}
         </Card>
       </section>
+
+      <Sheet open={cancelPlanModalOpen} onOpenChange={setCancelPlanModalOpen}>
+        <SheetContent
+          side="center"
+          showClose={false}
+          className="max-w-md border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(239,68,68,0.16),rgba(12,12,14,0.98)_42%),linear-gradient(180deg,rgba(12,12,14,0.98)_0%,rgba(8,8,10,1)_100%)] p-0 shadow-[0_32px_120px_rgba(0,0,0,0.55)]"
+        >
+          <div className="relative overflow-hidden rounded-[1.75rem]">
+            <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-red-400/60 to-transparent" />
+
+            <div className="px-6 pb-6 pt-7">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-red-400/25 bg-red-500/10 shadow-[0_0_30px_rgba(239,68,68,0.18)]">
+                    <AlertTriangle className="h-5 w-5 text-red-300" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-red-300/80">Billing Change</p>
+                    <SheetTitle className="mt-1 text-[1.15rem] font-semibold tracking-[-0.02em] text-white">
+                      Cancel your plan?
+                    </SheetTitle>
+                  </div>
+                </div>
+
+                <SheetClose
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition-colors hover:border-white/20 hover:text-white"
+                  aria-label="Close cancel plan dialog"
+                >
+                  <span className="text-lg leading-none">×</span>
+                </SheetClose>
+              </div>
+
+              <SheetDescription className="mt-5 text-[13px] leading-6 text-zinc-300">
+                Your subscription will be managed in Stripe Billing. You&rsquo;ll keep access to your current features until the end of this billing period.
+              </SheetDescription>
+
+              <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+                <p className="text-[12px] font-medium text-zinc-100">What happens next</p>
+                <ul className="mt-3 space-y-2 text-[12px] leading-5 text-zinc-400">
+                  <li className="flex items-start gap-2">
+                    <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-red-300/80" />
+                    You&apos;ll be redirected to Stripe&apos;s secure billing portal.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-red-300/80" />
+                    Cancellation takes effect at the end of the active billing cycle.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-red-300/80" />
+                    You can still return to manage payment methods or reactivate there.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setCancelPlanModalOpen(false)}
+                  disabled={portalLoading}
+                  className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-[12px] font-medium text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+                >
+                  Keep Plan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmCancelPlan()}
+                  disabled={portalLoading}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {portalLoading ? 'Opening Stripe...' : 'Continue to Stripe'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       </>
       )}
@@ -800,12 +1040,13 @@ export function SettingsSection({
               <p className="mt-2 text-[13px] text-zinc-400">
                 Team management is available on Pro and Growth plans.
               </p>
-              <Link
-                href="/pricing"
+              <button
+                type="button"
+                onClick={() => handleUnlockComplete('pro_monthly')}
                 className={cn(btnPrimary, 'mt-4 inline-flex')}
               >
                 Upgrade to unlock
-              </Link>
+              </button>
             </div>
           ) : !teamData.team ? (
             /* ── No team yet — create one ──────────────────────── */
@@ -1139,12 +1380,13 @@ export function SettingsSection({
           )}
           {selectedPlatforms.length >= maxPlatforms && tier !== 'growth' && (
             <div className="border-t border-white/[0.06] px-5 py-3">
-              <Link
-                href="/pricing"
+              <button
+                type="button"
+                onClick={() => handleUnlockComplete(tier === 'free' ? 'starter_monthly' : tier === 'starter' ? 'pro_monthly' : 'growth_monthly')}
                 className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
               >
                 Upgrade for more platforms &rarr;
-              </Link>
+              </button>
             </div>
           )}
         </Card>
@@ -1199,12 +1441,13 @@ export function SettingsSection({
           )}
           {selectedRegions.length >= maxRegions && tier !== 'growth' && (
             <div className="border-t border-white/[0.06] px-5 py-3">
-              <Link
-                href="/pricing"
+              <button
+                type="button"
+                onClick={() => handleUnlockComplete(tier === 'free' ? 'starter_monthly' : tier === 'starter' ? 'pro_monthly' : 'growth_monthly')}
                 className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
               >
                 Upgrade for more regions &rarr;
-              </Link>
+              </button>
             </div>
           )}
         </Card>

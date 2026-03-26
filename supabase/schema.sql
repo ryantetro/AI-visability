@@ -38,6 +38,7 @@ create table if not exists user_profiles (
   stripe_customer_id text unique,
   stripe_subscription_id text,
   plan_expires_at timestamptz,
+  plan_cancel_at_period_end boolean not null default false,
   plan_updated_at timestamptz,
   created_at      timestamptz default now(),
   updated_at      timestamptz default now()

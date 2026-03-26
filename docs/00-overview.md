@@ -24,6 +24,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [18-pricing-restructure-implementation.md](./18-pricing-restructure-implementation.md) | Pricing restructure implementation — platform gating, data export, analytics, regions, content generator | `src/lib/platform-gating.ts`, `src/lib/region-gating.ts`, `src/lib/content-generator.ts` |
 | [19-team-management.md](./19-team-management.md) | Multi-seat team management — invitations, shared domains, plan resolution | `src/lib/team-management.ts`, `src/app/api/teams/` |
 | [20-fix-my-site.md](./20-fix-my-site.md) | Fix My Site $499 service add-on — one-time Stripe payment, order tracking, email notifications | `src/lib/fix-my-site.ts`, `src/app/api/fix-my-site/` |
+| [21-payment-flow-fixes-upsells.md](./21-payment-flow-fixes-upsells.md) | Payment flow bug fixes + tier-contextual upgrade upsells | `src/contexts/domain-context.tsx`, `src/app/api/webhooks/stripe/route.ts` |
 
 ## Architecture Principles
 

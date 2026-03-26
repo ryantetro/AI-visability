@@ -70,6 +70,7 @@ import { analysisExampleReport, analysisExampleScan } from '@/lib/analysis-examp
 import { getCheckFixContent } from '@/lib/analysis-fix-content';
 import { EffortBand } from '@/types/score';
 import { useAuth } from '@/hooks/use-auth';
+import { buildLoginHref, getCurrentAppPath } from '@/lib/app-paths';
 
 interface ReportData {
   id: string;
@@ -842,17 +843,34 @@ export function AnalysisPageContent() {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scanId: id, plan: plan || 'starter_monthly' }),
+        body: JSON.stringify({
+          scanId: id,
+          plan: plan || 'starter_monthly',
+          returnPath: getCurrentAppPath('/analysis'),
+        }),
       });
 
+      if (res.status === 401) {
+        router.push(buildLoginHref(getCurrentAppPath('/analysis')));
+        return;
+      }
+
       if (!res.ok) {
-        throw new Error('Failed to start checkout');
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error || 'Failed to start checkout');
       }
 
       const session = await res.json();
+      if (typeof session.url !== 'string' || session.url.length === 0) {
+        throw new Error('Checkout session did not include a redirect URL.');
+      }
+      if (/^https?:\/\//i.test(session.url)) {
+        window.location.href = session.url;
+        return;
+      }
       router.push(session.url);
-    } catch {
-      setActionError('Unable to start checkout right now. Please try again.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Unable to start checkout right now. Please try again.');
     } finally {
       setCheckoutLoading(false);
     }

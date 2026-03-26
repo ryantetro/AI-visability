@@ -15,6 +15,8 @@ export interface PlanCacheSnapshot {
   teamId: string | null;
   teamRole: 'owner' | 'member' | null;
   teamName: string | null;
+  planExpiresAt: string | null;
+  planCancelAtPeriodEnd: boolean | null;
 }
 
 interface AuthMePayload {
@@ -30,6 +32,8 @@ interface AuthMePayload {
   teamId?: string | null;
   teamRole?: 'owner' | 'member' | null;
   teamName?: string | null;
+  planExpiresAt?: string | null;
+  planCancelAtPeriodEnd?: boolean;
   reason?: string;
   user?: {
     email?: string | null;
@@ -52,6 +56,8 @@ const EMPTY_PLAN_CACHE: PlanCacheSnapshot = {
   teamId: null,
   teamRole: null,
   teamName: null,
+  planExpiresAt: null,
+  planCancelAtPeriodEnd: null,
 };
 
 let snapshot: PlanCacheSnapshot = { ...EMPTY_PLAN_CACHE };
@@ -97,6 +103,8 @@ export function hydratePlanCache(payload: AuthMePayload | null | undefined): Pla
     teamId: payload?.teamId ?? null,
     teamRole: payload?.teamRole ?? null,
     teamName: payload?.teamName ?? null,
+    planExpiresAt: payload?.planExpiresAt ?? null,
+    planCancelAtPeriodEnd: payload?.planCancelAtPeriodEnd ?? false,
   };
 
   return getPlanCacheSnapshot();

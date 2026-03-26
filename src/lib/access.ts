@@ -19,6 +19,8 @@ export interface AccessInfo {
   teamId: string | null;
   teamRole: 'owner' | 'member' | null;
   teamName: string | null;
+  planExpiresAt: string | null;
+  planCancelAtPeriodEnd: boolean;
 }
 
 export async function getUserAccess(userId: string, email: string): Promise<AccessInfo> {
@@ -34,13 +36,15 @@ export async function getUserAccess(userId: string, email: string): Promise<Acce
   // If user is a team member (not owner), use the team owner's plan
   let effectivePlan: string;
   let tier: PlanTier;
+  let planExpiresAt: string | null;
+  let planCancelAtPeriodEnd = false;
 
   if (teamInfo && teamInfo.role === 'member') {
     // Resolve owner's profile via plain select (not upsert — we don't have their email here)
     const supabase = getSupabaseClient();
     const { data: ownerProfile } = await supabase
       .from('user_profiles')
-      .select('plan, email')
+      .select('plan, email, plan_expires_at, plan_cancel_at_period_end')
       .eq('id', teamInfo.team.owner_id)
       .single();
 
@@ -48,9 +52,13 @@ export async function getUserAccess(userId: string, email: string): Promise<Acce
     const ownerOverride = getAccountAccessOverride(ownerEmail);
     effectivePlan = ownerOverride?.plan ?? ownerProfile?.plan ?? 'free';
     tier = ownerOverride?.tier ?? planStringToTier(effectivePlan);
+    planExpiresAt = ownerProfile?.plan_expires_at ?? null;
+    planCancelAtPeriodEnd = ownerProfile?.plan_cancel_at_period_end ?? false;
   } else {
     effectivePlan = override?.plan ?? profile.plan;
     tier = override?.tier ?? planStringToTier(effectivePlan);
+    planExpiresAt = profile.plan_expires_at ?? null;
+    planCancelAtPeriodEnd = profile.plan_cancel_at_period_end ?? false;
   }
 
   const isPaid = tier !== 'free';
@@ -75,5 +83,7 @@ export async function getUserAccess(userId: string, email: string): Promise<Acce
     teamId,
     teamRole,
     teamName,
+    planExpiresAt,
+    planCancelAtPeriodEnd,
   };
 }

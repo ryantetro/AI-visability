@@ -2,8 +2,16 @@ import Stripe from 'stripe';
 import { CheckoutSession, PaymentPlan, PaymentService } from '@/types/services';
 import { getPlanPriceCents, getPlanDisplayName } from '@/lib/pricing';
 import { getSupabaseClient } from '@/lib/supabase';
+import { sanitizeAppRelativePath } from '@/lib/app-paths';
 
 let _stripe: Stripe | null = null;
+const STRIPE_SESSION_PLACEHOLDER = '{CHECKOUT_SESSION_ID}';
+const TRANSIENT_BILLING_PARAMS = ['upgrade', 'checkout', 'session_id', 'fms', 'order_id'];
+
+interface RedirectOptions {
+  returnPath?: string;
+  cancelPath?: string;
+}
 
 function getStripe(): Stripe {
   if (_stripe) return _stripe;
@@ -23,6 +31,28 @@ export function canUseStripe() {
 
 function getAppUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+}
+
+function buildAppRedirectUrl(
+  path: string | null | undefined,
+  queryParams: Record<string, string> = {},
+  fallback = '/dashboard'
+) {
+  const appUrl = getAppUrl();
+  const normalizedPath = sanitizeAppRelativePath(path, fallback);
+  const url = new URL(normalizedPath, appUrl);
+
+  for (const key of TRANSIENT_BILLING_PARAMS) {
+    url.searchParams.delete(key);
+  }
+
+  for (const [key, value] of Object.entries(queryParams)) {
+    url.searchParams.set(key, value);
+  }
+
+  return url
+    .toString()
+    .replace(encodeURIComponent(STRIPE_SESSION_PLACEHOLDER), STRIPE_SESSION_PLACEHOLDER);
 }
 
 function getPriceId(plan: PaymentPlan): string | null {
@@ -70,12 +100,14 @@ export async function getOrCreateStripeCustomer(userId: string, email: string): 
 export async function createSubscriptionCheckout(
   userId: string,
   email: string,
-  plan: PaymentPlan = 'starter_monthly'
+  plan: PaymentPlan = 'starter_monthly',
+  options: RedirectOptions = {}
 ): Promise<CheckoutSession> {
   const stripe = getStripe();
   const customerId = await getOrCreateStripeCustomer(userId, email);
-  const appUrl = getAppUrl();
   const priceId = getPriceId(plan);
+  const returnPath = sanitizeAppRelativePath(options.returnPath, '/dashboard');
+  const cancelPath = sanitizeAppRelativePath(options.cancelPath, returnPath);
 
   const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = priceId
     ? { price: priceId, quantity: 1 }
@@ -96,8 +128,11 @@ export async function createSubscriptionCheckout(
     mode: 'subscription',
     customer: customerId,
     line_items: [lineItem],
-    success_url: `${appUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${appUrl}/pricing`,
+    success_url: buildAppRedirectUrl(returnPath, {
+      checkout: 'success',
+      session_id: STRIPE_SESSION_PLACEHOLDER,
+    }),
+    cancel_url: buildAppRedirectUrl(cancelPath),
     metadata: { userId, plan },
     subscription_data: { metadata: { userId, plan } },
   });
@@ -115,12 +150,13 @@ export async function createFixMySiteCheckout(
   userId: string,
   email: string,
   orderId: string,
+  options: RedirectOptions = {},
 ): Promise<CheckoutSession> {
   const stripe = getStripe();
   const customerId = await getOrCreateStripeCustomer(userId, email);
-  const appUrl = getAppUrl();
-
   const priceId = process.env.STRIPE_PRICE_FIX_MY_SITE || null;
+  const returnPath = sanitizeAppRelativePath(options.returnPath, '/dashboard');
+  const cancelPath = sanitizeAppRelativePath(options.cancelPath, returnPath);
 
   const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = priceId
     ? { price: priceId, quantity: 1 }
@@ -140,8 +176,11 @@ export async function createFixMySiteCheckout(
     mode: 'payment',
     customer: customerId,
     line_items: [lineItem],
-    success_url: `${appUrl}/dashboard?fms=success&order_id=${orderId}`,
-    cancel_url: `${appUrl}/dashboard?fms=cancelled`,
+    success_url: buildAppRedirectUrl(returnPath, {
+      fms: 'success',
+      order_id: orderId,
+    }),
+    cancel_url: buildAppRedirectUrl(cancelPath, { fms: 'cancelled' }),
     metadata: { userId, orderId, type: 'fix_my_site' },
   });
 
@@ -154,14 +193,17 @@ export async function createFixMySiteCheckout(
   };
 }
 
-export async function createPortalSession(userId: string, email: string): Promise<string> {
+export async function createPortalSession(
+  userId: string,
+  email: string,
+  returnPath?: string,
+): Promise<string> {
   const stripe = getStripe();
   const customerId = await getOrCreateStripeCustomer(userId, email);
-  const appUrl = getAppUrl();
 
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
-    return_url: `${appUrl}/settings`,
+    return_url: buildAppRedirectUrl(returnPath, {}, '/settings'),
   });
 
   return session.url;
@@ -184,6 +226,7 @@ export const stripePayment: PaymentService = {
       paid: session.payment_status === 'paid' || session.status === 'complete',
       scanId: (session.metadata?.scanId) || '',
       plan: session.metadata?.plan,
+      userId: session.metadata?.userId,
     };
   },
 };

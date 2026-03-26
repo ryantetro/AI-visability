@@ -23,9 +23,11 @@ interface EngineTimelineRow {
 export function AIReferralPanel({
   domain,
   trackingLastUsedAt,
+  tier,
 }: {
   domain: string;
   trackingLastUsedAt?: string | null;
+  tier?: string;
 }) {
   const searchParams = useSearchParams();
   const reportParam = searchParams.get('report');
@@ -124,6 +126,12 @@ export function AIReferralPanel({
               </span>
             ))}
           </div>
+          {tier === 'starter' && (
+            <p className="mt-4 text-[11px] text-zinc-600">Upgrade to Pro for full referral timeline and trends.</p>
+          )}
+          {tier === 'pro' && (
+            <p className="mt-4 text-[11px] text-zinc-600">Upgrade to Growth to export referral data as CSV.</p>
+          )}
         </div>
       </DashboardPanel>
     );

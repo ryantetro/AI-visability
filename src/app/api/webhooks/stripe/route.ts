@@ -26,6 +26,8 @@ function priceIdToPlan(priceId: string): string | null {
   if (process.env.STRIPE_PRICE_STARTER_ANNUAL) mapping[process.env.STRIPE_PRICE_STARTER_ANNUAL] = 'starter_annual';
   if (process.env.STRIPE_PRICE_PRO_MONTHLY) mapping[process.env.STRIPE_PRICE_PRO_MONTHLY] = 'pro_monthly';
   if (process.env.STRIPE_PRICE_PRO_ANNUAL) mapping[process.env.STRIPE_PRICE_PRO_ANNUAL] = 'pro_annual';
+  if (process.env.STRIPE_PRICE_GROWTH_MONTHLY) mapping[process.env.STRIPE_PRICE_GROWTH_MONTHLY] = 'growth_monthly';
+  if (process.env.STRIPE_PRICE_GROWTH_ANNUAL) mapping[process.env.STRIPE_PRICE_GROWTH_ANNUAL] = 'growth_annual';
   return mapping[priceId] || null;
 }
 
@@ -140,6 +142,7 @@ export async function POST(request: NextRequest) {
               .from('user_profiles')
               .update({
                 stripe_subscription_id: subId,
+                plan_cancel_at_period_end: false,
                 plan_updated_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               })
@@ -153,6 +156,7 @@ export async function POST(request: NextRequest) {
       break;
     }
 
+    case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       try {
         const subscription = event.data.object as Stripe.Subscription;
@@ -160,7 +164,7 @@ export async function POST(request: NextRequest) {
         const userId = await findUserByCustomerId(customerId);
 
         if (!userId) {
-          console.warn('customer.subscription.updated: no user found for customer', customerId, '— acknowledging to prevent retry storm');
+          console.warn(`${event.type}: no user found for customer`, customerId, '— acknowledging to prevent retry storm');
           return NextResponse.json({ received: true });
         }
 
@@ -179,12 +183,13 @@ export async function POST(request: NextRequest) {
           .update({
             stripe_subscription_id: subscription.id,
             plan_expires_at: currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString() : null,
+            plan_cancel_at_period_end: subscription.cancel_at_period_end,
             plan_updated_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq('id', userId);
       } catch (err) {
-        console.error('Error handling customer.subscription.updated:', err);
+        console.error(`Error handling ${event.type}:`, err);
         return NextResponse.json({ error: 'Internal error' }, { status: 500 });
       }
       break;
@@ -208,6 +213,7 @@ export async function POST(request: NextRequest) {
           .update({
             stripe_subscription_id: null,
             plan_expires_at: null,
+            plan_cancel_at_period_end: false,
             plan_updated_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })

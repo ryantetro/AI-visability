@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPayment, getDatabase } from '@/lib/services/registry';
-import { canUseStripe } from '@/lib/services/stripe-payment';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { upgradeUserPlan } from '@/lib/user-profile';
 
@@ -20,9 +19,11 @@ export async function POST(request: NextRequest) {
   const payment = getPayment();
   const result = await payment.verifyPayment(sessionId);
 
+  if (result.userId && result.userId !== user.id) {
+    return NextResponse.json({ error: 'This checkout belongs to another account.' }, { status: 403 });
+  }
+
   if (result.paid) {
-    // For mock mode: do the plan upgrade here since there's no webhook
-    // For real Stripe: the webhook handles the actual upgrade, this is just a status check
     const plan = result.plan || 'starter_monthly';
 
     if (result.scanId && !result.scanId.startsWith('upgrade_')) {
@@ -36,13 +37,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Only upgrade plan in mock mode. In real Stripe mode the webhook owns the upgrade.
-    if (!canUseStripe()) {
-      try {
-        await upgradeUserPlan(user.id, plan);
-      } catch {
-        // Non-blocking: scan unlock still succeeds even if plan upgrade fails
-      }
+    // Keep the webhook as the source of truth, but also apply the upgrade here so the
+    // returning user sees the new plan immediately and webhook delays do not block access.
+    try {
+      await upgradeUserPlan(user.id, plan);
+    } catch {
+      // Non-blocking: scan unlock still succeeds even if plan upgrade fails
     }
   }
 

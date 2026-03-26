@@ -21,7 +21,7 @@ export type PaymentPlan = 'starter_monthly' | 'starter_annual' | 'pro_monthly' |
 
 export interface PaymentService {
   createCheckout(scanId: string, plan?: PaymentPlan): Promise<CheckoutSession>;
-  verifyPayment(sessionId: string): Promise<{ paid: boolean; scanId: string; plan?: string }>;
+  verifyPayment(sessionId: string): Promise<{ paid: boolean; scanId: string; plan?: string; userId?: string }>;
 }
 
 export interface SubscriptionPaymentService extends PaymentService {

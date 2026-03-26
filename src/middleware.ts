@@ -127,7 +127,8 @@ function handleUnauthenticated(request: NextRequest, pathname: string): NextResp
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
   const loginUrl = new URL('/login', request.url);
-  loginUrl.searchParams.set('next', pathname);
+  const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  loginUrl.searchParams.set('next', nextPath);
   return NextResponse.redirect(loginUrl);
 }
 

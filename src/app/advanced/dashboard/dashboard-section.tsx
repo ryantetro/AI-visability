@@ -30,6 +30,7 @@ import { QuickWinsSection } from './quick-wins-section';
 import { OpportunityAlertBanner } from './opportunity-alert-banner';
 import { OnboardingChecklist } from '@/components/app/onboarding-checklist';
 import { NextStepsCard } from '@/components/app/next-steps-card';
+import { usePlan } from '@/hooks/use-plan';
 import type { DashboardReportData, RecentScanData } from '../lib/types';
 import type { CompetitorComparisonData } from '@/types/competitors';
 import type { OpportunityAlertSummary } from '@/types/services';
@@ -72,6 +73,7 @@ export function DashboardSection({
   const scores = report.score.scores;
   const mentions = report.mentionSummary;
   const [renderedAt] = useState(() => Date.now());
+  const { tier } = usePlan();
 
   // Lift tracking key + last signal so both panels share one API call
   const [trackingReady, setTrackingReady] = useState(false);
@@ -597,11 +599,11 @@ export function DashboardSection({
 
       {/* AI Crawler Traffic */}
       <div id="tracking" className="scroll-mt-6">
-        <AICrawlerPanel domain={domain} trackingReady={trackingReady} trackingLastUsedAt={trackingLastUsedAt} />
+        <AICrawlerPanel domain={domain} trackingReady={trackingReady} trackingLastUsedAt={trackingLastUsedAt} tier={tier} />
       </div>
 
       {/* AI Referral Traffic */}
-      <AIReferralPanel domain={domain} trackingLastUsedAt={trackingLastUsedAt} />
+      <AIReferralPanel domain={domain} trackingLastUsedAt={trackingLastUsedAt} tier={tier} />
 
       {/* Recent Scans removed — redundant with sidebar domain list */}
     </div>

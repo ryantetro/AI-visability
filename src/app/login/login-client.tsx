@@ -277,6 +277,13 @@ export function LoginPageContent() {
         return;
       }
 
+      if (payload.requiresEmailVerification) {
+        setEmailHint(email);
+        setCheckEmailKind('signup');
+        switchMode('check-email');
+        return;
+      }
+
       // Otherwise auto-login with the same credentials to establish a session
       const loginRes = await fetch('/api/auth/login', {
         method: 'POST',

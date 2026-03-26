@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ensureProtocol, getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
 import { invalidatePlanCache, usePlan } from '@/hooks/use-plan';
+import { getCurrentAppPath } from '@/lib/app-paths';
 import {
   loadStoredDomains,
   saveStoredDomains,
@@ -298,6 +299,27 @@ export function DomainContextProvider({
     return () => { active = false; };
   }, [searchParams, initialReportId, manualDomains, recentScans, setSelectedDomain]);
 
+  // Auto-navigate to Brand > Services tab when arriving with ?fms=start (Fix 3)
+  useEffect(() => {
+    if (searchParams.get('fms') === 'start') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('fms');
+      window.history.replaceState({}, '', url.toString());
+      window.location.href = '/brand?tab=services';
+    }
+  }, [searchParams]);
+
+  // Show success banner after Fix My Site payment (Fix 4)
+  useEffect(() => {
+    if (searchParams.get('fms') === 'success' && searchParams.get('order_id')) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('fms');
+      url.searchParams.delete('order_id');
+      window.history.replaceState({}, '', url.toString());
+      setCheckoutBanner('Fix My Site order confirmed! Our team will begin optimizing your site within 1-2 business days.');
+    }
+  }, [searchParams]);
+
   // --- Computed values ---
   const paidDomains = useMemo(() => {
     const seen = new Set<string>();
@@ -575,7 +597,11 @@ export function DomainContextProvider({
         const res = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scanId, plan: selectedPlan }),
+          body: JSON.stringify({
+            scanId,
+            plan: selectedPlan,
+            returnPath: getCurrentAppPath('/dashboard'),
+          }),
         });
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}));
@@ -618,6 +644,18 @@ export function DomainContextProvider({
       }
     })();
   }, [pendingDomain, manualDomains, setSelectedDomain]);
+
+  // Auto-trigger checkout when arriving from pricing page with ?upgrade= param (Fix 1)
+  useEffect(() => {
+    const upgradePlan = searchParams.get('upgrade');
+    if (!upgradePlan) return;
+    // Prevent re-triggering
+    const url = new URL(window.location.href);
+    url.searchParams.delete('upgrade');
+    window.history.replaceState({}, '', url.toString());
+    // Reuse existing checkout handler
+    handleUnlockComplete(upgradePlan);
+  }, [searchParams, handleUnlockComplete]);
 
   const handleRunFirstScan = useCallback(async (site: SiteSummary) => {
     setActionError('');

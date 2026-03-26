@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
   let teamId: string | null = null;
   let teamRole: string | null = null;
   let teamName: string | null = null;
+  let planExpiresAt: string | null = null;
+  let planCancelAtPeriodEnd = false;
   try {
     const profile = await getOrCreateProfile(auth.user.id, auth.user.email);
     const access = await getUserAccess(auth.user.id, auth.user.email);
@@ -48,6 +50,8 @@ export async function GET(request: NextRequest) {
     teamId = access.teamId;
     teamRole = access.teamRole;
     teamName = access.teamName;
+    planExpiresAt = access.planExpiresAt;
+    planCancelAtPeriodEnd = access.planCancelAtPeriodEnd;
     scansUsed = profile.scans_used;
     freeScanLimit = profile.free_scan_limit;
   } catch {
@@ -69,6 +73,8 @@ export async function GET(request: NextRequest) {
     teamId,
     teamRole,
     teamName,
+    planExpiresAt,
+    planCancelAtPeriodEnd,
     scans_used: scansUsed,
     free_scan_limit: freeScanLimit,
     session: {

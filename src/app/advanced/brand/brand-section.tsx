@@ -7,8 +7,10 @@ import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primiti
 import type { PrioritizedFix } from '@/types/score';
 import { cn } from '@/lib/utils';
 import { formatPlatformLabel } from '@/lib/platform-detection';
+import { usePlan } from '@/hooks/use-plan';
 import { AiPresenceTab } from '../panels/ai-presence-tab';
 import { AICrawlerPanel } from '../panels/ai-crawler-panel';
+import { PromptLibraryPanel } from '../panels/prompt-library-panel';
 import { PromptAnalyticsPanel } from '../panels/prompt-analytics-panel';
 import { ContentGeneratorPanel } from '../panels/content-generator-panel';
 import { FixMySitePanel } from '../panels/fix-my-site-panel';
@@ -32,6 +34,7 @@ const VALID_TABS: BrandTab[] = ['presence', 'improve', 'citations', 'files', 'tr
 export function BrandSection({ report, files, domain, platformLabel }: BrandSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { tier, maxPrompts } = usePlan();
 
   const tabParam = searchParams.get('tab') as BrandTab | null;
   const activeTab: BrandTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'presence';
@@ -167,7 +170,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
             </DashboardPanel>
           )}
 
-          {/* <PromptLibraryPanel domain={domain} /> */}
+          <PromptLibraryPanel domain={domain} tier={tier} maxPrompts={maxPrompts} />
         </>
       )}
 
@@ -238,7 +241,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
       {activeTab === 'traffic' && (
         <>
           <PromptAnalyticsPanel domain={domain} />
-          <AICrawlerPanel domain={domain} />
+          <AICrawlerPanel domain={domain} tier={tier} />
         </>
       )}
 

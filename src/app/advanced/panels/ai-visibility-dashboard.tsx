@@ -8,13 +8,22 @@ import {
 } from 'recharts';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import { ExportButton } from '@/components/ui/export-button';
+import { Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CHART_COLORS } from '../lib/constants';
 import { scoreColor, barFillColor } from '../lib/utils';
 import { ChartTooltipContent } from './shared';
 import type { DashboardReportData } from '../lib/types';
 
-export function AiVisibilityDashboard({ report }: { report: DashboardReportData }) {
+export function AiVisibilityDashboard({
+  report,
+  tier,
+  onUpgrade,
+}: {
+  report: DashboardReportData;
+  tier?: string;
+  onUpgrade?: () => void;
+}) {
   const dimensions = report.score.dimensions;
   if (!dimensions?.length) return null;
 
@@ -154,6 +163,29 @@ export function AiVisibilityDashboard({ report }: { report: DashboardReportData 
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+      {/* Upgrade upsell footer */}
+      {tier && tier !== 'growth' && onUpgrade && (
+        <div className="mt-6 border-t border-dashed border-white/[0.08] pt-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <Zap className="h-4 w-4 shrink-0 text-amber-400/60" />
+              <p className="text-[12px] text-zinc-500">
+                {tier === 'starter' && 'Upgrade to Pro — unlock competitor tracking, daily monitoring, and data export'}
+                {tier === 'pro' && 'Upgrade to Growth — unlimited platforms, regions, white-label, and CSV export'}
+                {tier === 'free' && 'Upgrade to Starter — unlock monitoring, prompt tracking, and brand section'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-300 transition-colors hover:bg-amber-500/20"
+            >
+              <Zap className="h-3 w-3" />
+              Upgrade
+            </button>
           </div>
         </div>
       )}

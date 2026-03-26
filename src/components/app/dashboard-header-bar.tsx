@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Loader2, LogOut, Megaphone, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { planStringToTier, PLANS } from '@/lib/pricing';
+import { buildLoginHref, getCurrentAppPath } from '@/lib/app-paths';
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -33,6 +34,7 @@ export function DashboardHeaderBar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [usageData, setUsageData] = useState<{ plan: string; isPaid: boolean } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const title = getPageTitle(pathname);
@@ -67,23 +69,33 @@ export function DashboardHeaderBar() {
 
   const handleUpgrade = async (plan: string) => {
     setCheckoutLoading(plan);
+    setCheckoutError(null);
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, returnPath: getCurrentAppPath('/dashboard') }),
       });
-      if (!res.ok) throw new Error('Checkout failed');
+      if (res.status === 401) {
+        router.push(buildLoginHref(getCurrentAppPath('/dashboard')));
+        return;
+      }
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error || 'Unable to start checkout right now.');
+      }
       const session = await res.json();
+      if (typeof session.url !== 'string' || session.url.length === 0) {
+        throw new Error('Checkout session did not include a redirect URL.');
+      }
       setDropdownOpen(false);
       if (typeof session.url === 'string' && /^https?:\/\//i.test(session.url)) {
         window.location.href = session.url;
         return;
       }
       router.push(session.url);
-    } catch {
-      setDropdownOpen(false);
-      router.push('/pricing');
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : 'Unable to start checkout right now.');
     } finally {
       setCheckoutLoading(null);
     }
@@ -133,6 +145,11 @@ export function DashboardHeaderBar() {
                 <div className="border-b border-white/[0.06] px-5 py-3">
                   <p className="text-[12px] font-medium text-zinc-500">{planLabel}</p>
                 </div>
+                {checkoutError && (
+                  <div className="border-b border-white/[0.06] px-5 py-2.5">
+                    <p className="text-[12px] text-red-400">{checkoutError}</p>
+                  </div>
+                )}
                 {tier === 'free' && (
                   <div className="border-b border-white/[0.06] py-1.5">
                     <button
@@ -215,7 +232,7 @@ export function DashboardHeaderBar() {
           </div>
         ) : (
           <Link
-            href="/login?next=/dashboard"
+            href={buildLoginHref(getCurrentAppPath('/dashboard'))}
             className="inline-flex items-center justify-center rounded-full border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-white/[0.04]"
           >
             Sign in

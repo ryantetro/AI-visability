@@ -200,13 +200,20 @@ export function planStringToTier(plan: string): PlanTier {
   return 'free';
 }
 
-export type PaymentPlanString =
-  | 'starter_monthly'
-  | 'starter_annual'
-  | 'pro_monthly'
-  | 'pro_annual'
-  | 'growth_monthly'
-  | 'growth_annual';
+export const PAYMENT_PLAN_IDS = [
+  'starter_monthly',
+  'starter_annual',
+  'pro_monthly',
+  'pro_annual',
+  'growth_monthly',
+  'growth_annual',
+] as const;
+
+export type PaymentPlanString = (typeof PAYMENT_PLAN_IDS)[number];
+
+export function isPaymentPlanString(plan: string): plan is PaymentPlanString {
+  return (PAYMENT_PLAN_IDS as readonly string[]).includes(plan);
+}
 
 /** Get price in cents for a payment plan */
 export function getPlanPriceCents(plan: PaymentPlanString): number {

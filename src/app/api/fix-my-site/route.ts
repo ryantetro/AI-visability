@@ -29,14 +29,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Payments are not configured' }, { status: 503 });
   }
 
-  let body: { domain?: string; notes?: string; filesRequested?: string[] };
+  let body: { domain?: string; notes?: string; filesRequested?: string[]; returnPath?: string } | null = null;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { domain, notes, filesRequested } = body;
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const { domain, notes, filesRequested, returnPath } = body;
 
   if (!domain || typeof domain !== 'string' || !domain.trim()) {
     return NextResponse.json({ error: 'Domain is required' }, { status: 400 });
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest) {
       filesRequested,
     );
 
-    const checkout = await createFixMySiteCheckout(user.id, profile.email, order.id);
+    const checkout = await createFixMySiteCheckout(user.id, profile.email, order.id, { returnPath });
 
     return NextResponse.json({
       order,

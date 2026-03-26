@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Check, Loader2, Wrench } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import { cn } from '@/lib/utils';
+import { getCurrentAppPath } from '@/lib/app-paths';
 
 interface FixMySiteOrder {
   id: string;
@@ -95,6 +96,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
           domain: orderDomain.trim(),
           notes: notes.trim() || undefined,
           filesRequested: Array.from(selectedFiles),
+          returnPath: getCurrentAppPath('/dashboard'),
         }),
       });
 

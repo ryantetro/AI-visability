@@ -23,6 +23,8 @@ interface PlanState {
   teamId: string | null;
   teamRole: 'owner' | 'member' | null;
   teamName: string | null;
+  planExpiresAt: string | null;
+  planCancelAtPeriodEnd: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -47,6 +49,8 @@ function readPlanSnapshot() {
     teamId: snapshot.teamId ?? null,
     teamRole: snapshot.teamRole ?? null,
     teamName: snapshot.teamName ?? null,
+    planExpiresAt: snapshot.planExpiresAt ?? null,
+    planCancelAtPeriodEnd: snapshot.planCancelAtPeriodEnd ?? false,
     loading: snapshot.tier === null,
   };
 }

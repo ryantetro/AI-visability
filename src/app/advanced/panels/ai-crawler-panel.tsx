@@ -24,10 +24,12 @@ export function AICrawlerPanel({
   domain,
   trackingReady: trackingReadyProp,
   trackingLastUsedAt: trackingLastUsedAtProp,
+  tier,
 }: {
   domain: string;
   trackingReady?: boolean;
   trackingLastUsedAt?: string | null;
+  tier?: string;
 }) {
   const searchParams = useSearchParams();
   const [providerTimeline, setProviderTimeline] = useState<ProviderTimelineRow[]>([]);
@@ -168,6 +170,12 @@ export function AICrawlerPanel({
                 </div>
               ))}
             </div>
+            {tier === 'starter' && (
+              <p className="mt-4 text-[11px] text-zinc-600">Your Starter plan includes basic crawler totals. Upgrade to Pro for full timeline and trend analysis.</p>
+            )}
+            {tier === 'pro' && (
+              <p className="mt-4 text-[11px] text-zinc-600">Upgrade to Growth to export crawler data as CSV.</p>
+            )}
           </div>
         </div>
       </DashboardPanel>
