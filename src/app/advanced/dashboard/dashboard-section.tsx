@@ -22,6 +22,7 @@ import { scoreColor, barFillColor, formatRelativeTime, getScoreColor } from '../
 import { ENGINE_COLORS } from '../lib/constants';
 import { AI_ENGINES, AI_ENGINE_META, getAIEngineLabel } from '@/lib/ai-engines';
 import { MonitoringTrendsPanel } from '../panels/monitoring-trends-panel';
+import { PromptAnalyticsPanel } from '../panels/prompt-analytics-panel';
 import { AICrawlerPanel } from '../panels/ai-crawler-panel';
 import { AIReferralPanel } from '../panels/ai-referral-panel';
 import { EmptyStateCard } from './empty-state-card';
@@ -581,6 +582,9 @@ export function DashboardSection({
           </div>
         </DashboardPanel>
       </div>
+
+      {/* Prompt Analytics */}
+      <PromptAnalyticsPanel domain={domain} />
 
       {/* Monitoring Trends */}
       <MonitoringTrendsPanel

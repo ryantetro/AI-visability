@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { planStringToTier, PLANS } from '@/lib/pricing';
 import { detectAppShellSection } from '@/lib/workspace-ui';
+import { AisoBrand } from '@/components/ui/aiso-brand';
 
 type AppSection = 'history' | 'leaderboard' | 'featured' | 'dashboard';
 
@@ -16,35 +17,6 @@ const navItems: { key: AppSection; label: string; href: string; icon: typeof Dia
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', icon: Trophy },
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: Diamond },
 ];
-
-function AisoLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
-      <path
-        d="M16 3 A13 13 0 0 1 27.3 18.5"
-        fill="none"
-        stroke="#356df4"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M27.3 18.5 A13 13 0 0 1 4.7 18.5"
-        fill="none"
-        stroke="#25c972"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M4.7 18.5 A13 13 0 0 1 16 3"
-        fill="none"
-        stroke="#16b7ca"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 export function AppShellNav() {
   const router = useRouter();
@@ -121,10 +93,7 @@ export function AppShellNav() {
           href="/"
           className="inline-flex items-center gap-3 text-[15px] font-semibold text-[var(--text-primary)] transition-opacity hover:opacity-90"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center">
-            <AisoLogo className="h-9 w-9" />
-          </span>
-          <span className="tracking-tight">AISO</span>
+          <AisoBrand logoClassName="h-9 w-9" textClassName="tracking-tight text-[var(--text-primary)]" />
         </Link>
 
         {/* Center nav */}
@@ -204,7 +173,7 @@ export function AppShellNav() {
                         ) : (
                           <Zap className="h-4 w-4 text-[#25c972]" />
                         )}
-                        Upgrade to Starter — $29/mo
+                        Upgrade to Starter — $49/mo
                       </button>
                       <button
                         type="button"
@@ -217,7 +186,7 @@ export function AppShellNav() {
                         ) : (
                           <Zap className="h-4 w-4 text-[#356df4]" />
                         )}
-                        Upgrade to Pro — $79/mo
+                        Upgrade to Pro — $99/mo
                       </button>
                     </div>
                   )}
@@ -234,7 +203,24 @@ export function AppShellNav() {
                         ) : (
                           <Zap className="h-4 w-4 text-[#356df4]" />
                         )}
-                        Upgrade to Pro — $79/mo
+                        Upgrade to Pro — $99/mo
+                      </button>
+                    </div>
+                  )}
+                  {tier === 'pro' && (
+                    <div className="border-b border-white/[0.06] py-1.5">
+                      <button
+                        type="button"
+                        disabled={checkoutLoading !== null}
+                        onClick={() => void handleUpgrade('growth_monthly')}
+                        className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-[var(--text-primary)] transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+                      >
+                        {checkoutLoading === 'growth_monthly' ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-[#a855f7]" />
+                        ) : (
+                          <Zap className="h-4 w-4 text-[#a855f7]" />
+                        )}
+                        Upgrade to Growth — $249/mo
                       </button>
                     </div>
                   )}

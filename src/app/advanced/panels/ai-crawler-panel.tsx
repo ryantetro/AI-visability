@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import { ArrowRight, CheckCircle2, Code2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
+import { ExportButton } from '@/components/ui/export-button';
 import { cn } from '@/lib/utils';
 import { ENGINE_COLORS, PROVIDER_DISPLAY_ORDER, PROVIDER_LABELS } from '../lib/constants';
 import { formatRelativeTime } from '../lib/utils';
@@ -220,22 +221,30 @@ export function AICrawlerPanel({
           title="Traffic Analysis"
           description={`${totalVisits} AI bot visit${totalVisits === 1 ? '' : 's'} detected in the last ${days} days.`}
         />
-        <div className="flex gap-1 mt-1">
-          {[14, 30, 90].map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setDays(d)}
-              className={cn(
-                'px-2.5 py-1 text-[10px] font-medium rounded transition-colors',
-                days === d
-                  ? 'bg-white/10 text-white'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              )}
-            >
-              {d}d
-            </button>
-          ))}
+        <div className="flex items-center gap-2 mt-1">
+          <div className="flex gap-1">
+            {[14, 30, 90].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDays(d)}
+                className={cn(
+                  'px-2.5 py-1 text-[10px] font-medium rounded transition-colors',
+                  days === d
+                    ? 'bg-white/10 text-white'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                )}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+          <ExportButton
+            exportType="crawler-visits"
+            domain={domain}
+            days={days}
+            featureGate="full_export"
+          />
         </div>
       </div>
 

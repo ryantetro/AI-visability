@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getSupabaseClient } from '@/lib/supabase';
 import { upgradeUserPlan } from '@/lib/user-profile';
+import { setStripeIds } from '@/lib/fix-my-site';
+import { sendFixMySiteOrderNotification, sendFixMySiteConfirmation } from '@/lib/services/resend-alerts';
 
 const processedEvents = new Set<string>();
 
@@ -72,6 +74,59 @@ export async function POST(request: NextRequest) {
     case 'checkout.session.completed': {
       try {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // Handle Fix My Site one-time payment
+        if (session.metadata?.type === 'fix_my_site') {
+          const orderId = session.metadata.orderId;
+          const paymentIntent = typeof session.payment_intent === 'string'
+            ? session.payment_intent
+            : session.payment_intent?.id ?? null;
+
+          if (orderId) {
+            await setStripeIds(orderId, session.id, paymentIntent);
+
+            // Look up customer email for notifications
+            const customerEmail = session.customer_details?.email || session.customer_email || '';
+
+            // Get order details for notifications
+            const { data: order } = await supabase
+              .from('fix_my_site_orders')
+              .select('domain, notes, files_requested')
+              .eq('id', orderId)
+              .single();
+
+            if (order) {
+              // Notify AISO team
+              try {
+                await sendFixMySiteOrderNotification({
+                  orderId,
+                  customerEmail,
+                  domain: order.domain,
+                  notes: order.notes || '',
+                  filesRequested: order.files_requested || [],
+                });
+              } catch (emailErr) {
+                console.error('Failed to send Fix My Site team notification:', emailErr);
+              }
+
+              // Send confirmation to customer
+              if (customerEmail) {
+                try {
+                  await sendFixMySiteConfirmation({
+                    recipientEmail: customerEmail,
+                    domain: order.domain,
+                    orderId,
+                  });
+                } catch (emailErr) {
+                  console.error('Failed to send Fix My Site customer confirmation:', emailErr);
+                }
+              }
+            }
+          }
+          break;
+        }
+
+        // Handle subscription checkout
         const userId = session.metadata?.userId;
         const plan = session.metadata?.plan || 'starter_monthly';
 

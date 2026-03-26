@@ -17,7 +17,7 @@ export interface CheckoutSession {
   url: string;
 }
 
-export type PaymentPlan = 'starter_monthly' | 'starter_annual' | 'pro_monthly' | 'pro_annual';
+export type PaymentPlan = 'starter_monthly' | 'starter_annual' | 'pro_monthly' | 'pro_annual' | 'growth_monthly' | 'growth_annual';
 
 export interface PaymentService {
   createCheckout(scanId: string, plan?: PaymentPlan): Promise<CheckoutSession>;

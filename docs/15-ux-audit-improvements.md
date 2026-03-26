@@ -14,6 +14,7 @@ Comprehensive UX audit and improvements to reduce friction, clarify jargon, and 
 | `src/app/login/login-client.tsx` | Sign-up subtitle and email confirmation copy |
 | `src/hooks/use-onboarding.ts` | Clearer onboarding step labels |
 | `src/components/app/next-steps-card.tsx` | Improved card titles, descriptions, CTAs |
+| `src/components/ui/aiso-brand.tsx` | Shared AISO brand mark/wordmark used across dashboard + landing/auth headers |
 | `src/app/advanced/report/report-section.tsx` | Renamed sections, added tooltips, section-specific copy labels |
 | `src/app/advanced/panels/ai-crawler-panel.tsx` | Plain-language descriptions |
 | `src/app/advanced/panels/ai-referral-panel.tsx` | Jargon-free descriptions |
@@ -55,6 +56,10 @@ Comprehensive UX audit and improvements to reduce friction, clarify jargon, and 
 - **AI Mentions null state**: Shows "No prompts configured yet" vs "Awaiting first scan" depending on whether scan data exists
 - **Workspace shell error**: Replaced raw error string with user-friendly message and refresh prompt
 - **Platform Performance toggles**: Removed non-functional 7d/30d/3m period toggles (state was never consumed)
+
+### Batch 5 — Brand Consistency
+
+- **Unified logo usage**: Landing header, dashboard sidebar/app-shell nav, and login now all use the same shared `AisoLogo` mark and `AisoBrand` lockup
 
 ## Design Decisions
 

@@ -6,7 +6,10 @@ import { getOpportunityAlertSummary, hasOpportunityAlertCooldownElapsed } from '
 import { startScan } from '@/lib/scan-workflow';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getDomain } from '@/lib/url-utils';
-import type { MentionPrompt } from '@/types/ai-mentions';
+import type { AIEngine, MentionPrompt } from '@/types/ai-mentions';
+import { getUserAccess } from '@/lib/access';
+import { getScannableEngines, getSelectedPlatforms } from '@/lib/platform-gating';
+import { applyRegionContext, getSelectedRegions, DEFAULT_REGION_ID } from '@/lib/region-gating';
 
 const VALID_CATEGORIES: MentionPrompt['category'][] = [
   'direct', 'category', 'comparison', 'recommendation',
@@ -205,7 +208,7 @@ export async function GET(request: NextRequest) {
     // ── Phase 2: Prompt monitoring loop ──────────────────────────
     const pm = getPromptMonitoring();
     const tester = getMentionTester();
-    const engines = tester.availableEngines();
+    const allEngines = tester.availableEngines();
     let promptsChecked = 0;
     let promptErrors = 0;
 
@@ -215,16 +218,45 @@ export async function GET(request: NextRequest) {
       for (const domain of activeDomains) {
         const prompts = await pm.listPrompts(domain);
         const active = prompts.filter((p) => p.active);
+        if (active.length === 0) continue;
+
+        // Resolve platform-gated engines and region for this domain's owner
+        let domainEngines: AIEngine[] = allEngines;
+        let primaryRegionId = DEFAULT_REGION_ID;
+        try {
+          const ownerId = active[0].userId;
+          if (ownerId) {
+            const supabase = getSupabaseClient();
+            const { data: profile } = await supabase
+              .from('user_profiles')
+              .select('email')
+              .eq('id', ownerId)
+              .single();
+
+            if (profile?.email) {
+              const access = await getUserAccess(ownerId, profile.email);
+              const selectedPlatforms = await getSelectedPlatforms(ownerId, domain);
+              domainEngines = getScannableEngines(selectedPlatforms, access.tier, allEngines);
+
+              // Resolve primary region
+              const selectedRegions = await getSelectedRegions(ownerId, domain);
+              if (selectedRegions?.[0]) primaryRegionId = selectedRegions[0];
+            }
+          }
+        } catch {
+          // Fall through to all available engines if lookup fails
+        }
 
         for (const prompt of active) {
+          const regionText = applyRegionContext(prompt.promptText, primaryRegionId);
           const mentionPrompt: MentionPrompt = {
             id: prompt.id,
-            text: prompt.promptText,
+            text: regionText,
             category: isValidCategory(prompt.category) ? prompt.category : 'direct',
             industry: prompt.industry ?? '',
           };
 
-          for (const engine of engines) {
+          for (const engine of domainEngines) {
             try {
               const response = await tester.query(engine, mentionPrompt);
               const analysis = analyzeResponse(response, domain, domain);

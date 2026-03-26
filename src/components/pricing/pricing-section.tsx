@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, Sparkles, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PLANS, type BillingCycle, type PlanTier } from '@/lib/pricing';
 
 const FAQ_ITEMS = [
   {
     q: 'What happens after my free scan?',
-    a: 'You can run unlimited scans on the Analysis page for free. To unlock the full dashboard, reports, monitoring, and all fix tools, upgrade to Starter or Pro.',
+    a: 'You can run unlimited scans on the Analysis page for free. To unlock the full dashboard, reports, monitoring, and all fix tools, upgrade to Starter or above.',
   },
   {
     q: 'Can I change plans later?',
@@ -21,13 +21,26 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How many domains can I monitor?',
-    a: 'Free: 1 domain for scanning. Starter: 1 domain with full monitoring. Pro: up to 5 domains with daily monitoring and competitor radar.',
+    a: 'Free: 1 domain for scanning. Starter: 1 domain with weekly monitoring. Pro: up to 3 domains with daily monitoring. Growth: up to 10 domains with daily monitoring and full platform coverage.',
+  },
+  {
+    q: 'What are AI-optimized pages?',
+    a: 'AI-optimized pages are content pages generated to help your site get recommended by AI search engines. Pro includes 2 per month, Growth includes 5 per month.',
   },
   {
     q: 'Can I cancel anytime?',
     a: 'Yes. Cancel at any time and your access continues until the end of the current billing period. No long-term contracts.',
   },
 ];
+
+const TIER_ORDER: PlanTier[] = ['free', 'starter', 'pro', 'growth'];
+
+const TIER_DESCRIPTIONS: Record<PlanTier, string> = {
+  free: 'Get your first AI visibility baseline.',
+  starter: 'Ongoing visibility monitoring and fix workflows.',
+  pro: 'For teams managing multiple domains and competitors.',
+  growth: 'Full platform coverage with unlimited scale.',
+};
 
 function PricingCard({
   tier,
@@ -41,7 +54,7 @@ function PricingCard({
   context: 'home' | 'pricing';
 }) {
   const plan = PLANS[tier];
-  const monthlyPrice = cycle === 'annual'
+  const monthlyPrice = cycle === 'annual' && plan.annualPrice > 0
     ? Math.round(plan.annualPrice / 12)
     : plan.monthlyPrice;
   const isFree = tier === 'free';
@@ -67,11 +80,7 @@ function PricingCard({
         <div>
           <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
           <p className="mt-2 text-sm leading-6 text-zinc-500">
-            {tier === 'free'
-              ? 'Best for getting your first AI visibility baseline.'
-              : tier === 'starter'
-                ? 'For operators who want ongoing visibility and fix workflows.'
-                : 'For teams managing multiple domains, monitoring, and competitive pressure.'}
+            {TIER_DESCRIPTIONS[tier]}
           </p>
         </div>
         {featured ? (
@@ -167,7 +176,7 @@ export function PricingSection({
 
   return (
     <section id={id} className="relative px-4 py-24">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
             Pricing
@@ -210,10 +219,79 @@ export function PricingSection({
           </button>
         </div>
 
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
-          <PricingCard tier="free" cycle={cycle} context={context} />
-          <PricingCard tier="starter" cycle={cycle} context={context} />
-          <PricingCard tier="pro" cycle={cycle} context={context} featured />
+        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {TIER_ORDER.map((tier) => (
+            <PricingCard
+              key={tier}
+              tier={tier}
+              cycle={cycle}
+              context={context}
+              featured={tier === 'pro'}
+            />
+          ))}
+        </div>
+
+        {/* Fix My Site Add-on */}
+        <div className="mx-auto mt-16 max-w-2xl">
+          <div className="text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+              Add-on Service
+            </p>
+            <h3 className="mt-3 text-2xl font-bold text-white">
+              Need hands-on help?
+            </h3>
+            <p className="mt-2 text-[15px] text-zinc-400">
+              Let our team optimize your site for AI visibility
+            </p>
+          </div>
+
+          <div className="mt-8 rounded-[28px] border border-[#25c972]/20 bg-[linear-gradient(180deg,rgba(37,201,114,0.06)_0%,rgba(8,10,14,0.98)_100%)] p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-lg font-semibold text-white">Fix My Site</h4>
+                <p className="mt-1 text-sm text-zinc-400">
+                  Professional AI visibility optimization by the AISO team
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[#25c972]/20 bg-[#25c972]/10 p-2.5">
+                <Wrench className="h-4 w-4 text-[#25c972]" />
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-baseline gap-1">
+              <span className="text-4xl font-bold text-white">$499</span>
+              <span className="text-sm text-zinc-400">one-time</span>
+            </div>
+            <p className="mt-1 text-[12px] text-zinc-500">3-5 business day delivery</p>
+
+            <ul className="mt-6 space-y-3">
+              {[
+                'robots.txt optimization',
+                'llms.txt creation & configuration',
+                'Structured data (JSON-LD) setup',
+                'Sitemap optimization',
+                'Schema markup implementation',
+                'Meta tags for AI discoverability',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2.5 text-[13px] text-zinc-300">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#25c972]/15">
+                    <Check className="h-2.5 w-2.5 text-[#25c972]" />
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-8">
+              <Link
+                href="/dashboard?fms=start"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#25c972] text-sm font-semibold text-black transition-opacity hover:opacity-90"
+              >
+                <Wrench className="h-4 w-4" />
+                Get Started
+              </Link>
+            </div>
+          </div>
         </div>
 
         {showFaq ? (

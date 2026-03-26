@@ -24,6 +24,14 @@ export async function GET(request: NextRequest) {
   let isPaid = false;
   let maxDomains = 1;
   let maxPrompts = 5;
+  let maxPlatforms = 2;
+  let maxCompetitors = 0;
+  let maxRegions = 1;
+  let maxSeats = 1;
+  let maxContentPages = 0;
+  let teamId: string | null = null;
+  let teamRole: string | null = null;
+  let teamName: string | null = null;
   try {
     const profile = await getOrCreateProfile(auth.user.id, auth.user.email);
     const access = await getUserAccess(auth.user.id, auth.user.email);
@@ -32,6 +40,14 @@ export async function GET(request: NextRequest) {
     isPaid = access.isPaid;
     maxDomains = access.maxDomains;
     maxPrompts = access.maxPrompts;
+    maxPlatforms = access.maxPlatforms;
+    maxCompetitors = access.maxCompetitors;
+    maxRegions = access.maxRegions;
+    maxSeats = access.maxSeats;
+    maxContentPages = access.maxContentPages;
+    teamId = access.teamId;
+    teamRole = access.teamRole;
+    teamName = access.teamName;
     scansUsed = profile.scans_used;
     freeScanLimit = profile.free_scan_limit;
   } catch {
@@ -45,6 +61,14 @@ export async function GET(request: NextRequest) {
     isPaid,
     maxDomains,
     maxPrompts,
+    maxPlatforms,
+    maxCompetitors,
+    maxRegions,
+    maxSeats,
+    maxContentPages,
+    teamId,
+    teamRole,
+    teamName,
     scans_used: scansUsed,
     free_scan_limit: freeScanLimit,
     session: {

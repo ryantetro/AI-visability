@@ -31,6 +31,8 @@ function getPriceId(plan: PaymentPlan): string | null {
     starter_annual: 'STRIPE_PRICE_STARTER_ANNUAL',
     pro_monthly: 'STRIPE_PRICE_PRO_MONTHLY',
     pro_annual: 'STRIPE_PRICE_PRO_ANNUAL',
+    growth_monthly: 'STRIPE_PRICE_GROWTH_MONTHLY',
+    growth_annual: 'STRIPE_PRICE_GROWTH_ANNUAL',
   };
   return process.env[envMap[plan]] || null;
 }
@@ -104,6 +106,49 @@ export async function createSubscriptionCheckout(
     id: session.id,
     scanId: `upgrade_${userId}`,
     amount: session.amount_total ?? getPlanPriceCents(plan),
+    currency: 'usd',
+    url: session.url || '',
+  };
+}
+
+export async function createFixMySiteCheckout(
+  userId: string,
+  email: string,
+  orderId: string,
+): Promise<CheckoutSession> {
+  const stripe = getStripe();
+  const customerId = await getOrCreateStripeCustomer(userId, email);
+  const appUrl = getAppUrl();
+
+  const priceId = process.env.STRIPE_PRICE_FIX_MY_SITE || null;
+
+  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = priceId
+    ? { price: priceId, quantity: 1 }
+    : {
+        price_data: {
+          currency: 'usd',
+          unit_amount: 49900,
+          product_data: {
+            name: 'AISO Fix My Site — AI Visibility Optimization',
+            description: 'One-time professional optimization of robots.txt, llms.txt, structured data, sitemap, and other AI visibility files.',
+          },
+        },
+        quantity: 1,
+      };
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer: customerId,
+    line_items: [lineItem],
+    success_url: `${appUrl}/dashboard?fms=success&order_id=${orderId}`,
+    cancel_url: `${appUrl}/dashboard?fms=cancelled`,
+    metadata: { userId, orderId, type: 'fix_my_site' },
+  });
+
+  return {
+    id: session.id,
+    scanId: `fms_${orderId}`,
+    amount: session.amount_total ?? 49900,
     currency: 'usd',
     url: session.url || '',
   };

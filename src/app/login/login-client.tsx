@@ -7,6 +7,7 @@ import { LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { PASSWORD_MIN_LENGTH } from '@/lib/auth';
 import { getDomain } from '@/lib/url-utils';
+import { AisoBrand } from '@/components/ui/aiso-brand';
 
 type AuthMode = 'sign-in' | 'sign-up' | 'forgot-password' | 'check-email' | 'reset-password';
 type CheckEmailKind = 'signup' | 'recovery';
@@ -23,17 +24,6 @@ function resolveMode(value: string | null): AuthMode {
   if (value === 'check-email') return 'check-email';
   if (value === 'reset-password') return 'reset-password';
   return 'sign-in';
-}
-
-function BrandMark() {
-  return (
-    <svg viewBox="0 0 32 32" className="h-9 w-9" aria-hidden>
-      <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
-      <path d="M16 3 A13 13 0 0 1 27.3 18.5" fill="none" stroke="var(--color-primary-500)" strokeWidth="3" strokeLinecap="round" />
-      <path d="M27.3 18.5 A13 13 0 0 1 4.7 18.5" fill="none" stroke="var(--color-band-ai-ready)" strokeWidth="3" strokeLinecap="round" />
-      <path d="M4.7 18.5 A13 13 0 0 1 16 3" fill="none" stroke="var(--color-accent-500)" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 function AuthInput({
@@ -392,13 +382,11 @@ export function LoginPageContent() {
           {/* Brand header */}
           <div className="flex flex-col items-center text-center mb-8 animate-hero-fade" style={{ animationDelay: '0ms' }}>
             <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
-              <BrandMark />
-              <span
-                className="text-[1.6rem] font-bold tracking-tight"
-                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
-              >
-                AISO
-              </span>
+              <AisoBrand
+                logoClassName="h-9 w-9"
+                textClassName="text-[1.6rem] font-bold tracking-tight text-[var(--text-primary)]"
+                textStyle={{ fontFamily: 'var(--font-display)' }}
+              />
             </Link>
           </div>
 

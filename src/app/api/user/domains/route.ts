@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getOrCreateProfile, getUserUsage } from '@/lib/user-profile';
+import { getEffectiveUserIds } from '@/lib/team-management';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -10,10 +11,14 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = getSupabaseClient();
+
+  // Get all team member IDs for shared domain access
+  const userIds = await getEffectiveUserIds(user.id);
+
   const { data, error } = await supabase
     .from('user_domains')
     .select('domain, url, created_at')
-    .eq('user_id', user.id)
+    .in('user_id', userIds)
     .eq('hidden', false)
     .order('created_at', { ascending: false });
 
@@ -42,16 +47,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid domain format' }, { status: 400 });
   }
 
-  // Enforce plan-based domain limit
+  // Enforce plan-based domain limit (counted across all team members)
   const profile = await getOrCreateProfile(user.id, user.email);
   const usage = getUserUsage(profile);
   const maxDomains = usage.domains;
 
   const supabase = getSupabaseClient();
+  const userIds = await getEffectiveUserIds(user.id);
   const { count } = await supabase
     .from('user_domains')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
+    .in('user_id', userIds)
     .eq('hidden', false);
 
   if ((count ?? 0) >= maxDomains) {

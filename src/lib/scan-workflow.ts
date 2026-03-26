@@ -11,6 +11,9 @@ import { CrawlData } from '@/types/crawler';
 import { DatabaseService } from '@/types/services';
 import { ScanJob, ScanProgress } from '@/types/scan';
 import { getOrCreateProfile, canUserScan, incrementScanCount, getUserUsage } from '@/lib/user-profile';
+import { getUserAccess } from '@/lib/access';
+import { getScannableEngines, getSelectedPlatforms } from '@/lib/platform-gating';
+import type { MentionTesterService } from '@/lib/ai-mentions/engine-tester';
 
 export interface StartScanInput {
   url: string;
@@ -246,11 +249,40 @@ export async function runScan(scanId: string, db = getDatabase()) {
 
     try {
       const mentionTester = getMentionTester();
-      const availableEngines = mentionTester.availableEngines();
-      const disabledEngines = AI_ENGINES.filter((engine) => !availableEngines.includes(engine));
-      console.log(`[scan-workflow] Starting AI mention testing. Available engines: ${availableEngines.join(', ') || 'none'}. Disabled (no API key): ${disabledEngines.join(', ') || 'none'}.`);
+      const allAvailable = mentionTester.availableEngines();
+
+      // Apply platform gating: filter engines to user's selected/allowed platforms
+      let filteredEngines = allAvailable;
+      try {
+        if (scan.email) {
+          const supabase = await import('@/lib/supabase').then((m) => m.getSupabaseClient());
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('id')
+            .eq('email', scan.email.toLowerCase())
+            .single();
+
+          if (profile?.id) {
+            const domain = new URL(scan.url).hostname.replace(/^www\./, '');
+            const access = await getUserAccess(profile.id, scan.email);
+            const selectedPlatforms = await getSelectedPlatforms(profile.id, domain);
+            filteredEngines = getScannableEngines(selectedPlatforms, access.tier, allAvailable);
+          }
+        }
+      } catch {
+        // Platform gating lookup failed — fall through to all available engines
+      }
+
+      // Create a filtered tester that only exposes the allowed engines
+      const filteredTester: MentionTesterService = {
+        query: (engine, prompt) => mentionTester.query(engine, prompt),
+        availableEngines: () => filteredEngines,
+      };
+
+      const disabledEngines = AI_ENGINES.filter((engine) => !filteredEngines.includes(engine));
+      console.log(`[scan-workflow] Starting AI mention testing. Engines: ${filteredEngines.join(', ') || 'none'}. Excluded: ${disabledEngines.join(', ') || 'none'}.`);
       const mentionSummary = await withTimeout(
-        runMentionTests(crawlData, mentionTester),
+        runMentionTests(crawlData, filteredTester),
         120000,
         'AI mention testing timed out.'
       );

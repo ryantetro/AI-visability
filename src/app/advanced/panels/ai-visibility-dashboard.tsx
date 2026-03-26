@@ -7,6 +7,7 @@ import {
   ResponsiveContainer, Tooltip,
 } from 'recharts';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
+import { ExportButton } from '@/components/ui/export-button';
 import { cn } from '@/lib/utils';
 import { CHART_COLORS } from '../lib/constants';
 import { scoreColor, barFillColor } from '../lib/utils';
@@ -19,6 +20,9 @@ export function AiVisibilityDashboard({ report }: { report: DashboardReportData 
 
   const scores = report.score.scores;
   const fixes = report.score.fixes ?? report.fixes ?? [];
+
+  let domain = '';
+  try { domain = new URL(report.url).hostname.replace(/^www\./, ''); } catch { /* fallback */ }
 
   const radarData = dimensions.map((d) => ({ subject: d.label, value: d.percentage, fullMark: 100 }));
 
@@ -47,7 +51,17 @@ export function AiVisibilityDashboard({ report }: { report: DashboardReportData 
 
   return (
     <DashboardPanel className="p-5">
-      <SectionTitle eyebrow="Dashboard" title="AI Visibility Overview" description="Visual breakdown of your AI visibility metrics across all dimensions." />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <SectionTitle eyebrow="Dashboard" title="AI Visibility Overview" description="Visual breakdown of your AI visibility metrics across all dimensions." />
+        {domain && (
+          <ExportButton
+            exportType="scans"
+            domain={domain}
+            featureGate="data_export"
+            className="mt-1"
+          />
+        )}
+      </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map((card) => (

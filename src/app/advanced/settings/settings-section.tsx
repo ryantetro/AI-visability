@@ -1,7 +1,7 @@
 'use client';
 
-import { type ReactNode, useEffect, useState } from 'react';
-import { Copy, CreditCard, KeyRound, Mail, RefreshCw } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { Copy, CreditCard, KeyRound, Lock, Mail, RefreshCw, Trash2, UserMinus, UserPlus, Users } from 'lucide-react';
 import Link from 'next/link';
 import { isUnlimitedPlanLimit } from '@/lib/account-access-overrides';
 import { cn } from '@/lib/utils';
@@ -9,7 +9,10 @@ import { buildBotTrackingInstallPrompt, buildBotTrackingSnippet, type BotTrackin
 import { formatRelativeTime } from '@/app/advanced/lib/utils';
 import { usePlan } from '@/hooks/use-plan';
 import { useAuth } from '@/hooks/use-auth';
-import { PLANS } from '@/lib/pricing';
+import { PLANS, AI_PLATFORMS, PLATFORM_LABELS, type AIPlatform, canAccess } from '@/lib/pricing';
+import { useTeam } from '@/hooks/use-team';
+import { invalidatePlanCache } from '@/hooks/use-plan';
+import { REGIONS } from '@/lib/region-gating';
 import { useDomainContext } from '@/contexts/domain-context';
 
 interface SettingsSectionProps {
@@ -35,6 +38,15 @@ type OpportunityAlertState = {
 
 function normalizeAppUrl(url: string) {
   return url.replace(/\/$/, '');
+}
+
+/** Convert a 2-letter country code to its flag emoji */
+function regionFlag(code: string): string {
+  return code
+    .toUpperCase()
+    .split('')
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
 }
 
 /* ── Minimal row: label left, control right, thin divider ─────────── */
@@ -140,9 +152,141 @@ export function SettingsSection({
   const [opportunityAlertSaving, setOpportunityAlertSaving] = useState(false);
   const [opportunityAlertError, setOpportunityAlertError] = useState<string | null>(null);
   const [appUrl, setAppUrl] = useState(() => normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL || ''));
-  const { tier, plan, email, maxDomains, maxPrompts } = usePlan();
+  const [selectedPlatforms, setSelectedPlatforms] = useState<AIPlatform[]>([]);
+  const [platformsLoading, setPlatformsLoading] = useState(true);
+  const [platformsSaving, setPlatformsSaving] = useState(false);
+  const [platformsError, setPlatformsError] = useState<string | null>(null);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>(['us-en']);
+  const [regionsLoading, setRegionsLoading] = useState(true);
+  const [regionsSaving, setRegionsSaving] = useState(false);
+  const [regionsError, setRegionsError] = useState<string | null>(null);
+  const { tier, plan, email, maxDomains, maxPrompts, maxPlatforms, maxRegions, maxSeats, teamId, teamRole } = usePlan();
   const { user } = useAuth();
   const planConfig = PLANS[tier];
+  const teamData = useTeam();
+  const [teamNameInput, setTeamNameInput] = useState('');
+  const [teamCreating, setTeamCreating] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [memberRemoving, setMemberRemoving] = useState<string | null>(null);
+  const [invitationRevoking, setInvitationRevoking] = useState<string | null>(null);
+  const [teamActionLoading, setTeamActionLoading] = useState(false);
+
+  const hasMultiSeat = canAccess(tier, 'pro');
+
+  const handleCreateTeam = async () => {
+    if (!teamNameInput.trim()) return;
+    setTeamCreating(true);
+    setTeamError(null);
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: teamNameInput.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to create team');
+      setTeamNameInput('');
+      invalidatePlanCache();
+      await teamData.refresh();
+    } catch (err) {
+      setTeamError(err instanceof Error ? err.message : 'Failed to create team');
+    } finally {
+      setTeamCreating(false);
+    }
+  };
+
+  const handleSendInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviteSending(true);
+    setInviteError(null);
+    setInviteSuccess(false);
+    try {
+      const res = await fetch('/api/teams/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to send invitation');
+      setInviteEmail('');
+      setInviteSuccess(true);
+      setTimeout(() => setInviteSuccess(false), 3000);
+      await teamData.refresh();
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Failed to send invitation');
+    } finally {
+      setInviteSending(false);
+    }
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!window.confirm('Remove this member from the team?')) return;
+    setTeamError(null);
+    setMemberRemoving(userId);
+    try {
+      const res = await fetch(`/api/teams/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to remove member');
+      await teamData.refresh();
+    } catch (err) {
+      setTeamError(err instanceof Error ? err.message : 'Failed to remove member');
+    } finally {
+      setMemberRemoving(null);
+    }
+  };
+
+  const handleRevokeInvitation = async (invitationId: string) => {
+    setTeamError(null);
+    setInvitationRevoking(invitationId);
+    try {
+      const res = await fetch(`/api/teams/invite/${encodeURIComponent(invitationId)}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to revoke invitation');
+      await teamData.refresh();
+    } catch (err) {
+      setTeamError(err instanceof Error ? err.message : 'Failed to revoke invitation');
+    } finally {
+      setInvitationRevoking(null);
+    }
+  };
+
+  const handleLeaveTeam = async () => {
+    if (!window.confirm('Leave this team? You will lose access to shared domains and data.')) return;
+    setTeamError(null);
+    setTeamActionLoading(true);
+    try {
+      const res = await fetch('/api/teams/leave', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to leave team');
+      invalidatePlanCache();
+      await teamData.refresh();
+    } catch (err) {
+      setTeamError(err instanceof Error ? err.message : 'Failed to leave team');
+    } finally {
+      setTeamActionLoading(false);
+    }
+  };
+
+  const handleDissolveTeam = async () => {
+    if (!window.confirm('Dissolve this team? All members will be removed and team data will be deleted. This cannot be undone.')) return;
+    setTeamError(null);
+    setTeamActionLoading(true);
+    try {
+      const res = await fetch('/api/teams/dissolve', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to dissolve team');
+      invalidatePlanCache();
+      await teamData.refresh();
+    } catch (err) {
+      setTeamError(err instanceof Error ? err.message : 'Failed to dissolve team');
+    } finally {
+      setTeamActionLoading(false);
+    }
+  };
   const { monitoredSites } = useDomainContext();
   const displayEmail = user?.email ?? email;
 
@@ -190,6 +334,129 @@ export function SettingsSection({
     if (appUrl || typeof window === 'undefined') return;
     setAppUrl(normalizeAppUrl(window.location.origin));
   }, [appUrl]);
+
+  // Load selected platforms for this domain
+  useEffect(() => {
+    let active = true;
+    async function loadPlatforms() {
+      setPlatformsLoading(true);
+      try {
+        const res = await fetch(`/api/user/domains/platforms?domain=${encodeURIComponent(domain)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!active) return;
+        if (data.selectedPlatforms) {
+          setSelectedPlatforms(data.selectedPlatforms);
+        } else {
+          // Default: first N platforms by priority
+          setSelectedPlatforms(AI_PLATFORMS.slice(0, maxPlatforms) as AIPlatform[]);
+        }
+      } catch {
+        if (!active) return;
+        setSelectedPlatforms(AI_PLATFORMS.slice(0, maxPlatforms) as AIPlatform[]);
+      } finally {
+        if (active) setPlatformsLoading(false);
+      }
+    }
+    void loadPlatforms();
+    return () => { active = false; };
+  }, [domain, maxPlatforms]);
+
+  // Load selected regions for this domain
+  useEffect(() => {
+    let active = true;
+    async function loadRegions() {
+      setRegionsLoading(true);
+      try {
+        const res = await fetch(`/api/user/domains/regions?domain=${encodeURIComponent(domain)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!active) return;
+        if (data.selectedRegions) {
+          setSelectedRegions(data.selectedRegions);
+        } else {
+          setSelectedRegions(['us-en']);
+        }
+      } catch {
+        if (!active) return;
+        setSelectedRegions(['us-en']);
+      } finally {
+        if (active) setRegionsLoading(false);
+      }
+    }
+    void loadRegions();
+    return () => { active = false; };
+  }, [domain]);
+
+  const handleToggleRegion = async (regionId: string) => {
+    const isSelected = selectedRegions.includes(regionId);
+    let next: string[];
+    if (isSelected) {
+      if (selectedRegions.length <= 1) return;
+      next = selectedRegions.filter((r) => r !== regionId);
+    } else {
+      if (selectedRegions.length >= maxRegions) {
+        setRegionsError(`Your ${PLANS[tier].name} plan allows up to ${maxRegions} region${maxRegions !== 1 ? 's' : ''}. Upgrade for more.`);
+        return;
+      }
+      next = [...selectedRegions, regionId];
+    }
+    setSelectedRegions(next);
+    setRegionsSaving(true);
+    setRegionsError(null);
+    try {
+      const res = await fetch('/api/user/domains/regions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, regions: next }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setRegionsError(data.error || 'Failed to save region selection');
+        setSelectedRegions(selectedRegions);
+      }
+    } catch {
+      setRegionsError('Failed to save region selection');
+      setSelectedRegions(selectedRegions);
+    } finally {
+      setRegionsSaving(false);
+    }
+  };
+
+  const handleTogglePlatform = async (platform: AIPlatform) => {
+    const isSelected = selectedPlatforms.includes(platform);
+    let next: AIPlatform[];
+    if (isSelected) {
+      // Don't allow deselecting the last platform
+      if (selectedPlatforms.length <= 1) return;
+      next = selectedPlatforms.filter((p) => p !== platform);
+    } else {
+      if (selectedPlatforms.length >= maxPlatforms) {
+        setPlatformsError(`Your ${PLANS[tier].name} plan allows up to ${maxPlatforms} platforms. Upgrade for more.`);
+        return;
+      }
+      next = [...selectedPlatforms, platform];
+    }
+    setSelectedPlatforms(next);
+    setPlatformsSaving(true);
+    setPlatformsError(null);
+    try {
+      const res = await fetch('/api/user/domains/platforms', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, platforms: next }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setPlatformsError(data.error || 'Failed to save platform selection');
+        // Revert
+        setSelectedPlatforms(selectedPlatforms);
+      }
+    } catch {
+      setPlatformsError('Failed to save platform selection');
+      setSelectedPlatforms(selectedPlatforms);
+    } finally {
+      setPlatformsSaving(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -389,13 +656,37 @@ export function SettingsSection({
     }
   };
 
+  /* ── Tabs ────────────────────────────────────────────────────── */
+  type SettingsTab = 'general' | 'team' | 'monitoring' | 'platforms';
+
+  const TABS: { key: SettingsTab; label: string; icon: ReactNode }[] = [
+    { key: 'general', label: 'General', icon: <CreditCard className="h-3.5 w-3.5" /> },
+    { key: 'team', label: 'Team', icon: <Users className="h-3.5 w-3.5" /> },
+    { key: 'monitoring', label: 'Monitoring', icon: <Mail className="h-3.5 w-3.5" /> },
+    { key: 'platforms', label: 'Platforms', icon: <KeyRound className="h-3.5 w-3.5" /> },
+  ];
+
+  const getInitialTab = useCallback((): SettingsTab => {
+    if (typeof window === 'undefined') return 'general';
+    const hash = window.location.hash.replace('#', '') as SettingsTab;
+    if (TABS.some((t) => t.key === hash)) return hash;
+    return 'general';
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(getInitialTab);
+
+  const handleTabChange = useCallback((tab: SettingsTab) => {
+    setActiveTab(tab);
+    window.history.replaceState(null, '', `#${tab}`);
+  }, []);
+
   /* ── Shared button styles ──────────────────────────────────────── */
   const btnBase = 'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors disabled:opacity-50';
   const btnPrimary = cn(btnBase, 'bg-white/[0.08] text-zinc-200 hover:bg-white/[0.12]');
   const btnAccent = cn(btnBase, 'bg-[var(--color-primary)] text-white hover:opacity-90');
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10 pb-12">
+    <div className="mx-auto max-w-3xl pb-12">
       {/* ─── Page header ─────────────────────────────────────────── */}
       <div>
         <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-white">Settings</h1>
@@ -404,6 +695,32 @@ export function SettingsSection({
         </p>
       </div>
 
+      {/* ─── Tab navigation ──────────────────────────────────────── */}
+      <nav className="mt-6 flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.015] p-1">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => handleTabChange(tab.key)}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-medium transition-all',
+              activeTab === tab.key
+                ? 'bg-white/[0.08] text-white shadow-sm'
+                : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300'
+            )}
+          >
+            {tab.icon}
+            <span className="hidden sm:inline">{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* ─── Tab content ─────────────────────────────────────────── */}
+      <div className="mt-8 space-y-10">
+
+      {/* ─── GENERAL TAB ─────────────────────────────────────────── */}
+      {activeTab === 'general' && (
+      <>
       {/* ─── Plan & Billing ──────────────────────────────────────── */}
       <section>
         <h2 className="text-[15px] font-semibold text-white">Plan & Billing</h2>
@@ -460,6 +777,229 @@ export function SettingsSection({
         </Card>
       </section>
 
+      </>
+      )}
+
+      {/* ─── TEAM TAB ────────────────────────────────────────────── */}
+      {activeTab === 'team' && (
+      <>
+      {/* ─── Team Management ──────────────────────────────────────── */}
+      <section id="team" className="scroll-mt-6">
+        <h2 className="text-[15px] font-semibold text-white">Team</h2>
+        <p className="mt-1 text-[12px] text-zinc-500">
+          {hasMultiSeat
+            ? 'Invite team members to share tracked domains and AI visibility data.'
+            : 'Upgrade to Pro or Growth to invite team members.'}
+        </p>
+
+        <Card className="mt-4">
+          {!hasMultiSeat ? (
+            /* ── Locked state ──────────────────────────────────── */
+            <div className="px-5 py-6 text-center">
+              <Lock className="mx-auto h-5 w-5 text-zinc-600" />
+              <p className="mt-2 text-[13px] text-zinc-400">
+                Team management is available on Pro and Growth plans.
+              </p>
+              <Link
+                href="/pricing"
+                className={cn(btnPrimary, 'mt-4 inline-flex')}
+              >
+                Upgrade to unlock
+              </Link>
+            </div>
+          ) : !teamData.team ? (
+            /* ── No team yet — create one ──────────────────────── */
+            <div className="px-5 py-5">
+              <p className="text-[13px] text-zinc-300">Create a team to start inviting members.</p>
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={teamNameInput}
+                  onChange={(e) => setTeamNameInput(e.target.value)}
+                  placeholder="Team name"
+                  maxLength={50}
+                  className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[13px] text-white placeholder:text-zinc-600 focus:border-[var(--color-primary)] focus:outline-none"
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateTeam(); }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateTeam}
+                  disabled={teamCreating || !teamNameInput.trim()}
+                  className={cn(btnAccent, 'py-2 text-[12px]')}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  {teamCreating ? 'Creating...' : 'Create Team'}
+                </button>
+              </div>
+              {teamError && <p className="mt-2 text-[12px] text-red-400">{teamError}</p>}
+            </div>
+          ) : teamData.role === 'owner' ? (
+            /* ── Owner view ────────────────────────────────────── */
+            <>
+              {/* Team info */}
+              <FieldRow
+                label="Team name"
+                value={teamData.team.name}
+              />
+              <FieldRow
+                label="Seats"
+                value={
+                  maxSeats === -1
+                    ? `${teamData.seatCount} / Unlimited`
+                    : `${teamData.seatCount} / ${maxSeats}`
+                }
+              />
+
+              {/* Members list */}
+              <div className="border-b border-white/[0.06] px-5 py-4">
+                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Members</p>
+                <div className="space-y-2">
+                  {teamData.members.map((member) => (
+                    <div key={member.user_id} className="flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] text-zinc-200">{member.email || member.user_id}</span>
+                        <span className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                          member.role === 'owner'
+                            ? 'bg-[#6c63ff]/20 text-[#6c63ff]'
+                            : 'bg-white/[0.06] text-zinc-500'
+                        )}>
+                          {member.role}
+                        </span>
+                      </div>
+                      {member.role !== 'owner' && (
+                        <button
+                          type="button"
+                          onClick={() => void handleRemoveMember(member.user_id)}
+                          disabled={memberRemoving === member.user_id}
+                          className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                        >
+                          <UserMinus className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Invite form */}
+              <div className="border-b border-white/[0.06] px-5 py-4">
+                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Invite member</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="colleague@company.com"
+                    className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[13px] text-white placeholder:text-zinc-600 focus:border-[var(--color-primary)] focus:outline-none"
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleSendInvite(); }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendInvite}
+                    disabled={inviteSending || !inviteEmail.trim()}
+                    className={cn(btnAccent, 'py-2 text-[12px]')}
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    {inviteSending ? 'Sending...' : 'Send Invite'}
+                  </button>
+                </div>
+                {inviteError && <p className="mt-2 text-[12px] text-red-400">{inviteError}</p>}
+                {inviteSuccess && <p className="mt-2 text-[12px] text-[#25c972]">Invitation sent!</p>}
+
+                {/* Pending invitations */}
+                {teamData.invitations.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-[11px] font-medium text-zinc-600">Pending invitations</p>
+                    {teamData.invitations.map((inv) => (
+                      <div key={inv.id} className="flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2">
+                        <span className="text-[12px] text-zinc-400">{inv.email}</span>
+                        <button
+                          type="button"
+                          onClick={() => void handleRevokeInvitation(inv.id)}
+                          disabled={invitationRevoking === inv.id}
+                          className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                        >
+                          {invitationRevoking === inv.id ? 'Revoking...' : 'Revoke'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Dissolve */}
+              <div className="px-5 py-4">
+                <button
+                  type="button"
+                  onClick={handleDissolveTeam}
+                  disabled={teamActionLoading}
+                  className="inline-flex items-center gap-2 text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {teamActionLoading ? 'Dissolving...' : 'Dissolve Team'}
+                </button>
+              </div>
+              {teamError && (
+                <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+                  {teamError}
+                </div>
+              )}
+            </>
+          ) : (
+            /* ── Member view ───────────────────────────────────── */
+            <>
+              <FieldRow label="Team name" value={teamData.team.name} />
+              <FieldRow label="Your role" value="Member" />
+
+              {/* Members list (read-only) */}
+              <div className="border-b border-white/[0.06] px-5 py-4">
+                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Members</p>
+                <div className="space-y-2">
+                  {teamData.members.map((member) => (
+                    <div key={member.user_id} className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-3 py-2">
+                      <span className="text-[13px] text-zinc-200">{member.email || member.user_id}</span>
+                      <span className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                        member.role === 'owner'
+                          ? 'bg-[#6c63ff]/20 text-[#6c63ff]'
+                          : 'bg-white/[0.06] text-zinc-500'
+                      )}>
+                        {member.role}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Leave team */}
+              <div className="px-5 py-4">
+                <button
+                  type="button"
+                  onClick={handleLeaveTeam}
+                  disabled={teamActionLoading}
+                  className="inline-flex items-center gap-2 text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                >
+                  <UserMinus className="h-3.5 w-3.5" />
+                  {teamActionLoading ? 'Leaving...' : 'Leave Team'}
+                </button>
+              </div>
+              {teamError && (
+                <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+                  {teamError}
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      </section>
+
+      </>
+      )}
+
+      {/* ─── MONITORING TAB ──────────────────────────────────────── */}
+      {activeTab === 'monitoring' && (
+      <>
       {/* ─── Monitoring & Alerts ─────────────────────────────────── */}
       <section id="monitoring" className="scroll-mt-6">
         <h2 className="text-[15px] font-semibold text-white">Monitoring</h2>
@@ -470,7 +1010,7 @@ export function SettingsSection({
         <Card className="mt-4">
           <FieldRow
             label="Automated scans"
-            description={`Runs ${tier === 'pro' ? 'daily' : 'weekly'} and tracks score changes over time.`}
+            description={`Runs ${tier === 'pro' || tier === 'growth' ? 'daily' : 'weekly'} and tracks score changes over time.`}
             action={
               <>
                 <span
@@ -551,7 +1091,131 @@ export function SettingsSection({
         </Card>
       </section>
 
-      {/* ─── AI Bot Tracking ─────────────────────────────────────── */}
+      </>
+      )}
+
+      {/* ─── PLATFORMS TAB ───────────────────────────────────────── */}
+      {activeTab === 'platforms' && (
+      <>
+      {/* ─── AI Platform Selection ──────────────────────────────── */}
+      <section id="platforms" className="scroll-mt-6">
+        <h2 className="text-[15px] font-semibold text-white">AI Platforms</h2>
+        <p className="mt-1 text-[12px] text-zinc-500">
+          Choose which AI engines to track for {domain}. Your {planConfig.name} plan includes up to {maxPlatforms} platform{maxPlatforms !== 1 ? 's' : ''}.
+        </p>
+
+        <Card className="mt-4">
+          {platformsLoading ? (
+            <div className="px-5 py-4 text-[13px] text-zinc-500">Loading platforms...</div>
+          ) : (
+            <div className="divide-y divide-white/[0.06]">
+              {AI_PLATFORMS.map((platform) => {
+                const isSelected = selectedPlatforms.includes(platform);
+                const isDisabled = !isSelected && selectedPlatforms.length >= maxPlatforms;
+                return (
+                  <div key={platform} className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[13px] font-medium text-zinc-200">{PLATFORM_LABELS[platform]}</span>
+                      {isDisabled && (
+                        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-500">
+                          Upgrade to add
+                        </span>
+                      )}
+                    </div>
+                    <ToggleSwitch
+                      checked={isSelected}
+                      disabled={platformsSaving || (isDisabled && !isSelected) || (isSelected && selectedPlatforms.length <= 1)}
+                      onToggle={() => void handleTogglePlatform(platform)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {platformsError && (
+            <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+              {platformsError}
+            </div>
+          )}
+          {selectedPlatforms.length >= maxPlatforms && tier !== 'growth' && (
+            <div className="border-t border-white/[0.06] px-5 py-3">
+              <Link
+                href="/pricing"
+                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
+              >
+                Upgrade for more platforms &rarr;
+              </Link>
+            </div>
+          )}
+        </Card>
+      </section>
+
+      {/* ─── Region Targeting ──────────────────────────────────── */}
+      <section id="regions" className="scroll-mt-6">
+        <h2 className="text-[15px] font-semibold text-white">Region Targeting</h2>
+        <p className="mt-1 text-[12px] text-zinc-500">
+          Choose regions for AI mention testing. Your {planConfig.name} plan includes {planConfig.regions === -1 ? 'unlimited' : planConfig.regions} region{planConfig.regions !== 1 ? 's' : ''}.
+          {planConfig.regions === 1 && (
+            <> Upgrade to Pro for multi-region testing.</>
+          )}
+        </p>
+
+        <Card className="mt-4">
+          {regionsLoading ? (
+            <div className="px-5 py-4 text-[13px] text-zinc-500">Loading regions...</div>
+          ) : (
+            <div className="divide-y divide-white/[0.06]">
+              {REGIONS.map((region) => {
+                const isSelected = selectedRegions.includes(region.id);
+                const isDisabled = !isSelected && selectedRegions.length >= maxRegions;
+                return (
+                  <div key={region.id} className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-base">{regionFlag(region.flag)}</span>
+                      <div>
+                        <span className="text-[13px] font-medium text-zinc-200">{region.label}</span>
+                        <span className="ml-2 text-[11px] text-zinc-500">{region.language}</span>
+                      </div>
+                      {isDisabled && (
+                        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-500">
+                          Upgrade to add
+                        </span>
+                      )}
+                    </div>
+                    <ToggleSwitch
+                      checked={isSelected}
+                      disabled={regionsSaving || (isDisabled && !isSelected) || (isSelected && selectedRegions.length <= 1)}
+                      onToggle={() => void handleToggleRegion(region.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {regionsError && (
+            <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+              {regionsError}
+            </div>
+          )}
+          {selectedRegions.length >= maxRegions && tier !== 'growth' && (
+            <div className="border-t border-white/[0.06] px-5 py-3">
+              <Link
+                href="/pricing"
+                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
+              >
+                Upgrade for more regions &rarr;
+              </Link>
+            </div>
+          )}
+        </Card>
+      </section>
+
+      </>
+      )}
+
+      {/* ─── AI Bot Tracking (Monitoring tab) ──────────────────────── */}
+      {activeTab === 'monitoring' && (
+      <>
       <section id="tracking" className="scroll-mt-6">
         <h2 className="text-[15px] font-semibold text-white">AI Bot Tracking</h2>
         <p className="mt-1 text-[12px] text-zinc-500">
@@ -680,7 +1344,12 @@ export function SettingsSection({
         </Card>
       </section>
 
-      {/* ─── Account ─────────────────────────────────────────────── */}
+      </>
+      )}
+
+      {/* ─── Account (General tab) ──────────────────────────────────── */}
+      {activeTab === 'general' && (
+      <>
       <section>
         <h2 className="text-[15px] font-semibold text-white">Account</h2>
         <p className="mt-1 text-[12px] text-zinc-500">Your account details.</p>
@@ -699,6 +1368,11 @@ export function SettingsSection({
           />
         </Card>
       </section>
+
+      </>
+      )}
+
+    </div>
     </div>
   );
 }

@@ -172,6 +172,8 @@ create table if not exists user_domains (
   domain     text not null,
   url        text,
   hidden     boolean not null default false,
+  selected_platforms text[] default null,
+  selected_regions   text[] default null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique(user_id, domain)
@@ -255,4 +257,85 @@ alter table user_competitors enable row level security;
 
 do $$ begin
   begin create policy "Service role full access" on user_competitors for all using (auth.role() = 'service_role'); exception when duplicate_object then null; end;
+end $$;
+
+-- 12. TEAMS — multi-seat team management
+create table if not exists teams (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  owner_id   text not null references user_profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_teams_owner on teams (owner_id);
+
+-- 13. TEAM MEMBERS — users belonging to a team
+create table if not exists team_members (
+  id        uuid primary key default gen_random_uuid(),
+  team_id   uuid not null references teams(id) on delete cascade,
+  user_id   text not null references user_profiles(id) on delete cascade,
+  role      text not null default 'member'
+              check (role in ('owner', 'member')),
+  joined_at timestamptz not null default now(),
+  unique(team_id, user_id)
+);
+
+create index if not exists idx_team_members_team on team_members (team_id);
+-- Enforce one-team-per-user at the DB level (prevents race conditions)
+create unique index if not exists idx_team_members_single_team on team_members (user_id);
+
+-- 14. TEAM INVITATIONS — pending email invitations
+create table if not exists team_invitations (
+  id          uuid primary key default gen_random_uuid(),
+  team_id     uuid not null references teams(id) on delete cascade,
+  email       text not null,
+  token       text not null unique,
+  invited_by  text not null references user_profiles(id) on delete cascade,
+  status      text not null default 'pending'
+                check (status in ('pending', 'accepted', 'revoked')),
+  expires_at  timestamptz not null,
+  created_at  timestamptz not null default now(),
+  accepted_at timestamptz
+);
+
+create index if not exists idx_team_invitations_team on team_invitations (team_id);
+create index if not exists idx_team_invitations_token on team_invitations (token);
+create index if not exists idx_team_invitations_email on team_invitations (email);
+
+alter table teams enable row level security;
+alter table team_members enable row level security;
+alter table team_invitations enable row level security;
+
+do $$ begin
+  begin create policy "Service role full access" on teams for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role'); exception when duplicate_object then null; end;
+  begin create policy "Service role full access" on team_members for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role'); exception when duplicate_object then null; end;
+  begin create policy "Service role full access" on team_invitations for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role'); exception when duplicate_object then null; end;
+end $$;
+
+-- 15. FIX MY SITE ORDERS — one-time $499 service orders
+create table if not exists fix_my_site_orders (
+  id                      uuid primary key default gen_random_uuid(),
+  user_id                 text not null references user_profiles(id) on delete cascade,
+  domain                  text not null,
+  status                  text not null default 'ordered'
+                            check (status in ('ordered', 'in_progress', 'delivered', 'refunded')),
+  notes                   text,
+  files_requested         text[] default '{}',
+  stripe_session_id       text,
+  stripe_payment_intent_id text,
+  amount_cents            int not null default 49900,
+  created_at              timestamptz not null default now(),
+  updated_at              timestamptz,
+  completed_at            timestamptz
+);
+
+create index if not exists idx_fms_orders_user on fix_my_site_orders (user_id);
+create index if not exists idx_fms_orders_status on fix_my_site_orders (status);
+create index if not exists idx_fms_orders_stripe_session on fix_my_site_orders (stripe_session_id);
+
+alter table fix_my_site_orders enable row level security;
+
+do $$ begin
+  begin create policy "Service role full access" on fix_my_site_orders for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role'); exception when duplicate_object then null; end;
 end $$;

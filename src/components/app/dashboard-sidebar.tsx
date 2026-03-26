@@ -25,6 +25,7 @@ import { useDomainContext } from '@/contexts/domain-context';
 import { usePlan } from '@/hooks/use-plan';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { NAV_GATES, canAccess } from '@/lib/pricing';
+import { AisoLogo } from '@/components/ui/aiso-brand';
 import type { SiteSummary } from '@/app/advanced/lib/types';
 
 type SidebarItem = {
@@ -102,17 +103,6 @@ const WORKSPACE_KEYS = new Set(['dashboard', 'report', 'brand', 'competitors', '
 function buildNavHref(base: string, reportId: string | null): string {
   if (!reportId) return base;
   return `${base}?report=${reportId}`;
-}
-
-function AisoLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
-      <path d="M16 3 A13 13 0 0 1 27.3 18.5" fill="none" stroke="#356df4" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M27.3 18.5 A13 13 0 0 1 4.7 18.5" fill="none" stroke="#25c972" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M4.7 18.5 A13 13 0 0 1 16 3" fill="none" stroke="#16b7ca" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 function NavItem({

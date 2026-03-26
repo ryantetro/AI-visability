@@ -14,7 +14,15 @@ interface PlanState {
   isPaid: boolean;
   maxDomains: number;
   maxPrompts: number;
+  maxPlatforms: number;
+  maxCompetitors: number;
+  maxRegions: number;
+  maxSeats: number;
+  maxContentPages: number;
   email: string;
+  teamId: string | null;
+  teamRole: 'owner' | 'member' | null;
+  teamName: string | null;
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -30,29 +38,24 @@ function readPlanSnapshot() {
     isPaid: snapshot.isPaid ?? false,
     maxDomains: snapshot.maxDomains ?? 1,
     maxPrompts: snapshot.maxPrompts ?? 5,
+    maxPlatforms: snapshot.maxPlatforms ?? 2,
+    maxCompetitors: snapshot.maxCompetitors ?? 0,
+    maxRegions: snapshot.maxRegions ?? 1,
+    maxSeats: snapshot.maxSeats ?? 1,
+    maxContentPages: snapshot.maxContentPages ?? 0,
     email: snapshot.email ?? '',
+    teamId: snapshot.teamId ?? null,
+    teamRole: snapshot.teamRole ?? null,
+    teamName: snapshot.teamName ?? null,
     loading: snapshot.tier === null,
   };
 }
 
 export function usePlan(): PlanState {
-  const [tier, setTier] = useState<PlanTier>(() => readPlanSnapshot().tier);
-  const [plan, setPlan] = useState<string>(() => readPlanSnapshot().plan);
-  const [isPaid, setIsPaid] = useState<boolean>(() => readPlanSnapshot().isPaid);
-  const [maxDomains, setMaxDomains] = useState<number>(() => readPlanSnapshot().maxDomains);
-  const [maxPrompts, setMaxPrompts] = useState<number>(() => readPlanSnapshot().maxPrompts);
-  const [email, setEmail] = useState<string>(() => readPlanSnapshot().email);
-  const [loading, setLoading] = useState(() => readPlanSnapshot().loading);
+  const [state, setState] = useState(() => readPlanSnapshot());
 
   const syncFromCache = useCallback(() => {
-    const snapshot = readPlanSnapshot();
-
-    setTier(snapshot.tier);
-    setPlan(snapshot.plan);
-    setIsPaid(snapshot.isPaid);
-    setMaxDomains(snapshot.maxDomains);
-    setMaxPrompts(snapshot.maxPrompts);
-    setEmail(snapshot.email);
+    setState(readPlanSnapshot());
   }, []);
 
   const refresh = useCallback(async () => {
@@ -62,15 +65,13 @@ export function usePlan(): PlanState {
       // keep current values
     } finally {
       syncFromCache();
-      setLoading(false);
+      setState((prev) => ({ ...prev, loading: false }));
     }
   }, [syncFromCache]);
 
   useEffect(() => {
     const handleInvalidation = () => {
-      const snapshot = readPlanSnapshot();
       syncFromCache();
-      setLoading(snapshot.loading);
       void refresh();
     };
 
@@ -84,7 +85,7 @@ export function usePlan(): PlanState {
     };
   }, [refresh, syncFromCache]);
 
-  return { tier, plan, isPaid, maxDomains, maxPrompts, email, loading, refresh };
+  return { ...state, refresh };
 }
 
 /** Invalidate the plan cache (e.g., after a successful upgrade) */

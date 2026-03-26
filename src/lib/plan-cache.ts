@@ -6,7 +6,15 @@ export interface PlanCacheSnapshot {
   isPaid: boolean | null;
   maxDomains: number | null;
   maxPrompts: number | null;
+  maxPlatforms: number | null;
+  maxCompetitors: number | null;
+  maxRegions: number | null;
+  maxSeats: number | null;
+  maxContentPages: number | null;
   email: string | null;
+  teamId: string | null;
+  teamRole: 'owner' | 'member' | null;
+  teamName: string | null;
 }
 
 interface AuthMePayload {
@@ -14,6 +22,14 @@ interface AuthMePayload {
   isPaid?: boolean;
   maxDomains?: number;
   maxPrompts?: number;
+  maxPlatforms?: number;
+  maxCompetitors?: number;
+  maxRegions?: number;
+  maxSeats?: number;
+  maxContentPages?: number;
+  teamId?: string | null;
+  teamRole?: 'owner' | 'member' | null;
+  teamName?: string | null;
   reason?: string;
   user?: {
     email?: string | null;
@@ -27,7 +43,15 @@ const EMPTY_PLAN_CACHE: PlanCacheSnapshot = {
   isPaid: null,
   maxDomains: null,
   maxPrompts: null,
+  maxPlatforms: null,
+  maxCompetitors: null,
+  maxRegions: null,
+  maxSeats: null,
+  maxContentPages: null,
   email: null,
+  teamId: null,
+  teamRole: null,
+  teamName: null,
 };
 
 let snapshot: PlanCacheSnapshot = { ...EMPTY_PLAN_CACHE };
@@ -64,7 +88,15 @@ export function hydratePlanCache(payload: AuthMePayload | null | undefined): Pla
     isPaid: payload?.isPaid ?? resolvedTier !== 'free',
     maxDomains: payload?.maxDomains ?? 1,
     maxPrompts: payload?.maxPrompts ?? 5,
+    maxPlatforms: payload?.maxPlatforms ?? 2,
+    maxCompetitors: payload?.maxCompetitors ?? 0,
+    maxRegions: payload?.maxRegions ?? 1,
+    maxSeats: payload?.maxSeats ?? 1,
+    maxContentPages: payload?.maxContentPages ?? 0,
     email: payload?.user?.email ?? '',
+    teamId: payload?.teamId ?? null,
+    teamRole: payload?.teamRole ?? null,
+    teamName: payload?.teamName ?? null,
   };
 
   return getPlanCacheSnapshot();

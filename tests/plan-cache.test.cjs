@@ -29,8 +29,36 @@ test('plan cache hydrates from auth payload data', () => {
     isPaid: true,
     maxDomains: 999,
     maxPrompts: 100,
+    maxPlatforms: 2,
+    maxCompetitors: 0,
+    maxRegions: 1,
+    maxSeats: 1,
+    maxContentPages: 0,
     email: 'ryan@example.com',
+    teamId: null,
+    teamRole: null,
+    teamName: null,
   });
+});
+
+test('plan cache hydrates team fields from auth payload', () => {
+  const snapshot = hydratePlanCache({
+    plan: 'pro_monthly',
+    isPaid: true,
+    maxDomains: 3,
+    maxPrompts: 75,
+    maxSeats: 3,
+    teamId: 'team-uuid-123',
+    teamRole: 'owner',
+    teamName: 'My Team',
+    user: { email: 'owner@example.com' },
+  });
+
+  assert.equal(snapshot.teamId, 'team-uuid-123');
+  assert.equal(snapshot.teamRole, 'owner');
+  assert.equal(snapshot.teamName, 'My Team');
+  assert.equal(snapshot.tier, 'pro');
+  assert.equal(snapshot.maxSeats, 3);
 });
 
 test('plan cache clears fully on invalidation', () => {
@@ -50,7 +78,15 @@ test('plan cache clears fully on invalidation', () => {
     isPaid: null,
     maxDomains: null,
     maxPrompts: null,
+    maxPlatforms: null,
+    maxCompetitors: null,
+    maxRegions: null,
+    maxSeats: null,
+    maxContentPages: null,
     email: null,
+    teamId: null,
+    teamRole: null,
+    teamName: null,
   });
 });
 
@@ -112,6 +148,38 @@ test('plan cache replaces prior user data when auth resolves to no session', asy
     isPaid: false,
     maxDomains: 1,
     maxPrompts: 5,
+    maxPlatforms: 2,
+    maxCompetitors: 0,
+    maxRegions: 1,
+    maxSeats: 1,
+    maxContentPages: 0,
     email: '',
+    teamId: null,
+    teamRole: null,
+    teamName: null,
   });
+});
+
+test('plan cache clears team fields when no session', async () => {
+  hydratePlanCache({
+    plan: 'pro_monthly',
+    isPaid: true,
+    maxDomains: 3,
+    maxPrompts: 75,
+    teamId: 'team-abc',
+    teamRole: 'member',
+    teamName: 'Old Team',
+    user: { email: 'member@example.com' },
+  });
+
+  const snapshot = await refreshPlanCache(async () => ({
+    ok: true,
+    async json() {
+      return { user: null, plan: 'free', reason: 'no_session' };
+    },
+  }));
+
+  assert.equal(snapshot.teamId, null);
+  assert.equal(snapshot.teamRole, null);
+  assert.equal(snapshot.teamName, null);
 });

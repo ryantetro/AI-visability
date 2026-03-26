@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Sparkles, X } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
+import { ExportButton } from '@/components/ui/export-button';
 import { cn } from '@/lib/utils';
 import { PROMPT_CATEGORIES } from '../lib/constants';
 import type { PromptCategory, PromptMonitoringData } from '../lib/types';
@@ -76,10 +77,17 @@ export function PromptLibraryPanel({ domain }: { domain: string }) {
     <DashboardPanel className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <SectionTitle eyebrow="Prompt Library" title="Prompt Monitoring" description="Manage prompts to track how AI engines mention your brand over time." />
-        <button type="button" className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/10 px-3 py-2 text-[11px] font-semibold text-[#d8b4fe] transition-colors hover:bg-[#a855f7]/16">
-          <Sparkles className="h-3 w-3" />
-          Suggest prompts
-        </button>
+        <div className="flex items-center gap-2 mt-1">
+          <button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/10 px-3 py-2 text-[11px] font-semibold text-[#d8b4fe] transition-colors hover:bg-[#a855f7]/16">
+            <Sparkles className="h-3 w-3" />
+            Suggest prompts
+          </button>
+          <ExportButton
+            exportType="prompts"
+            domain={domain}
+            featureGate="data_export"
+          />
+        </div>
       </div>
 
       <div className="mt-5 flex gap-1 border-b border-white/8 pb-px">

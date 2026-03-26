@@ -110,7 +110,7 @@ export function getUserUsage(profile: UserProfile): UserUsage {
   };
 }
 
-const VALID_PLANS = new Set(['free', 'starter_monthly', 'starter_annual', 'pro_monthly', 'pro_annual', 'lifetime']);
+const VALID_PLANS = new Set(['free', 'starter_monthly', 'starter_annual', 'pro_monthly', 'pro_annual', 'growth_monthly', 'growth_annual', 'lifetime']);
 
 export async function upgradeUserPlan(userId: string, plan: string): Promise<void> {
   if (!VALID_PLANS.has(plan)) {

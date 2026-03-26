@@ -9,13 +9,16 @@ import { cn } from '@/lib/utils';
 import { formatPlatformLabel } from '@/lib/platform-detection';
 import { AiPresenceTab } from '../panels/ai-presence-tab';
 import { AICrawlerPanel } from '../panels/ai-crawler-panel';
+import { PromptAnalyticsPanel } from '../panels/prompt-analytics-panel';
+import { ContentGeneratorPanel } from '../panels/content-generator-panel';
+import { FixMySitePanel } from '../panels/fix-my-site-panel';
 import { CitationTrackingPanel } from '../panels/citation-tracking-panel';
 import { ContentGapsSection } from '../panels/content-gaps-section';
 import { FixCard } from '../panels/fix-card';
 import { getFileMeta, getGroupedFixes, matchFixToFile, verificationPath, downloadTextFile, buildCursorPrompt, buildAllFilesPrompt } from '../lib/utils';
 import type { DashboardReportData, FilesData, GeneratedFile } from '../lib/types';
 
-type BrandTab = 'presence' | 'improve' | 'citations' | 'files' | 'traffic';
+type BrandTab = 'presence' | 'improve' | 'citations' | 'files' | 'traffic' | 'content' | 'services';
 
 interface BrandSectionProps {
   report: DashboardReportData;
@@ -24,7 +27,7 @@ interface BrandSectionProps {
   platformLabel: string | null;
 }
 
-const VALID_TABS: BrandTab[] = ['presence', 'improve', 'citations', 'files', 'traffic'];
+const VALID_TABS: BrandTab[] = ['presence', 'improve', 'citations', 'files', 'traffic', 'content', 'services'];
 
 export function BrandSection({ report, files, domain, platformLabel }: BrandSectionProps) {
   const router = useRouter();
@@ -54,6 +57,8 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
     { id: 'citations', label: 'Citations' },
     { id: 'files', label: 'Files' },
     { id: 'traffic', label: 'Traffic' },
+    { id: 'content', label: 'Content' },
+    { id: 'services', label: 'Services' },
   ];
 
   const fixes = report.score.fixes ?? report.fixes ?? [];
@@ -230,7 +235,20 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
         </DashboardPanel>
       )}
 
-      {activeTab === 'traffic' && <AICrawlerPanel domain={domain} />}
+      {activeTab === 'traffic' && (
+        <>
+          <PromptAnalyticsPanel domain={domain} />
+          <AICrawlerPanel domain={domain} />
+        </>
+      )}
+
+      {activeTab === 'content' && (
+        <ContentGeneratorPanel domain={domain} />
+      )}
+
+      {activeTab === 'services' && (
+        <FixMySitePanel domain={domain} />
+      )}
     </div>
   );
 }

@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { Check, Sparkles, X } from 'lucide-react';
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { PLANS, type BillingCycle, type PaymentPlanString } from '@/lib/pricing';
+import { PLANS, type BillingCycle, type PlanTier, type PaymentPlanString } from '@/lib/pricing';
+
+type PaidTier = Exclude<PlanTier, 'free'>;
 
 interface UnlockFeaturesModalProps {
   open: boolean;
@@ -13,8 +15,10 @@ interface UnlockFeaturesModalProps {
   loading?: boolean;
   onUnlock?: (plan: PaymentPlanString) => void;
   contextFeature?: string;
-  contextTier?: 'starter' | 'pro';
+  contextTier?: PaidTier;
 }
+
+const PAID_TIERS: PaidTier[] = ['starter', 'pro', 'growth'];
 
 export function UnlockFeaturesModal({
   open,
@@ -25,7 +29,7 @@ export function UnlockFeaturesModal({
   contextTier,
 }: UnlockFeaturesModalProps) {
   const [cycle, setCycle] = useState<BillingCycle>('annual');
-  const [selectedTier, setSelectedTier] = useState<'starter' | 'pro'>(contextTier ?? 'starter');
+  const [selectedTier, setSelectedTier] = useState<PaidTier>(contextTier ?? 'starter');
 
   const handleUnlock = () => {
     const plan = `${selectedTier}_${cycle}` as PaymentPlanString;
@@ -40,11 +44,13 @@ export function UnlockFeaturesModal({
     onOpenChange(nextOpen);
   };
 
-  const starterPlan = PLANS.starter;
-  const proPlan = PLANS.pro;
+  const getPrice = (tier: PaidTier) => {
+    const plan = PLANS[tier];
+    return cycle === 'annual' ? Math.round(plan.annualPrice / 12) : plan.monthlyPrice;
+  };
 
-  const starterPrice = cycle === 'annual' ? Math.round(starterPlan.annualPrice / 12) : starterPlan.monthlyPrice;
-  const proPrice = cycle === 'annual' ? Math.round(proPlan.annualPrice / 12) : proPlan.monthlyPrice;
+  const selectedPlan = PLANS[selectedTier];
+  const selectedPrice = getPrice(selectedTier);
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
@@ -102,77 +108,56 @@ export function UnlockFeaturesModal({
             </div>
 
             {/* Plan cards */}
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {/* Starter card */}
-              <button
-                type="button"
-                onClick={() => setSelectedTier('starter')}
-                className={cn(
-                  'relative flex flex-col items-start rounded-xl border-2 p-4 text-left transition-colors',
-                  selectedTier === 'starter'
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                    : 'border-white/10 bg-white/[0.02] hover:border-white/15'
-                )}
-              >
-                {selectedTier === 'starter' && (
-                  <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-primary)]">
-                    <Check className="h-3.5 w-3.5 text-white" />
-                  </span>
-                )}
-                <span className="text-base font-semibold text-zinc-200">Starter</span>
-                <span className="mt-1 text-2xl font-bold text-zinc-100">${starterPrice}</span>
-                <span className="text-xs text-zinc-400">/month</span>
-                <ul className="mt-3 space-y-1.5">
-                  {starterPlan.features.slice(0, 4).map((f) => (
-                    <li key={f} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                      <Check className="h-2.5 w-2.5 text-[#25c972]" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </button>
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              {PAID_TIERS.map((tier) => {
+                const plan = PLANS[tier];
+                const price = getPrice(tier);
+                const isSelected = selectedTier === tier;
+                const isPopular = tier === 'pro';
 
-              {/* Pro card */}
-              <button
-                type="button"
-                onClick={() => setSelectedTier('pro')}
-                className={cn(
-                  'relative flex flex-col items-start rounded-xl border-2 p-4 text-left transition-colors',
-                  selectedTier === 'pro'
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                    : 'border-white/10 bg-white/[0.02] hover:border-white/15'
-                )}
-              >
-                {selectedTier === 'pro' && (
-                  <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-primary)]">
-                    <Check className="h-3.5 w-3.5 text-white" />
-                  </span>
-                )}
-                <span className="flex items-center gap-1.5 text-base font-semibold text-zinc-200">
-                  Pro
-                  <span className="rounded-full bg-[var(--color-primary)]/15 px-1.5 py-0.5 text-[9px] font-bold text-[var(--color-primary)]">
-                    POPULAR
-                  </span>
-                </span>
-                <span className="mt-1 text-2xl font-bold text-zinc-100">${proPrice}</span>
-                <span className="text-xs text-zinc-400">/month</span>
-                <ul className="mt-3 space-y-1.5">
-                  {proPlan.features.slice(0, 4).map((f) => (
-                    <li key={f} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                      <Check className="h-2.5 w-2.5 text-[#25c972]" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </button>
+                return (
+                  <button
+                    key={tier}
+                    type="button"
+                    onClick={() => setSelectedTier(tier)}
+                    className={cn(
+                      'relative flex flex-col items-start rounded-xl border-2 p-4 text-left transition-colors',
+                      isSelected
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                        : 'border-white/10 bg-white/[0.02] hover:border-white/15'
+                    )}
+                  >
+                    {isSelected && (
+                      <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-primary)]">
+                        <Check className="h-3.5 w-3.5 text-white" />
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5 text-base font-semibold text-zinc-200">
+                      {plan.name}
+                      {isPopular && (
+                        <span className="rounded-full bg-[var(--color-primary)]/15 px-1.5 py-0.5 text-[9px] font-bold text-[var(--color-primary)]">
+                          POPULAR
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-1 text-2xl font-bold text-zinc-100">${price}</span>
+                    <span className="text-xs text-zinc-400">/month</span>
+                    <ul className="mt-3 space-y-1.5">
+                      {plan.features.slice(0, 4).map((f) => (
+                        <li key={f} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                          <Check className="h-2.5 w-2.5 text-[#25c972]" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </button>
+                );
+              })}
             </div>
 
             {cycle === 'annual' && (
               <p className="mt-3 text-center text-[11px] text-zinc-500">
-                {selectedTier === 'starter'
-                  ? `$${starterPlan.annualPrice}/yr (save $${starterPlan.monthlyPrice * 12 - starterPlan.annualPrice})`
-                  : `$${proPlan.annualPrice}/yr (save $${proPlan.monthlyPrice * 12 - proPlan.annualPrice})`
-                }
+                ${selectedPlan.annualPrice}/yr (save ${selectedPlan.monthlyPrice * 12 - selectedPlan.annualPrice})
               </p>
             )}
 
@@ -185,7 +170,7 @@ export function UnlockFeaturesModal({
               <Sparkles className="h-4 w-4" />
               {loading
                 ? 'Starting checkout...'
-                : `Get ${selectedTier === 'starter' ? 'Starter' : 'Pro'} — $${selectedTier === 'starter' ? starterPrice : proPrice}/mo`
+                : `Get ${selectedPlan.name} — $${selectedPrice}/mo`
               }
             </button>
 

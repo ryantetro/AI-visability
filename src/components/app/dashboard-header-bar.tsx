@@ -146,7 +146,7 @@ export function DashboardHeaderBar() {
                       ) : (
                         <Zap className="h-4 w-4 text-[#25c972]" />
                       )}
-                      Upgrade to Starter — $29/mo
+                      Upgrade to Starter — $49/mo
                     </button>
                     <button
                       type="button"
@@ -159,7 +159,7 @@ export function DashboardHeaderBar() {
                       ) : (
                         <Zap className="h-4 w-4 text-[#356df4]" />
                       )}
-                      Upgrade to Pro — $79/mo
+                      Upgrade to Pro — $99/mo
                     </button>
                   </div>
                 )}
@@ -176,7 +176,24 @@ export function DashboardHeaderBar() {
                       ) : (
                         <Zap className="h-4 w-4 text-[#356df4]" />
                       )}
-                      Upgrade to Pro — $79/mo
+                      Upgrade to Pro — $99/mo
+                    </button>
+                  </div>
+                )}
+                {tier === 'pro' && (
+                  <div className="border-b border-white/[0.06] py-1.5">
+                    <button
+                      type="button"
+                      disabled={checkoutLoading !== null}
+                      onClick={() => void handleUpgrade('growth_monthly')}
+                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+                    >
+                      {checkoutLoading === 'growth_monthly' ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[#a855f7]" />
+                      ) : (
+                        <Zap className="h-4 w-4 text-[#a855f7]" />
+                      )}
+                      Upgrade to Growth — $249/mo
                     </button>
                   </div>
                 )}
