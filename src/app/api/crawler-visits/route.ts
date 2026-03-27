@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { AI_CRAWLER_PROVIDER_ORDER, getCrawlerProvider } from '@/lib/ai-crawlers';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getCrawlerVisits } from '@/lib/services/registry';
 import { getSupabaseClient } from '@/lib/supabase';
-
-const BOT_TO_PROVIDER: Record<string, string> = {
-  GPTBot: 'chatgpt',
-  'ChatGPT-User': 'chatgpt',
-  PerplexityBot: 'perplexity',
-  ClaudeBot: 'claude',
-  'Claude-Web': 'claude',
-  'anthropic-ai': 'claude',
-  CCBot: 'other',
-  'cohere-ai': 'other',
-  'Google-Extended': 'gemini',
-};
-
-const PROVIDER_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude', 'other'];
 
 /** GET — Authenticated dashboard query for crawler visit summaries. */
 export async function GET(request: NextRequest) {
@@ -87,14 +74,14 @@ export async function GET(request: NextRequest) {
     const dayBuckets = new Map<string, Map<string, number>>();
     for (const v of currentVisits) {
       const dateStr = new Date(v.visitedAt).toISOString().slice(0, 10);
-      const provider = BOT_TO_PROVIDER[v.botName] ?? 'other';
+      const provider = getCrawlerProvider(v.botName);
       if (!dayBuckets.has(dateStr)) dayBuckets.set(dateStr, new Map());
       const provMap = dayBuckets.get(dateStr)!;
       provMap.set(provider, (provMap.get(provider) ?? 0) + 1);
     }
 
     // Zero-fill every day in the range
-    const allProviders = PROVIDER_ORDER;
+    const allProviders = AI_CRAWLER_PROVIDER_ORDER;
     const startDate = new Date(currentCutoff);
     startDate.setUTCHours(0, 0, 0, 0);
     const endDate = new Date(now);
@@ -114,7 +101,7 @@ export async function GET(request: NextRequest) {
     // --- Provider summaries with trend ---
     const currentByProvider = new Map<string, { count: number; paths: Set<string> }>();
     for (const v of currentVisits) {
-      const provider = BOT_TO_PROVIDER[v.botName] ?? 'other';
+      const provider = getCrawlerProvider(v.botName);
       const existing = currentByProvider.get(provider);
       if (existing) {
         existing.count++;
@@ -126,7 +113,7 @@ export async function GET(request: NextRequest) {
 
     const previousByProvider = new Map<string, number>();
     for (const v of previousVisits) {
-      const provider = BOT_TO_PROVIDER[v.botName] ?? 'other';
+      const provider = getCrawlerProvider(v.botName);
       previousByProvider.set(provider, (previousByProvider.get(provider) ?? 0) + 1);
     }
 

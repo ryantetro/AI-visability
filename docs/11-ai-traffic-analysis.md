@@ -17,7 +17,7 @@ Displays AI crawler traffic data grouped by **provider** (ChatGPT, Perplexity, G
 
 ## How it works
 
-1. **Bot-to-provider mapping**: Each bot name (GPTBot, ClaudeBot, etc.) is mapped to a provider key (`chatgpt`, `claude`, etc.) using `BOT_TO_PROVIDER`.
+1. **Bot-to-provider mapping**: Each bot name (GPTBot, ClaudeBot, GoogleOther, Google-CloudVertexBot, etc.) is mapped to a provider key (`chatgpt`, `claude`, `gemini`, etc.) using a shared crawler catalog.
 2. **API route**: Fetches `days * 2` of visits, splits into current/previous periods. Builds:
    - `providerTimeline`: Zero-filled daily rows with visit counts per provider
    - `providerSummaries`: Aggregated visits, unique paths, and trend % per provider
@@ -41,6 +41,10 @@ Displays AI crawler traffic data grouped by **provider** (ChatGPT, Perplexity, G
   "providerSummaries": [{ "provider": "chatgpt", "visits": 235, "trend": 18, "uniquePaths": 42 }]
 }
 ```
+
+## Google / Gemini caveat
+
+Google's crawler docs treat **`Google-Extended` as a `robots.txt` control token, not a distinct HTTP user-agent string**. The tracking layer therefore detects live Google crawler signals such as `GoogleOther` and `Google-CloudVertexBot`, while still mapping legacy stored `Google-Extended` rows to Gemini in analytics. This means a Gemini prompt will not always generate a fresh crawler hit: Google may answer from content it already has in the Google Search index.
 
 ## Install signal (empty state)
 

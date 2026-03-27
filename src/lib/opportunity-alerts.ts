@@ -1,3 +1,4 @@
+import { AI_CRAWLER_PROVIDER_ORDER, getCrawlerProvider } from '@/lib/ai-crawlers';
 import { getCrawlerVisits, getDatabase, getReferralVisits } from '@/lib/services/registry';
 import type {
   CrawlerVisit,
@@ -14,20 +15,6 @@ export const OPPORTUNITY_ALERT_MIN_RATIO = 20;
 export const OPPORTUNITY_ALERT_MIN_PAGE_CRAWLS = 3;
 export const OPPORTUNITY_ALERT_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
-const BOT_TO_PROVIDER: Record<string, string> = {
-  GPTBot: 'chatgpt',
-  'ChatGPT-User': 'chatgpt',
-  PerplexityBot: 'perplexity',
-  ClaudeBot: 'claude',
-  'Claude-Web': 'claude',
-  'anthropic-ai': 'claude',
-  CCBot: 'other',
-  'cohere-ai': 'other',
-  'Google-Extended': 'gemini',
-};
-
-const PROVIDER_SORT_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude', 'other'];
-
 function normalizePath(path: string) {
   const trimmed = path.trim();
   if (!trimmed) return '/';
@@ -38,7 +25,7 @@ function summarizeProviders(crawlerVisits: CrawlerVisit[]): OpportunityAlertProv
   const counts = new Map<string, number>();
 
   for (const visit of crawlerVisits) {
-    const provider = BOT_TO_PROVIDER[visit.botName] ?? 'other';
+    const provider = getCrawlerProvider(visit.botName);
     counts.set(provider, (counts.get(provider) ?? 0) + 1);
   }
 
@@ -46,7 +33,7 @@ function summarizeProviders(crawlerVisits: CrawlerVisit[]): OpportunityAlertProv
     .map(([provider, visits]) => ({ provider, visits }))
     .sort((a, b) => {
       if (b.visits !== a.visits) return b.visits - a.visits;
-      return PROVIDER_SORT_ORDER.indexOf(a.provider) - PROVIDER_SORT_ORDER.indexOf(b.provider);
+      return AI_CRAWLER_PROVIDER_ORDER.indexOf(a.provider) - AI_CRAWLER_PROVIDER_ORDER.indexOf(b.provider);
     })
     .slice(0, 3);
 }

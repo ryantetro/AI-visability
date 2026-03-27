@@ -40,6 +40,7 @@ const {
   hasOpportunityAlertCooldownElapsed,
   OPPORTUNITY_ALERT_COOLDOWN_MS,
 } = require('../src/lib/opportunity-alerts.ts');
+const { detectAiCrawler, getCrawlerProvider } = require('../src/lib/ai-crawlers.ts');
 const { mockAlertService } = require('../src/lib/monitoring-alerts.ts');
 const { mockCrawlerVisits, resetMockCrawlerVisits } = require('../src/lib/services/mock-crawler-visits.ts');
 const { mockReferralVisits, resetMockReferralVisits } = require('../src/lib/services/mock-referral-visits.ts');
@@ -1345,6 +1346,30 @@ test('opportunity cooldown uses a 7 day window', () => {
   assert.equal(hasOpportunityAlertCooldownElapsed(null, now), true);
   assert.equal(hasOpportunityAlertCooldownElapsed(now - OPPORTUNITY_ALERT_COOLDOWN_MS + 1000, now), false);
   assert.equal(hasOpportunityAlertCooldownElapsed(now - OPPORTUNITY_ALERT_COOLDOWN_MS - 1000, now), true);
+});
+
+test('Google crawler aliases map to Gemini while preserving Google-Extended legacy rows', () => {
+  assert.deepEqual(
+    detectAiCrawler('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GoogleOther) Chrome/124.0.0.0 Safari/537.36'),
+    {
+      botName: 'GoogleOther',
+      category: 'training',
+      company: 'Google',
+      provider: 'gemini',
+    }
+  );
+  assert.deepEqual(
+    detectAiCrawler('Mozilla/5.0 (compatible; Google-CloudVertexBot; +https://cloud.google.com/vertex-ai)'),
+    {
+      botName: 'Google-CloudVertexBot',
+      category: 'training',
+      company: 'Google',
+      provider: 'gemini',
+    }
+  );
+  assert.equal(getCrawlerProvider('GoogleOther'), 'gemini');
+  assert.equal(getCrawlerProvider('Google-CloudVertexBot'), 'gemini');
+  assert.equal(getCrawlerProvider('Google-Extended'), 'gemini');
 });
 
 test('mock alert service logs opportunity alert payload', async () => {

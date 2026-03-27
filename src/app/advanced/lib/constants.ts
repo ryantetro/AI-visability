@@ -8,6 +8,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import type { FileMeta, PromptCategory, WorkstreamMeta } from './types';
+import { BOT_TO_PROVIDER } from '@/lib/ai-crawlers';
 import { AI_ENGINE_META } from '@/lib/ai-engines';
 
 export const FILE_META: Record<string, FileMeta> = {
@@ -119,6 +120,8 @@ export const BOT_COLORS: Record<string, string> = {
   'anthropic-ai': '#d8b4fe',
   CCBot: '#f59e0b',
   'cohere-ai': '#fb923c',
+  GoogleOther: '#ef4444',
+  'Google-CloudVertexBot': '#f87171',
   'Google-Extended': '#ef4444',
 };
 
@@ -129,17 +132,7 @@ export const BOT_CATEGORY_LABEL: Record<string, string> = {
   unknown: 'Unknown',
 };
 
-export const BOT_TO_PROVIDER: Record<string, string> = {
-  GPTBot: 'chatgpt',
-  'ChatGPT-User': 'chatgpt',
-  PerplexityBot: 'perplexity',
-  ClaudeBot: 'claude',
-  'Claude-Web': 'claude',
-  'anthropic-ai': 'claude',
-  CCBot: 'other',
-  'cohere-ai': 'other',
-  'Google-Extended': 'gemini',
-};
+export { BOT_TO_PROVIDER };
 
 export const PROVIDER_DISPLAY_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude'] as const;
 

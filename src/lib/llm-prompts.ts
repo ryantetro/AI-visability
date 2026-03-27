@@ -5,6 +5,7 @@ import {
   WebHealthPillarKey,
   WebHealthSummary,
 } from '@/types/score';
+import { TRACKING_SNIPPET_BOTS } from '@/lib/ai-crawlers';
 
 export type ReportPromptSectionKey =
   | 'aiReadiness'
@@ -32,17 +33,7 @@ export interface ReportPromptBundle {
 
 export type BotTrackingRuntime = 'next' | 'express';
 
-const BOT_TRACKING_SNIPPET_BOTS = `{
-  GPTBot: 'indexing',
-  'ChatGPT-User': 'indexing',
-  PerplexityBot: 'citation',
-  ClaudeBot: 'indexing',
-  'Claude-Web': 'indexing',
-  'anthropic-ai': 'training',
-  CCBot: 'training',
-  'cohere-ai': 'training',
-  'Google-Extended': 'training',
-}`;
+const BOT_TRACKING_SNIPPET_BOTS = JSON.stringify(TRACKING_SNIPPET_BOTS, null, 2);
 
 const BOT_TRACKING_SNIPPET_REFERRERS = `{
   'chat.openai.com': 'chatgpt',

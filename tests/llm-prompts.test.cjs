@@ -187,8 +187,8 @@ test('buildBotTrackingInstallPrompt locks implementation to the customer site an
     siteKey: 'stk_1234567890abcdef1234567890abcdef',
   });
 
-  assert.ok(prompt.includes("This task is for the customer's own website/application only. Do not modify AISO itself."));
-  assert.ok(prompt.includes('Do not add or change AISO backend routes, middleware, database tables, migrations, auth, rate limiting, or tracking services.'));
+  assert.ok(prompt.includes("This task is for the customer's own website/application only. Do not modify airadr itself."));
+  assert.ok(prompt.includes('Do not add or change airadr backend routes, middleware, database tables, migrations, auth, rate limiting, or tracking services.'));
   assert.ok(prompt.includes('Do not invent a new `/api/track` route in the target project.'));
   assert.ok(prompt.includes('Selected runtime: Next.js / Vercel'));
   assert.ok(prompt.includes('https://app.aiso.com/api/track'));
@@ -196,7 +196,7 @@ test('buildBotTrackingInstallPrompt locks implementation to the customer site an
   assert.ok(prompt.includes('export function middleware(request)'));
   assert.ok(prompt.includes('middleware.ts or middleware.js at the project root'));
   assert.ok(prompt.includes('Short explanation'));
-  assert.ok(prompt.includes('Do not answer with a system redesign, backend architecture proposal, database schema, or AISO-side implementation.'));
+  assert.ok(prompt.includes('Do not answer with a system redesign, backend architecture proposal, database schema, or airadr-side implementation.'));
 });
 
 test('buildBotTrackingSnippet returns the correct runtime-specific snippet', () => {
@@ -208,5 +208,8 @@ test('buildBotTrackingSnippet returns the correct runtime-specific snippet', () 
 
   assert.ok(expressSnippet.includes('app.use((req, res, next) => {'));
   assert.ok(expressSnippet.includes("p: req.path"));
+  assert.ok(expressSnippet.includes('"GoogleOther": "training"'));
+  assert.ok(expressSnippet.includes('"Google-CloudVertexBot": "training"'));
+  assert.ok(!expressSnippet.includes('Google-Extended'));
   assert.ok(!expressSnippet.includes('request.nextUrl.pathname'));
 });

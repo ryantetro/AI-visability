@@ -1,28 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { detectAiCrawler } from '@/lib/ai-crawlers';
 import { maybeRefreshSessionInMiddleware } from '@/lib/auth';
-
-// ── AI Bot Detection ─────────────────────────────────────────────
-
-const AI_BOTS: Record<string, { company: string; category: 'indexing' | 'citation' | 'training' | 'unknown' }> = {
-  'GPTBot': { company: 'OpenAI', category: 'indexing' },
-  'ChatGPT-User': { company: 'OpenAI', category: 'indexing' },
-  'PerplexityBot': { company: 'Perplexity', category: 'citation' },
-  'ClaudeBot': { company: 'Anthropic', category: 'indexing' },
-  'Claude-Web': { company: 'Anthropic', category: 'indexing' },
-  'anthropic-ai': { company: 'Anthropic', category: 'training' },
-  'CCBot': { company: 'Common Crawl', category: 'training' },
-  'cohere-ai': { company: 'Cohere', category: 'training' },
-  'Google-Extended': { company: 'Google', category: 'training' },
-};
-
-function detectAiBot(userAgent: string): { botName: string; category: 'indexing' | 'citation' | 'training' | 'unknown' } | null {
-  for (const [botName, info] of Object.entries(AI_BOTS)) {
-    if (userAgent.includes(botName)) {
-      return { botName, category: info.category };
-    }
-  }
-  return null;
-}
 
 async function logBotVisit(domain: string, botName: string, category: string, pagePath: string, userAgent: string) {
   // Fire-and-forget POST to internal API to avoid importing service layer in edge middleware
@@ -75,7 +53,7 @@ export async function middleware(request: NextRequest) {
 
   // Detect AI bot visits (fire-and-forget, non-blocking)
   const userAgent = request.headers.get('user-agent') || '';
-  const bot = detectAiBot(userAgent);
+  const bot = detectAiCrawler(userAgent);
   if (bot) {
     const host = request.headers.get('host') || request.nextUrl.hostname;
     const domain = host.replace(/^www\./, '').split(':')[0];

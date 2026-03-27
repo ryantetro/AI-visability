@@ -9,7 +9,7 @@ DELETE FROM ai_crawler_visits WHERE domain = 'getpostgame.ai';
 -- Spread across the last 30 days with realistic patterns:
 --   ChatGPT (GPTBot): heaviest crawler, 5-15 visits/day
 --   Perplexity (PerplexityBot): moderate, 3-10 visits/day
---   Gemini (Google-Extended): moderate, 2-8 visits/day
+--   Gemini (GoogleOther): moderate, 2-8 visits/day
 --   Claude (ClaudeBot): lighter, 1-6 visits/day
 --   Other (CCBot): occasional, 0-3 visits/day
 
@@ -68,17 +68,17 @@ BEGIN
       );
     END LOOP;
 
-    -- Google-Extended: 2-8 visits/day
+    -- GoogleOther: 2-8 visits/day
     visit_count := 2 + floor(random() * 7)::int;
     FOR i IN 1..visit_count LOOP
       rand_path := paths[1 + floor(random() * array_length(paths, 1))::int];
       INSERT INTO ai_crawler_visits (domain, bot_name, bot_category, page_path, user_agent, visited_at)
       VALUES (
         'getpostgame.ai',
-        'Google-Extended',
+        'GoogleOther',
         'training',
         rand_path,
-        'Mozilla/5.0 (compatible; Google-Extended)',
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GoogleOther) Chrome/124.0.0.0 Safari/537.36',
         d + (random() * INTERVAL '24 hours')
       );
     END LOOP;
