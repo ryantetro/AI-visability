@@ -471,6 +471,7 @@ function buildPromptIssues(
   rows: UsageRows,
   promptLimit: number | null,
   targetLabel: string,
+  severity: LimitIssueSeverity = 'blocker',
 ): LimitIssue[] {
   if (promptLimit === null) return [];
 
@@ -487,7 +488,7 @@ function buildPromptIssues(
     return [{
       id: `prompts:${userId}`,
       category: 'prompts' as const,
-      severity: 'blocker' as const,
+      severity,
       scope: context.teamId ? 'member' as const : 'team' as const,
       title: member?.email
         ? `${member.email} has too many saved prompts`
@@ -512,6 +513,7 @@ function buildCompetitorIssues(
   rows: UsageRows,
   competitorLimit: number | null,
   targetLabel: string,
+  severity: LimitIssueSeverity = 'blocker',
 ): LimitIssue[] {
   if (competitorLimit === null) return [];
 
@@ -530,7 +532,7 @@ function buildCompetitorIssues(
     issues.push({
       id: `competitors:${key}`,
       category: 'competitors',
-      severity: 'blocker',
+      severity,
       scope: context.teamId ? 'member' : 'team',
       title: domain
         ? `${domain} exceeds competitor tracking`
@@ -559,6 +561,7 @@ function buildDomainSelectionIssues(
   category: 'platforms' | 'regions',
   limit: number | null,
   targetLabel: string,
+  severity: LimitIssueSeverity = 'blocker',
 ): LimitIssue[] {
   if (limit === null) return [];
 
@@ -574,7 +577,7 @@ function buildDomainSelectionIssues(
     return [{
       id: `${category}:${row.user_id}:${row.domain}`,
       category,
-      severity: 'blocker' as const,
+      severity,
       scope: context.teamId ? 'member' as const : 'team' as const,
       title: category === 'platforms'
         ? `${row.domain} tracks too many platforms`
@@ -715,6 +718,8 @@ export async function buildPlanUsageSnapshot(
   const currentTier = context.access.tier;
   const targetTier = planStringToTier(targetPlan);
   const sameEntitlements = currentTier === targetTier;
+  const isDowngrade = TIER_LEVEL[targetTier] < TIER_LEVEL[currentTier];
+  const issueSeverity: LimitIssueSeverity = isDowngrade ? 'advisory' : 'blocker';
   const shouldCheckIssues = options.forceChecks || !sameEntitlements;
   const targetLabel = getBillingPlanLabel(targetPlan);
   const limits = getPlanLimits(targetPlan, context.billingProfile.email);
@@ -750,7 +755,7 @@ export async function buildPlanUsageSnapshot(
       issues.push({
         id: 'domains:team',
         category: 'domains',
-        severity: 'blocker',
+        severity: issueSeverity,
         scope: 'team',
         title: 'Shared domain count exceeds the target plan',
         description: `This workspace has ${rows.domains.length} tracked domains. ${targetLabel} allows ${domainLimit} shared domain${domainLimit === 1 ? '' : 's'}. Remove or hide domains before the downgrade takes effect.`,
@@ -767,7 +772,7 @@ export async function buildPlanUsageSnapshot(
       issues.push({
         id: 'seats:team',
         category: 'seats',
-        severity: 'blocker',
+        severity: issueSeverity,
         scope: 'team',
         title: 'Seat usage exceeds the target plan',
         description: `This team is using ${teamSeatCount} seats including pending invitations. ${targetLabel} allows ${seatLimit} seat${seatLimit === 1 ? '' : 's'}.`,
@@ -783,7 +788,7 @@ export async function buildPlanUsageSnapshot(
         issues.push({
           id: 'pending_invites:team',
           category: 'pending_invites',
-          severity: 'blocker',
+          severity: issueSeverity,
           scope: 'team',
           title: 'Pending invitations count against the seat cap',
           description: `${context.pendingInvitations.length} pending invitation${context.pendingInvitations.length === 1 ? '' : 's'} must be revoked before active members lose access priority.`,
@@ -806,7 +811,7 @@ export async function buildPlanUsageSnapshot(
         issues.push({
           id: `seat_member:${member.user_id}`,
           category: 'seats',
-          severity: 'blocker',
+          severity: issueSeverity,
           scope: 'member',
           title: 'This member would move into cleanup-only access',
           description: member.email
@@ -824,10 +829,10 @@ export async function buildPlanUsageSnapshot(
       }
     }
 
-    issues.push(...buildPromptIssues(context, rows, promptLimit, targetLabel));
-    issues.push(...buildCompetitorIssues(context, rows, competitorLimit, targetLabel));
-    issues.push(...buildDomainSelectionIssues(context, rows, 'platforms', platformLimit, targetLabel));
-    issues.push(...buildDomainSelectionIssues(context, rows, 'regions', regionLimit, targetLabel));
+    issues.push(...buildPromptIssues(context, rows, promptLimit, targetLabel, issueSeverity));
+    issues.push(...buildCompetitorIssues(context, rows, competitorLimit, targetLabel, issueSeverity));
+    issues.push(...buildDomainSelectionIssues(context, rows, 'platforms', platformLimit, targetLabel, issueSeverity));
+    issues.push(...buildDomainSelectionIssues(context, rows, 'regions', regionLimit, targetLabel, issueSeverity));
     issues.push(...buildContentPageIssues(context, rows, contentLimit, targetLabel));
   }
 
