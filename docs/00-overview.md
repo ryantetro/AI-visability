@@ -25,6 +25,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [19-team-management.md](./19-team-management.md) | Multi-seat team management — invitations, shared domains, plan resolution | `src/lib/team-management.ts`, `src/app/api/teams/` |
 | [20-fix-my-site.md](./20-fix-my-site.md) | Fix My Site $499 service add-on — one-time Stripe payment, order tracking, email notifications | `src/lib/fix-my-site.ts`, `src/app/api/fix-my-site/` |
 | [21-payment-flow-fixes-upsells.md](./21-payment-flow-fixes-upsells.md) | Payment flow bug fixes + tier-contextual upgrade upsells | `src/contexts/domain-context.tsx`, `src/app/api/webhooks/stripe/route.ts` |
+| [22-graceful-downgrade-flow.md](./22-graceful-downgrade-flow.md) | Graceful plan downgrade — grace period, auto-trim, advisory issues | `src/lib/billing.ts`, `src/app/api/webhooks/stripe/route.ts` |
 
 ## Architecture Principles
 
