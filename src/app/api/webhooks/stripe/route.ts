@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getSupabaseClient } from '@/lib/supabase';
 import { upgradeUserPlan } from '@/lib/user-profile';
+import { trimWorkspaceToFit } from '@/lib/billing';
+import { planStringToTier, TIER_LEVEL } from '@/lib/pricing';
 import { setStripeIds } from '@/lib/fix-my-site';
 import { sendFixMySiteOrderNotification, sendFixMySiteConfirmation } from '@/lib/services/resend-alerts';
 
@@ -40,6 +42,19 @@ async function findUserByCustomerId(customerId: string): Promise<string | null> 
     .eq('stripe_customer_id', customerId)
     .single();
   return data?.id || null;
+}
+
+async function clearPendingPlanState(userId: string) {
+  const supabase = getSupabaseClient();
+  await supabase
+    .from('user_profiles')
+    .update({
+      pending_plan: null,
+      pending_plan_effective_at: null,
+      stripe_subscription_schedule_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
 }
 
 export async function POST(request: NextRequest) {
@@ -143,6 +158,9 @@ export async function POST(request: NextRequest) {
               .update({
                 stripe_subscription_id: subId,
                 plan_cancel_at_period_end: false,
+                pending_plan: null,
+                pending_plan_effective_at: null,
+                stripe_subscription_schedule_id: null,
                 plan_updated_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               })
@@ -171,6 +189,42 @@ export async function POST(request: NextRequest) {
         // Determine plan from subscription's price ID
         const priceId = subscription.items.data[0]?.price?.id;
         const plan = priceId ? priceIdToPlan(priceId) : subscription.metadata?.plan;
+        const scheduleId = typeof subscription.schedule === 'string'
+          ? subscription.schedule
+          : subscription.schedule?.id ?? null;
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('pending_plan')
+          .eq('id', userId)
+          .single();
+        const pendingPlan = typeof profile?.pending_plan === 'string' ? profile.pending_plan : null;
+        const planMatchesPending = Boolean(plan && pendingPlan && plan === pendingPlan);
+
+        // Auto-trim workspace on subscription UPDATES that are downgrades
+        // Skip for subscription.created — those are always upgrades from free
+        if (plan && event.type === 'customer.subscription.updated') {
+          const { data: currentProfile } = await supabase
+            .from('user_profiles')
+            .select('plan')
+            .eq('id', userId)
+            .single();
+          const currentPlan = currentProfile?.plan ?? 'free';
+          const currentTier = planStringToTier(currentPlan);
+          const newTier = planStringToTier(plan);
+
+          if (TIER_LEVEL[newTier] < TIER_LEVEL[currentTier]) {
+            try {
+              await trimWorkspaceToFit(userId, plan, currentPlan);
+            } catch (trimError) {
+              // Best-effort: log and set trim_failed flag, but still proceed with plan update
+              console.error('[webhook] trimWorkspaceToFit failed:', trimError);
+              await supabase
+                .from('user_profiles')
+                .update({ trim_failed: true, updated_at: new Date().toISOString() })
+                .eq('id', userId);
+            }
+          }
+        }
 
         if (plan) {
           await upgradeUserPlan(userId, plan);
@@ -178,15 +232,23 @@ export async function POST(request: NextRequest) {
 
         // Update expiry and subscription ID
         const currentPeriodEnd = subscription.items.data[0]?.current_period_end;
+        const updatePayload: Record<string, string | boolean | null> = {
+          stripe_subscription_id: subscription.id,
+          stripe_subscription_schedule_id: scheduleId,
+          plan_expires_at: currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString() : null,
+          plan_cancel_at_period_end: subscription.cancel_at_period_end,
+          plan_updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        if (planMatchesPending) {
+          updatePayload.pending_plan = null;
+          updatePayload.pending_plan_effective_at = null;
+        }
+
         await supabase
           .from('user_profiles')
-          .update({
-            stripe_subscription_id: subscription.id,
-            plan_expires_at: currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString() : null,
-            plan_cancel_at_period_end: subscription.cancel_at_period_end,
-            plan_updated_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq('id', userId);
       } catch (err) {
         console.error(`Error handling ${event.type}:`, err);
@@ -206,14 +268,37 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ received: true });
         }
 
+        // Read current plan before downgrading to free
+        const { data: currentProfileDel } = await supabase
+          .from('user_profiles')
+          .select('plan')
+          .eq('id', userId)
+          .single();
+        const currentPlanDel = currentProfileDel?.plan ?? 'free';
+
+        if (currentPlanDel !== 'free') {
+          try {
+            await trimWorkspaceToFit(userId, 'free', currentPlanDel);
+          } catch (trimError) {
+            console.error('[webhook] trimWorkspaceToFit failed on deletion:', trimError);
+            await supabase
+              .from('user_profiles')
+              .update({ trim_failed: true, updated_at: new Date().toISOString() })
+              .eq('id', userId);
+          }
+        }
+
         // Downgrade to free
         await upgradeUserPlan(userId, 'free');
         await supabase
           .from('user_profiles')
           .update({
             stripe_subscription_id: null,
+            stripe_subscription_schedule_id: null,
             plan_expires_at: null,
             plan_cancel_at_period_end: false,
+            pending_plan: null,
+            pending_plan_effective_at: null,
             plan_updated_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -227,6 +312,30 @@ export async function POST(request: NextRequest) {
 
     case 'invoice.payment_failed': {
       // Future: send email notification to user
+      break;
+    }
+
+    case 'subscription_schedule.aborted':
+    case 'subscription_schedule.canceled':
+    case 'subscription_schedule.completed':
+    case 'subscription_schedule.released': {
+      try {
+        const schedule = event.data.object as Stripe.SubscriptionSchedule;
+        const customerId = typeof schedule.customer === 'string' ? schedule.customer : schedule.customer?.id ?? null;
+        if (!customerId) {
+          break;
+        }
+
+        const userId = await findUserByCustomerId(customerId);
+        if (!userId) {
+          break;
+        }
+
+        await clearPendingPlanState(userId);
+      } catch (err) {
+        console.error(`Error handling ${event.type}:`, err);
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+      }
       break;
     }
   }
