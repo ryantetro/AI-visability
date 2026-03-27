@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Copy, CreditCard, ExternalLink, KeyRound, Loader2, Lock, Mail, RefreshCw, Trash2, UserMinus, UserPlus, Users, Zap } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Clock, Copy, CreditCard, ExternalLink, KeyRound, Loader2, Lock, Mail, RefreshCw, Trash2, UserMinus, UserPlus, Users, Zap } from 'lucide-react';
 import { isUnlimitedPlanLimit } from '@/lib/account-access-overrides';
 import { cn } from '@/lib/utils';
 import { buildBotTrackingInstallPrompt, buildBotTrackingSnippet, type BotTrackingRuntime } from '@/lib/llm-prompts';
@@ -14,6 +14,7 @@ import {
   PAYMENT_PLAN_IDS,
   PLANS,
   PLATFORM_LABELS,
+  TIER_LEVEL,
   canAccess,
   getPlanDisplayName,
   isPaymentPlanString,
@@ -238,6 +239,7 @@ export function SettingsSection({
   const [regionsLoading, setRegionsLoading] = useState(true);
   const [regionsSaving, setRegionsSaving] = useState(false);
   const [regionsError, setRegionsError] = useState<string | null>(null);
+  const [trimExpanded, setTrimExpanded] = useState(false);
   const {
     tier,
     plan,
@@ -1154,6 +1156,75 @@ export function SettingsSection({
       <section>
         <h2 className="text-[15px] font-semibold text-white">Plan & Billing</h2>
         <p className="mt-1 text-[12px] text-zinc-500">Your current subscription and usage limits.</p>
+
+        {billingStatus.status?.trimmedAt && !billingStatus.status?.trimBannerDismissed && (
+          <div className="mb-4 rounded-xl border border-sky-300/15 bg-sky-300/[0.06] px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-sky-300" />
+                <div>
+                  <p className="text-[12px] font-medium text-zinc-200">
+                    {billingStatus.status.trimFailed
+                      ? "We couldn't fully adjust your workspace. Please review your settings."
+                      : 'Your workspace was adjusted to fit your new plan.'}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500">
+                    Adjusted on {new Date(billingStatus.status.trimmedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTrimExpanded((prev) => !prev)}
+                  className="text-[11px] font-medium text-sky-300 transition-colors hover:text-sky-200"
+                >
+                  {trimExpanded ? 'Hide details' : 'View what changed'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch('/api/user/trim-banner', { method: 'PATCH' });
+                    await billingStatus.refresh();
+                  }}
+                  className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-white"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+            {trimExpanded && (
+              <div className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] leading-5 text-zinc-400">
+                <p>Your workspace was automatically adjusted to fit your plan limits. Domains may have been hidden, competitors removed, or platforms/regions adjusted.</p>
+                <p className="mt-1">Visit your domain and team settings to review the changes.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {billingStatus.status?.pendingChange && billingStatus.status.pendingChange.targetTier && billingStatus.status.currentTier && TIER_LEVEL[billingStatus.status.pendingChange.targetTier] < TIER_LEVEL[billingStatus.status.currentTier] && (
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300/15 bg-amber-300/[0.06] px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Clock className="h-4 w-4 shrink-0 text-amber-300" />
+              <p className="text-[12px] text-zinc-200">
+                Switching to <span className="font-semibold">{billingStatus.status.pendingChange.targetLabel}</span> on{' '}
+                {new Date(billingStatus.status.pendingChange.effectiveAt ?? '').toLocaleDateString()}
+                {billingStatus.status.readiness.viewerIssues.length > 0 && (
+                  <span className="text-zinc-400">
+                    {' · '}{billingStatus.status.readiness.viewerIssues.length} auto-adjustment{billingStatus.status.readiness.viewerIssues.length === 1 ? '' : 's'} pending
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setChangePlanModalOpen(true)}
+              className="text-[11px] font-medium text-amber-300 transition-colors hover:text-amber-200"
+            >
+              Cancel change
+            </button>
+          </div>
+        )}
 
         <Card className="mt-4">
           <FieldRow label="Current plan" value={planConfig.name} />

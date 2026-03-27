@@ -106,6 +106,9 @@ export interface BillingStatus {
   overageIssues: LimitIssue[];
   readiness: PlanUsageSnapshot;
   activeReadiness: PlanUsageSnapshot;
+  trimmedAt: string | null;
+  trimBannerDismissed: boolean;
+  trimFailed: boolean;
 }
 
 export type ChangePlanDecision =
@@ -139,6 +142,9 @@ interface BillingProfileRecord extends UserProfile {
   stripe_subscription_schedule_id: string | null;
   pending_plan: string | null;
   pending_plan_effective_at: string | null;
+  last_workspace_trim_at: string | null;
+  trim_banner_dismissed: boolean;
+  trim_failed: boolean;
 }
 
 export interface BillingContext {
@@ -370,7 +376,10 @@ async function getBillingProfileById(userId: string, fallbackEmail?: string): Pr
       pending_plan_effective_at,
       plan_updated_at,
       created_at,
-      updated_at
+      updated_at,
+      last_workspace_trim_at,
+      trim_banner_dismissed,
+      trim_failed
     `)
     .eq('id', userId)
     .maybeSingle();
@@ -391,6 +400,9 @@ async function getBillingProfileById(userId: string, fallbackEmail?: string): Pr
     stripe_subscription_schedule_id: null,
     pending_plan: null,
     pending_plan_effective_at: null,
+    last_workspace_trim_at: null,
+    trim_banner_dismissed: false,
+    trim_failed: false,
   };
 }
 
@@ -1224,6 +1236,9 @@ export async function getBillingStatus(userId: string, email: string): Promise<B
     overageIssues,
     readiness,
     activeReadiness,
+    trimmedAt: context.billingProfile.last_workspace_trim_at ?? null,
+    trimBannerDismissed: context.billingProfile.trim_banner_dismissed ?? false,
+    trimFailed: context.billingProfile.trim_failed ?? false,
   };
 }
 
