@@ -101,6 +101,7 @@ function buildNavHref(base, reportId) {
 }
 
 const WORKSPACE_KEYS = new Set(['dashboard', 'report', 'brand', 'competitors', 'settings']);
+const DOMAIN_CONTEXT_PREFIXES = ['/dashboard', '/report', '/brand', '/competitors', '/settings', '/advanced', '/history', '/leaderboard'];
 
 test('Fix 2: buildNavHref appends report param when present', () => {
   assert.equal(buildNavHref('/dashboard', 'abc-123'), '/dashboard?report=abc-123');
@@ -127,6 +128,17 @@ test('Fix 2: non-workspace routes should NOT carry report param', () => {
   for (const key of nonWorkspaceKeys) {
     assert.ok(!WORKSPACE_KEYS.has(key), `${key} should NOT be a workspace key`);
   }
+});
+
+test('Fix 2: leaderboard uses the workspace domain-context sidebar classification', () => {
+  assert.ok(
+    DOMAIN_CONTEXT_PREFIXES.some((prefix) => '/leaderboard'.startsWith(prefix)),
+    'leaderboard should use the workspace sidebar with domain context'
+  );
+  assert.ok(
+    !DOMAIN_CONTEXT_PREFIXES.some((prefix) => '/featured'.startsWith(prefix)),
+    'featured should remain outside the workspace domain-context routes'
+  );
 });
 
 test('Fix 2: sidebar nav items get correct hrefs with report param', () => {

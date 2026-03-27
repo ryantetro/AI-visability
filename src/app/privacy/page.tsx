@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | AISO',
-  description: 'Privacy information covering submitted URLs, emails, generated files, and temporary crawl storage in AISO.',
+  title: 'Privacy Policy | airadr',
+  description: 'Privacy information covering submitted URLs, emails, generated files, and temporary crawl storage in airadr.',
 };
 
 export default function PrivacyPage() {

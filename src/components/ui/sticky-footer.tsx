@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from './button';
 import Link from 'next/link';
+import { AisoBrand } from '@/components/ui/aiso-brand';
 
 interface FooterLink {
     title: string;
@@ -38,16 +39,7 @@ export function StickyFooter({ className, ...props }: StickyFooterProps) {
                 <div className="flex flex-col gap-12 md:flex-row justify-between">
                     {/* Brand column */}
                     <AnimatedContainer className="w-full max-w-sm space-y-6">
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-primary-400)] to-[var(--color-primary-600)] h-7 w-7 shadow-[0_0_12px_rgba(53,109,244,0.25)]">
-                                <span className="text-white text-[10px] font-bold leading-none tracking-tight">
-                                    AI
-                                </span>
-                            </div>
-                            <span className="text-[15px] font-semibold tracking-[-0.01em] text-white/90">
-                                AISO
-                            </span>
-                        </div>
+                        <AisoBrand logoClassName="h-7 w-7" textClassName="text-[15px]" wordmarkVariant="dark" />
                         <p className="max-w-xs text-sm leading-relaxed text-white/40">
                             Make your business visible to AI. Check how ChatGPT, Perplexity, and Claude perceive your brand, and use our tools to optimize your answers.
                         </p>
@@ -101,7 +93,7 @@ export function StickyFooter({ className, ...props }: StickyFooterProps) {
 
                 {/* Bottom Bar */}
                 <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/[0.06] pt-8 text-xs text-white/25 md:flex-row">
-                    <p>&copy; {new Date().getFullYear()} AISO &mdash; AI Search Optimization. All rights reserved.</p>
+                    <p>&copy; {new Date().getFullYear()} airadr &mdash; AI Search Optimization. All rights reserved.</p>
                     <div className="flex gap-6">
                         <Link href="/terms" className="hover:text-white/50 transition-colors duration-150">Terms of Service</Link>
                         <Link href="/privacy" className="hover:text-white/50 transition-colors duration-150">Privacy Policy</Link>
@@ -132,7 +124,7 @@ const footerLinkGroups: FooterLinkGroup[] = [
     {
         label: 'Resources',
         links: [
-            { title: 'AISO Flow Atlas', href: '/ui-ux-flow' },
+            { title: 'airadr Flow Atlas', href: '/ui-ux-flow' },
             { title: 'Styleguide', href: '/styleguide' },
             { title: 'Certified Reports', href: '/leaderboard' },
             { title: 'Terms', href: '/terms' },

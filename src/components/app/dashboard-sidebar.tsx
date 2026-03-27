@@ -25,7 +25,7 @@ import { useDomainContext } from '@/contexts/domain-context';
 import { usePlan } from '@/hooks/use-plan';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { NAV_GATES, canAccess } from '@/lib/pricing';
-import { AisoLogo } from '@/components/ui/aiso-brand';
+import { AisoBrand } from '@/components/ui/aiso-brand';
 import type { SiteSummary } from '@/app/advanced/lib/types';
 
 type SidebarItem = {
@@ -405,8 +405,11 @@ export function DashboardSidebar() {
       {/* Logo */}
       <div className="flex h-14 items-center gap-2.5 px-5">
         <Link href="/" className="flex items-center gap-2.5" onClick={closeMobile}>
-          <AisoLogo className="h-7 w-7" />
-          <span className="text-[15px] font-semibold tracking-tight text-white">AISO</span>
+          <AisoBrand
+            logoClassName="h-7 w-7"
+            textClassName="text-[15px]"
+            wordmarkVariant="dark"
+          />
         </Link>
       </div>
 
@@ -466,10 +469,12 @@ export function DashboardSidebar() {
 
       {/* Bottom logo */}
       <div className="px-5 pb-5">
-        <div className="flex items-center gap-2 text-[11px] text-zinc-600">
-          <AisoLogo className="h-5 w-5 opacity-40" />
-          <span>AISO</span>
-        </div>
+        <AisoBrand
+          className="opacity-40"
+          logoClassName="h-5 w-5"
+          textClassName="text-[11px]"
+          wordmarkVariant="dark"
+        />
       </div>
     </div>
   );

@@ -19,15 +19,15 @@ export async function generateMetadata({ params }: ScorePageProps): Promise<Meta
 
   if (!summary) {
     return {
-      title: 'Score Not Found | AISO',
+      title: 'Score Not Found | airadr',
     };
   }
 
   return {
-    title: `${summary.domain} scored ${summary.percentage} on AISO`,
+    title: `${summary.domain} scored ${summary.percentage} on airadr`,
     description: `${summary.domain} is currently rated ${summary.bandInfo.label} for AI search visibility.`,
     openGraph: {
-      title: `${summary.domain} scored ${summary.percentage} on AISO`,
+      title: `${summary.domain} scored ${summary.percentage} on airadr`,
       description: `${summary.domain} is currently rated ${summary.bandInfo.label} for AI search visibility.`,
       images: [{ url: `/score/${id}/opengraph-image` }],
     },
@@ -244,7 +244,7 @@ export default async function PublicScorePage({ params }: ScorePageProps) {
           Want to improve this score?
         </h2>
         <p className="mx-auto mt-2 max-w-lg text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Run a full AISO audit to get AI-generated fix files, copy-paste prompts for ChatGPT and Claude, and a prioritized action plan.
+          Run a full airadr audit to get AI-generated fix files, copy-paste prompts for ChatGPT and Claude, and a prioritized action plan.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href="/" className="aiso-button aiso-button-primary px-8 py-3 text-sm">
@@ -255,7 +255,7 @@ export default async function PublicScorePage({ params }: ScorePageProps) {
           </Link>
         </div>
         <p className="mt-6 text-xs" style={{ color: 'var(--text-muted)' }}>
-          Powered by AISO &mdash; AI Search Optimization
+          Powered by airadr &mdash; AI Search Optimization
         </p>
       </div>
     </div>

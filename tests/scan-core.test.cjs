@@ -26,6 +26,7 @@ const {
   startDomainVerification,
   confirmDomainVerification,
   listLeaderboardEntries,
+  listLeaderboardEntriesFiltered,
 } = require('../src/lib/public-proof.ts');
 const {
   addMonitoringDomain,
@@ -1044,6 +1045,57 @@ test('domain verification can start, confirm, and publish a leaderboard entry', 
   assert.equal(leaderboard.length, 1);
   assert.equal(leaderboard[0].summary.id, scan.id);
   assert.equal(leaderboard[0].summary.domain, 'example.com');
+});
+
+test('leaderboard filtering keeps the best score within the selected time window', async () => {
+  const oldHighScore = scoreCrawlData(createCrawlData());
+  oldHighScore.percentage = 95;
+  oldHighScore.scores.overall = 95;
+  oldHighScore.scores.aiVisibility = 92;
+
+  const recentExampleScore = scoreCrawlData(createCrawlData());
+  recentExampleScore.percentage = 81;
+  recentExampleScore.scores.overall = 81;
+  recentExampleScore.scores.aiVisibility = 79;
+
+  const recentChallengerScore = scoreCrawlData(
+    createCrawlData({
+      url: 'https://contender.com/',
+      normalizedUrl: 'https://contender.com',
+    })
+  );
+  recentChallengerScore.percentage = 88;
+  recentChallengerScore.scores.overall = 88;
+  recentChallengerScore.scores.aiVisibility = 84;
+
+  await saveCompletedScan('example-old-high', {
+    completedAt: Date.now() - 40 * DAY_MS,
+    scoreResult: oldHighScore,
+  });
+  await saveCompletedScan('example-recent', {
+    completedAt: Date.now() - 2 * DAY_MS,
+    scoreResult: recentExampleScore,
+  });
+  await saveCompletedScan('contender-recent', {
+    completedAt: Date.now() - 12 * 60 * 60 * 1000,
+    crawlData: createCrawlData({
+      url: 'https://contender.com/',
+      normalizedUrl: 'https://contender.com',
+    }),
+    scoreResult: recentChallengerScore,
+  });
+
+  const allTime = await listLeaderboardEntriesFiltered(10, 'all');
+  const last30Days = await listLeaderboardEntriesFiltered(10, '30d');
+  const last24Hours = await listLeaderboardEntriesFiltered(10, '24h');
+
+  assert.equal(allTime[0].summary.domain, 'example.com');
+  assert.equal(allTime[0].summary.percentage, 95);
+  assert.equal(last30Days[0].summary.domain, 'contender.com');
+  assert.equal(last30Days[1].summary.domain, 'example.com');
+  assert.equal(last30Days[1].summary.percentage, 81);
+  assert.equal(last24Hours.length, 1);
+  assert.equal(last24Hours[0].summary.domain, 'contender.com');
 });
 
 test('monitoring records can be added and removed for owned scans', async () => {

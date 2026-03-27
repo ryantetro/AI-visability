@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPayment, getDatabase } from '@/lib/services/registry';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { upgradeUserPlan } from '@/lib/user-profile';
+import { getSupabaseClient } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -41,6 +42,37 @@ export async function POST(request: NextRequest) {
     // returning user sees the new plan immediately and webhook delays do not block access.
     try {
       await upgradeUserPlan(user.id, plan);
+
+      const updatePayload: Record<string, string | boolean | null> = {
+        plan_updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (result.customerId) {
+        updatePayload.stripe_customer_id = result.customerId;
+      }
+      if (result.subscriptionId) {
+        updatePayload.stripe_subscription_id = result.subscriptionId;
+      }
+      if (typeof result.cancelAtPeriodEnd === 'boolean') {
+        updatePayload.plan_cancel_at_period_end = result.cancelAtPeriodEnd;
+      }
+      if (typeof result.currentPeriodEnd !== 'undefined') {
+        updatePayload.plan_expires_at = result.currentPeriodEnd ?? null;
+      }
+      if (typeof result.scheduleId !== 'undefined') {
+        updatePayload.stripe_subscription_schedule_id = result.scheduleId ?? null;
+      }
+
+      if (!result.scheduleId) {
+        updatePayload.pending_plan = null;
+        updatePayload.pending_plan_effective_at = null;
+      }
+
+      await getSupabaseClient()
+        .from('user_profiles')
+        .update(updatePayload)
+        .eq('id', user.id);
     } catch {
       // Non-blocking: scan unlock still succeeds even if plan upgrade fails
     }

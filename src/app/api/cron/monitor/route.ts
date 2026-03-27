@@ -8,6 +8,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { getDomain } from '@/lib/url-utils';
 import type { AIEngine, MentionPrompt } from '@/types/ai-mentions';
 import { getUserAccess } from '@/lib/access';
+import { getCurrentBillingReadiness } from '@/lib/billing';
 import { getScannableEngines, getSelectedPlatforms } from '@/lib/platform-gating';
 import { applyRegionContext, getSelectedRegions, DEFAULT_REGION_ID } from '@/lib/region-gating';
 
@@ -209,6 +210,11 @@ export async function GET(request: NextRequest) {
     const pm = getPromptMonitoring();
     const tester = getMentionTester();
     const allEngines = tester.availableEngines();
+    const promptRuntimeCache = new Map<string, {
+      engines: AIEngine[];
+      primaryRegionId: string;
+      blocked: boolean;
+    }>();
     let promptsChecked = 0;
     let promptErrors = 0;
 
@@ -220,34 +226,60 @@ export async function GET(request: NextRequest) {
         const active = prompts.filter((p) => p.active);
         if (active.length === 0) continue;
 
-        // Resolve platform-gated engines and region for this domain's owner
-        let domainEngines: AIEngine[] = allEngines;
-        let primaryRegionId = DEFAULT_REGION_ID;
-        try {
-          const ownerId = active[0].userId;
-          if (ownerId) {
-            const supabase = getSupabaseClient();
-            const { data: profile } = await supabase
-              .from('user_profiles')
-              .select('email')
-              .eq('id', ownerId)
-              .single();
-
-            if (profile?.email) {
-              const access = await getUserAccess(ownerId, profile.email);
-              const selectedPlatforms = await getSelectedPlatforms(ownerId, domain);
-              domainEngines = getScannableEngines(selectedPlatforms, access.tier, allEngines);
-
-              // Resolve primary region
-              const selectedRegions = await getSelectedRegions(ownerId, domain);
-              if (selectedRegions?.[0]) primaryRegionId = selectedRegions[0];
-            }
-          }
-        } catch {
-          // Fall through to all available engines if lookup fails
-        }
-
         for (const prompt of active) {
+          let promptEngines: AIEngine[] = allEngines;
+          let primaryRegionId = DEFAULT_REGION_ID;
+
+          try {
+            const cacheKey = `${prompt.userId}:${domain}`;
+            const cached = promptRuntimeCache.get(cacheKey);
+
+            if (cached) {
+              promptEngines = cached.engines;
+              primaryRegionId = cached.primaryRegionId;
+              if (cached.blocked) continue;
+            } else if (prompt.userId) {
+              const supabase = getSupabaseClient();
+              const { data: profile } = await supabase
+                .from('user_profiles')
+                .select('email')
+                .eq('id', prompt.userId)
+                .single();
+
+              if (profile?.email) {
+                const [access, selectedPlatforms, selectedRegions, readiness] = await Promise.all([
+                  getUserAccess(prompt.userId, profile.email),
+                  getSelectedPlatforms(prompt.userId, domain),
+                  getSelectedRegions(prompt.userId, domain),
+                  getCurrentBillingReadiness(prompt.userId, profile.email),
+                ]);
+
+                const issues = readiness.snapshot.issues;
+                const blocked = issues.some((issue) => (
+                  issue.memberUserId === prompt.userId
+                  && (
+                    issue.category === 'prompts'
+                    || (issue.category === 'platforms' && issue.domain === domain)
+                    || (issue.category === 'regions' && issue.domain === domain)
+                  )
+                ));
+
+                promptEngines = blocked
+                  ? []
+                  : getScannableEngines(selectedPlatforms, access.tier, allEngines);
+                primaryRegionId = selectedRegions?.[0] ?? DEFAULT_REGION_ID;
+                promptRuntimeCache.set(cacheKey, {
+                  engines: promptEngines,
+                  primaryRegionId,
+                  blocked,
+                });
+                if (blocked) continue;
+              }
+            }
+          } catch {
+            // Fall through to all available engines if lookup fails
+          }
+
           const regionText = applyRegionContext(prompt.promptText, primaryRegionId);
           const mentionPrompt: MentionPrompt = {
             id: prompt.id,
@@ -256,7 +288,7 @@ export async function GET(request: NextRequest) {
             industry: prompt.industry ?? '',
           };
 
-          for (const engine of domainEngines) {
+          for (const engine of promptEngines) {
             try {
               const response = await tester.query(engine, mentionPrompt);
               const analysis = analyzeResponse(response, domain, domain);

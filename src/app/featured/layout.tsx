@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Featured Spot | AISO',
+  title: 'Featured Spot | airadr',
   description: 'Buy your Featured Spot and get listed on the landing page and in the leaderboard.',
 };
 

@@ -250,7 +250,7 @@ export function PricingSection({
               <div>
                 <h4 className="text-lg font-semibold text-white">Fix My Site</h4>
                 <p className="mt-1 text-sm text-zinc-400">
-                  Professional AI visibility optimization by the AISO team
+                  Professional AI visibility optimization by the airadr team
                 </p>
               </div>
               <div className="rounded-2xl border border-[#25c972]/20 bg-[#25c972]/10 p-2.5">

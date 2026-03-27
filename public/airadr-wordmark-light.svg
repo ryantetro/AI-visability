@@ -1,0 +1,12 @@
+<svg viewBox="0 0 190 48" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="airadr wordmark">
+  <text
+    x="0"
+    y="36"
+    font-family="'Helvetica Neue', Arial, sans-serif"
+    font-size="40"
+    letter-spacing="-1.4"
+  >
+    <tspan fill="#042C53" font-weight="100">ai</tspan>
+    <tspan dx="-3.6" fill="#185FA5" font-weight="700">radr</tspan>
+  </text>
+</svg>

@@ -15,7 +15,7 @@ export function canUseResend(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
 }
 
-const FROM_EMAIL = () => process.env.RESEND_FROM_EMAIL || 'AISO Alerts <alerts@aiso.so>';
+const FROM_EMAIL = () => process.env.RESEND_FROM_EMAIL || 'airadr Alerts <alerts@aiso.so>';
 
 const PROVIDER_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
@@ -61,7 +61,7 @@ function buildScoreAlertHtml({
       <table width="560" cellpadding="0" cellspacing="0" style="background:#18181b;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden;">
         <!-- Header -->
         <tr><td style="padding:32px 32px 0;">
-          <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:#6c63ff;">AISO Score Alert</p>
+          <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:#6c63ff;">airadr Score Alert</p>
           <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;">${domain}</h1>
         </td></tr>
 
@@ -117,7 +117,7 @@ function buildScoreAlertHtml({
         <!-- Footer -->
         <tr><td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.06);">
           <p style="margin:0;font-size:11px;color:#52525b;">
-            You're receiving this because monitoring is enabled for ${domain} on AISO.
+            You're receiving this because monitoring is enabled for ${domain} on airadr.
           </p>
         </td></tr>
       </table>
@@ -168,7 +168,7 @@ function buildOpportunityAlertHtml(summary: OpportunityAlertSummary): string {
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#18181b;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden;">
         <tr><td style="padding:32px 32px 0;">
-          <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:#ffbb00;">AISO Opportunity Alert</p>
+          <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:#ffbb00;">airadr Opportunity Alert</p>
           <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;">AI engines are actively reading ${summary.domain}</h1>
         </td></tr>
 
@@ -219,7 +219,7 @@ function buildOpportunityAlertHtml(summary: OpportunityAlertSummary): string {
 
         <tr><td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.06);">
           <p style="margin:0;font-size:11px;color:#52525b;">
-            You're receiving this because opportunity alerts are enabled for ${summary.domain} on AISO.
+            You're receiving this because opportunity alerts are enabled for ${summary.domain} on airadr.
           </p>
         </td></tr>
       </table>
@@ -258,14 +258,14 @@ function buildTeamInvitationHtml({
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#18181b;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden;">
         <tr><td style="padding:32px 32px 0;">
-          <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:#6c63ff;">AISO Team Invitation</p>
+          <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:#6c63ff;">airadr Team Invitation</p>
           <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;">You've been invited to join a team</h1>
         </td></tr>
 
         <tr><td style="padding:24px 32px;">
           <p style="margin:0;font-size:14px;line-height:1.7;color:#a1a1aa;">
             <strong style="color:#fff;">${safeInviter}</strong> has invited you to join
-            <strong style="color:#fff;">${safeTeam}</strong> on AISO.
+            <strong style="color:#fff;">${safeTeam}</strong> on airadr.
             As a team member, you'll share access to tracked domains, AI visibility data, and monitoring alerts.
           </p>
         </td></tr>
@@ -278,13 +278,13 @@ function buildTeamInvitationHtml({
 
         <tr><td style="padding:0 32px 24px;">
           <p style="margin:0;font-size:12px;line-height:1.6;color:#71717a;">
-            This invitation expires in 7 days. If you don't have an AISO account, you'll be prompted to sign up first.
+            This invitation expires in 7 days. If you don't have an airadr account, you'll be prompted to sign up first.
           </p>
         </td></tr>
 
         <tr><td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.06);">
           <p style="margin:0;font-size:11px;color:#52525b;">
-            You're receiving this because ${safeInviter} invited you on AISO.
+            You're receiving this because ${safeInviter} invited you on airadr.
           </p>
         </td></tr>
       </table>
@@ -317,7 +317,7 @@ export async function sendTeamInvitationEmail({
   await resend.emails.send({
     from: FROM_EMAIL(),
     to: recipientEmail,
-    subject: `${safeSubjectInviter} invited you to join ${safeSubjectTeam} on AISO`,
+    subject: `${safeSubjectInviter} invited you to join ${safeSubjectTeam} on airadr`,
     html: buildTeamInvitationHtml({ inviterName, teamName, acceptUrl }),
   });
 }
@@ -401,7 +401,7 @@ function buildFixMySiteOrderHtml({
 
         <tr><td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.06);">
           <p style="margin:0;font-size:11px;color:#52525b;">
-            This is an internal notification for the AISO team.
+            This is an internal notification for the airadr team.
           </p>
         </td></tr>
       </table>
@@ -430,7 +430,7 @@ function buildFixMySiteConfirmationHtml({
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#18181b;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden;">
         <tr><td style="padding:32px 32px 0;">
-          <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:#25c972;">AISO Fix My Site</p>
+          <p style="margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:#25c972;">airadr Fix My Site</p>
           <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Your order is confirmed</h1>
         </td></tr>
 

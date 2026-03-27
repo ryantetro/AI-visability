@@ -1,6 +1,7 @@
 import { after } from 'next/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
+import { getUserAccess } from '@/lib/access';
 import { addCompetitor, countCompetitors, updateCompetitorScan } from '@/lib/competitor-service';
 import { startScan, getClientIp } from '@/lib/scan-workflow';
 import { getDomain, isValidUrl, ensureProtocol } from '@/lib/url-utils';
@@ -36,9 +37,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const access = await getUserAccess(user.id, user.email);
+    if (access.maxCompetitors <= 0) {
+      return NextResponse.json(
+        { error: 'Competitor tracking requires the Pro plan or above.' },
+        { status: 403 },
+      );
+    }
+
     const count = await countCompetitors(user.id, domain);
-    if (count >= 3) {
-      return NextResponse.json({ error: 'Maximum of 3 competitors per domain' }, { status: 400 });
+    if (count >= access.maxCompetitors) {
+      return NextResponse.json(
+        { error: `Your ${access.tier} plan allows ${access.maxCompetitors} competitor${access.maxCompetitors === 1 ? '' : 's'} per domain.` },
+        { status: 403 },
+      );
     }
 
     const competitor = await addCompetitor(user.id, domain, competitorUrl, competitorDomain);

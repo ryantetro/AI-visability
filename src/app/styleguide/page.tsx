@@ -11,7 +11,7 @@ export default function StyleGuidePage() {
     <div className="mx-auto max-w-[1024px] px-6 py-12">
       <div className="mb-12">
         <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-          AISO Dark Product Style Guide
+          airadr Dark Product Style Guide
         </h1>
         <p className="mt-2 text-lg" style={{ color: 'var(--text-secondary)' }}>
           Design tokens, colors, typography, and component patterns.
@@ -25,7 +25,7 @@ export default function StyleGuidePage() {
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
               Name & Tagline
             </h3>
-            <p className="text-3xl font-bold" style={{ color: 'var(--color-primary-600)' }}>AISO</p>
+            <p className="text-3xl font-bold" style={{ color: 'var(--color-primary-600)' }}>airadr</p>
             <p className="mt-1 text-lg" style={{ color: 'var(--text-secondary)' }}>{brand.tagline}</p>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-tertiary)' }}>{brand.descriptor}</p>
           </Card>
@@ -188,7 +188,7 @@ export default function StyleGuidePage() {
 > Your business described for AI models.
 
 ## About
-AISO helps businesses become visible to AI search.`}
+airadr helps businesses become visible to AI search.`}
           </pre>
         </Card>
       </Section>

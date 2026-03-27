@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
+import { getUserAccess } from '@/lib/access';
 import { getPromptMonitoring } from '@/lib/services/registry';
+import { getSupabaseClient } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -57,6 +59,26 @@ export async function POST(request: NextRequest) {
   }
   if (industry !== undefined && industry !== null && String(industry).length > 50) {
     return NextResponse.json({ error: 'industry must be 50 characters or fewer.' }, { status: 400 });
+  }
+
+  const access = await getUserAccess(user.id, user.email);
+  if (!isFinite(access.maxPrompts) || access.maxPrompts < 0) {
+    return NextResponse.json({ error: 'Prompt limits are not configured for this account.' }, { status: 500 });
+  }
+
+  const supabase = getSupabaseClient();
+  const { count } = await supabase
+    .from('monitored_prompts')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id);
+
+  if ((count ?? 0) >= access.maxPrompts) {
+    return NextResponse.json(
+      {
+        error: `Your ${access.tier} plan allows ${access.maxPrompts} saved prompt${access.maxPrompts === 1 ? '' : 's'} per member. Delete a prompt or upgrade to add more.`,
+      },
+      { status: 403 },
+    );
   }
 
   const pm = getPromptMonitoring();

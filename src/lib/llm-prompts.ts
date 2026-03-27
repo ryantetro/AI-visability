@@ -188,15 +188,15 @@ export function buildBotTrackingInstallPrompt({
     ? 'If the project already has middleware, merge this logic into the existing middleware instead of replacing unrelated auth, redirects, rewrites, or header logic.'
     : 'Insert this as middleware before the main route handlers, and preserve any existing middleware order that affects auth, security, logging, or response behavior.';
 
-  return `You are a senior web developer implementing an existing AISO bot-tracking integration inside a customer's website project.
+  return `You are a senior web developer implementing an existing airadr bot-tracking integration inside a customer's website project.
 
 ## Role / Task
-Add AISO AI bot tracking to the customer's site using the existing AISO tracking endpoint and the selected runtime below.
+Add airadr AI bot tracking to the customer's site using the existing airadr tracking endpoint and the selected runtime below.
 
 ## Non-Negotiable Rules
-- This task is for the customer's own website/application only. Do not modify AISO itself.
-- Do not add or change AISO backend routes, middleware, database tables, migrations, auth, rate limiting, or tracking services.
-- Do not invent a new \`/api/track\` route in the target project. The tracking endpoint already exists on AISO and must be called exactly as provided below.
+- This task is for the customer's own website/application only. Do not modify airadr itself.
+- Do not add or change airadr backend routes, middleware, database tables, migrations, auth, rate limiting, or tracking services.
+- Do not invent a new \`/api/track\` route in the target project. The tracking endpoint already exists on airadr and must be called exactly as provided below.
 - Do not create new database tables, analytics pipelines, or logging infrastructure in the target project for this feature.
 - Inspect the target project's current middleware/server setup before changing anything, then make the smallest production-safe change.
 - Preserve the project's existing auth, redirects, rewrites, security headers, logging, and error handling behavior.
@@ -204,12 +204,12 @@ Add AISO AI bot tracking to the customer's site using the existing AISO tracking
 - Do not replace the real domain, app URL, or site key with placeholders.
 - Adapt syntax only when necessary to fit the target project's existing code style or TypeScript setup.
 
-## AISO Integration Details
+## airadr Integration Details
 - Customer domain: ${domain}
 - Selected runtime: ${runtimeLabel}
-- AISO tracking endpoint: ${appUrl}/api/track
+- airadr tracking endpoint: ${appUrl}/api/track
 - Site key: ${siteKey}
-- Purpose: detect known AI crawler user agents on the customer's server and send a fire-and-forget POST to AISO when one is detected.
+- Purpose: detect known AI crawler user agents on the customer's server and send a fire-and-forget POST to airadr when one is detected.
 
 ## File / Placement Guidance
 - Primary target location: ${primaryFile}
@@ -223,9 +223,9 @@ ${snippet}
 ## Implementation Expectations
 - Reuse the target project's existing middleware/server structure rather than inventing a new architecture.
 - If the target project already has middleware logic, merge the AI bot detection into it cleanly.
-- Keep the AISO POST non-blocking so normal page responses are not delayed or broken if the request fails.
+- Keep the airadr POST non-blocking so normal page responses are not delayed or broken if the request fails.
 - Do not rename the JSON payload keys (\`sk\`, \`bn\`, \`bc\`, \`p\`, \`ua\`).
-- Do not send a separate domain field; the site key resolves the domain server-side inside AISO.
+- Do not send a separate domain field; the site key resolves the domain server-side inside airadr.
 
 ## What to Return
 After inspecting the target project, return the complete implementation with:
@@ -242,7 +242,7 @@ After inspecting the target project, return the complete implementation with:
 - Confirm the payload contains \`sk\`, \`bn\`, \`bc\`, \`p\`, and \`ua\`.
 - Confirm normal request handling still works even if the tracking POST fails.
 
-Do not answer with a system redesign, backend architecture proposal, database schema, or AISO-side implementation. Return only the customer-site implementation needed to install this integration safely.`;
+Do not answer with a system redesign, backend architecture proposal, database schema, or airadr-side implementation. Return only the customer-site implementation needed to install this integration safely.`;
 }
 
 export function buildFixPrompt(url: string, fix: PrioritizedFix): string {

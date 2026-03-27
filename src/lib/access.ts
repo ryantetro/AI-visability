@@ -38,6 +38,7 @@ export async function getUserAccess(userId: string, email: string): Promise<Acce
   let tier: PlanTier;
   let planExpiresAt: string | null;
   let planCancelAtPeriodEnd = false;
+  let effectiveOverride = override;
 
   if (teamInfo && teamInfo.role === 'member') {
     // Resolve owner's profile via plain select (not upsert — we don't have their email here)
@@ -50,6 +51,7 @@ export async function getUserAccess(userId: string, email: string): Promise<Acce
 
     const ownerEmail = ownerProfile?.email ?? '';
     const ownerOverride = getAccountAccessOverride(ownerEmail);
+    effectiveOverride = ownerOverride;
     effectivePlan = ownerOverride?.plan ?? ownerProfile?.plan ?? 'free';
     tier = ownerOverride?.tier ?? planStringToTier(effectivePlan);
     planExpiresAt = ownerProfile?.plan_expires_at ?? null;
@@ -73,8 +75,8 @@ export async function getUserAccess(userId: string, email: string): Promise<Acce
       if (!requiredTier) return true; // unknown feature = allow
       return canAccess(tier, requiredTier);
     },
-    maxDomains: override?.maxDomains ?? planConfig.domains,
-    maxPrompts: override?.maxPrompts ?? planConfig.prompts,
+    maxDomains: effectiveOverride?.maxDomains ?? planConfig.domains,
+    maxPrompts: effectiveOverride?.maxPrompts ?? planConfig.prompts,
     maxPlatforms: planConfig.platforms,
     maxCompetitors: planConfig.competitors,
     maxRegions: planConfig.regions,

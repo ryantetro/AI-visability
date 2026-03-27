@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { getPublicScoreSummary } from '@/lib/public-score';
 
-export const alt = 'AISO score card';
+export const alt = 'airadr score card';
 export const size = {
   width: 1200,
   height: 630,
@@ -57,7 +57,7 @@ export default async function OgImage({ params }: OgImageProps) {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div style={{ fontSize: 24, letterSpacing: '0.34em', textTransform: 'uppercase', opacity: 0.8 }}>
-            AISO
+            airadr
           </div>
           <div style={{ fontSize: 64, fontWeight: 800, lineHeight: 1.05 }}>{summary.domain}</div>
           <div style={{ fontSize: 28, opacity: 0.88 }}>

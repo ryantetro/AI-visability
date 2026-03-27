@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getDatabase } from '@/lib/services/registry';
-import { getPublicScoreSummary, PublicScoreSummary } from '@/lib/public-score';
+import { buildPublicScoreSummaryFromScan, type PublicScoreScanLike, type PublicScoreSummary } from '@/lib/public-score';
 import { getDomain } from '@/lib/url-utils';
 
 export interface DomainVerificationRecord {
@@ -41,6 +41,8 @@ export interface LeaderboardEntry {
   summary: PublicScoreSummary;
   profile: PublicProfileRecord;
 }
+
+type LeaderboardTimeFilter = 'all' | '24h' | '30d';
 
 const globalStore = globalThis as unknown as {
   __aisoPublicProfiles?: Map<string, PublicProfileRecord>;
@@ -163,6 +165,53 @@ async function getProfileByDomain(domain: string): Promise<PublicProfileRecord |
   }
 
   return getPublicProfileStore().get(normalizedDomain) ?? null;
+}
+
+async function getProfilesByDomains(domains: string[]): Promise<Map<string, PublicProfileRecord>> {
+  const uniqueDomains = [...new Set(domains.map((domain) => domain.toLowerCase()).filter(Boolean))];
+  if (uniqueDomains.length === 0) return new Map();
+
+  if (hasSupabaseConfig()) {
+    const results = await Promise.all(
+      chunk(uniqueDomains, 50).map((domainGroup) => {
+        const encodedDomainGroup = domainGroup.map((domain) => encodeURIComponent(domain)).join(',');
+        return (
+        querySupabase<
+          Array<{
+            id: string;
+            scan_id: string;
+            domain: string;
+            enabled: boolean;
+            badge_enabled: boolean;
+            leaderboard_enabled: boolean;
+            verified?: boolean | null;
+            created_at: string;
+            updated_at?: string | null;
+          }>
+        >(`public_profiles?domain=in.(${encodedDomainGroup})&select=*`)
+        );
+      })
+    );
+
+    return new Map(
+      results
+        .flat()
+        .map((row) => {
+          const record = profileRowToRecord(row);
+          return [record.domain, record] as const;
+        })
+    );
+  }
+
+  const store = getPublicProfileStore();
+  return new Map(
+    uniqueDomains
+      .map((domain) => {
+        const record = store.get(domain);
+        return record ? ([domain, record] as const) : null;
+      })
+      .filter((entry): entry is readonly [string, PublicProfileRecord] => Boolean(entry))
+  );
 }
 
 async function getVerificationByDomain(domain: string): Promise<DomainVerificationRecord | null> {
@@ -403,6 +452,82 @@ export async function listLeaderboardEntries(limit = 25): Promise<LeaderboardEnt
   return listLeaderboardEntriesFiltered(limit, 'all');
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const groups: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    groups.push(items.slice(index, index + size));
+  }
+  return groups;
+}
+
+function getLeaderboardCutoffMs(timeFilter: LeaderboardTimeFilter): number {
+  return (
+    timeFilter === '24h' ? 24 * 60 * 60 * 1000
+    : timeFilter === '30d' ? 30 * 24 * 60 * 60 * 1000
+    : 0
+  );
+}
+
+async function listLeaderboardCandidateScans(
+  limit: number,
+  timeFilter: LeaderboardTimeFilter
+): Promise<PublicScoreScanLike[]> {
+  const maxRows = Math.min(limit * 4, 200);
+  const cutoffMs = getLeaderboardCutoffMs(timeFilter);
+
+  if (hasSupabaseConfig()) {
+    const params = [
+      'status=eq.complete',
+      `limit=${Math.max(1, maxRows)}`,
+      'order=completed_at.desc.nullslast,created_at.desc',
+      'select=id,url,status,completed_at,score_result,mention_summary',
+    ];
+
+    if (cutoffMs > 0) {
+      params.splice(1, 0, `completed_at=gte.${encodeURIComponent(new Date(Date.now() - cutoffMs).toISOString())}`);
+    }
+
+    const rows = await querySupabase<
+      Array<{
+        id: string;
+        url: string;
+        status: 'complete';
+        completed_at: string | null;
+        score_result: PublicScoreScanLike['scoreResult'];
+        mention_summary: PublicScoreScanLike['mentionSummary'];
+      }>
+    >(`scans?${params.join('&')}`);
+
+    return rows.map((row) => ({
+      id: row.id,
+      url: row.url,
+      status: row.status,
+      completedAt: row.completed_at ? Date.parse(row.completed_at) : undefined,
+      scoreResult: row.score_result ?? undefined,
+      mentionSummary: row.mention_summary ?? undefined,
+    }));
+  }
+
+  const db = getDatabase();
+  const scans = await db.listCompletedScans(maxRows);
+  const now = Date.now();
+
+  return scans
+    .filter((scan) => {
+      if (cutoffMs === 0) return true;
+      if (!scan.completedAt) return false;
+      return now - scan.completedAt <= cutoffMs;
+    })
+    .map((scan) => ({
+      id: scan.id,
+      url: scan.url,
+      status: scan.status,
+      completedAt: scan.completedAt,
+      scoreResult: scan.scoreResult,
+      mentionSummary: scan.mentionSummary,
+    }));
+}
+
 /**
  * List leaderboard entries from all completed scans.
  * Any completed scan is eligible — no profile/verification required.
@@ -410,27 +535,13 @@ export async function listLeaderboardEntries(limit = 25): Promise<LeaderboardEnt
  */
 export async function listLeaderboardEntriesFiltered(
   limit = 100,
-  timeFilter: 'all' | '24h' | '30d' = 'all'
+  timeFilter: LeaderboardTimeFilter = 'all'
 ): Promise<LeaderboardEntry[]> {
-  const db = getDatabase();
-  // Fetch more than needed so we can deduplicate by domain
-  const scans = await db.listCompletedScans(Math.min(limit * 4, 200));
-
-  const now = Date.now();
-  const cutoffMs =
-    timeFilter === '24h' ? 24 * 60 * 60 * 1000
-    : timeFilter === '30d' ? 30 * 24 * 60 * 60 * 1000
-    : 0;
-
-  // Best score per domain
+  const scans = await listLeaderboardCandidateScans(limit, timeFilter);
   const bestByDomain = new Map<string, PublicScoreSummary>();
 
   for (const scan of scans) {
-    if (cutoffMs > 0 && scan.completedAt && now - scan.completedAt > cutoffMs) {
-      continue;
-    }
-
-    const summary = await getPublicScoreSummary(scan.id);
+    const summary = buildPublicScoreSummaryFromScan(scan);
     if (!summary) continue;
 
     const existing = bestByDomain.get(summary.domain);
@@ -443,15 +554,12 @@ export async function listLeaderboardEntriesFiltered(
     .sort((a, b) => b.percentage - a.percentage || b.completedAt - a.completedAt)
     .slice(0, limit);
 
-  // Check if domain has a verified profile (for certified page link)
-  const entries: LeaderboardEntry[] = [];
-  for (let i = 0; i < sorted.length; i++) {
-    const summary = sorted[i];
-    const profile = await getProfileByDomain(summary.domain);
-    entries.push({
-      rank: i + 1,
+  const profiles = await getProfilesByDomains(sorted.map((summary) => summary.domain));
+
+  return sorted.map((summary, index) => ({
+      rank: index + 1,
       summary,
-      profile: profile ?? {
+      profile: profiles.get(summary.domain) ?? {
         id: '',
         scanId: summary.id,
         domain: summary.domain,
@@ -462,10 +570,7 @@ export async function listLeaderboardEntriesFiltered(
         createdAt: summary.completedAt,
         updatedAt: summary.completedAt,
       },
-    });
-  }
-
-  return entries;
+  }));
 }
 
 export async function getCertifiedSummary(domain: string) {
@@ -495,4 +600,3 @@ export async function getCertifiedSummary(domain: string) {
     url: scan.url,
   };
 }
-

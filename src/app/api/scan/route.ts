@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { after } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
+import { getCurrentBillingReadiness } from '@/lib/billing';
 import { getClientIp, startScan } from '@/lib/scan-workflow';
 
 export async function POST(request: NextRequest) {
@@ -11,6 +12,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const readiness = await getCurrentBillingReadiness(user.id, user.email);
+    const hasDomainOverage = readiness.snapshot.issues.some((issue) => issue.category === 'domains');
+    if (hasDomainOverage) {
+      return NextResponse.json(
+        { error: 'This workspace is over its active domain limit. Remove domains until it fits your plan before starting new scans.' },
+        { status: 403 },
+      );
+    }
+
     const result = await startScan(
       {
         url: body.url,

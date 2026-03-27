@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
@@ -18,6 +18,40 @@ import type { ProviderTrafficSummary } from '../lib/types';
 interface ProviderTimelineRow {
   date: string;
   [provider: string]: string | number;
+}
+
+interface CrawlerPanelCacheEntry {
+  providerTimeline: ProviderTimelineRow[];
+  providerSummaries: ProviderTrafficSummary[];
+  totalVisits: number;
+  trackingReady: boolean;
+  trackingLastUsedAt: string | null;
+}
+
+function getCrawlerPanelCacheKey(domain: string, days: number) {
+  return `airadr:crawler-panel:${domain}:${days}`;
+}
+
+function readCrawlerPanelCache(domain: string, days: number): CrawlerPanelCacheEntry | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(getCrawlerPanelCacheKey(domain, days));
+    if (!raw) return null;
+    return JSON.parse(raw) as CrawlerPanelCacheEntry;
+  } catch {
+    return null;
+  }
+}
+
+function writeCrawlerPanelCache(domain: string, days: number, value: CrawlerPanelCacheEntry) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.sessionStorage.setItem(getCrawlerPanelCacheKey(domain, days), JSON.stringify(value));
+  } catch {
+    // Ignore storage failures; the panel still works without cache.
+  }
 }
 
 export function AICrawlerPanel({
@@ -48,36 +82,118 @@ export function AICrawlerPanel({
   const trackingReady = trackingReadyProp ?? internalTrackingReady;
   const trackingLastUsedAt =
     trackingLastUsedAtProp !== undefined ? trackingLastUsedAtProp : internalLastUsedAt;
+  const trackingReadyPropRef = useRef(trackingReadyProp);
+  const trackingLastUsedAtPropRef = useRef(trackingLastUsedAtProp);
 
   useEffect(() => {
-    (async () => {
+    trackingReadyPropRef.current = trackingReadyProp;
+    trackingLastUsedAtPropRef.current = trackingLastUsedAtProp;
+  }, [trackingLastUsedAtProp, trackingReadyProp]);
+
+  useEffect(() => {
+    const cached = readCrawlerPanelCache(domain, days);
+    const shouldFetchTrackingState = trackingReadyPropRef.current === undefined;
+
+    if (cached) {
+      setProviderTimeline(cached.providerTimeline);
+      setProviderSummaries(cached.providerSummaries);
+      setTotalVisits(cached.totalVisits);
+      if (shouldFetchTrackingState) {
+        setInternalTrackingReady(cached.trackingReady);
+        setInternalLastUsedAt(cached.trackingLastUsedAt);
+      }
+      setLoading(false);
+    } else {
+      setProviderTimeline([]);
+      setProviderSummaries([]);
+      setTotalVisits(0);
+      if (shouldFetchTrackingState) {
+        setInternalTrackingReady(false);
+        setInternalLastUsedAt(null);
+      }
       setLoading(true);
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    (async () => {
       try {
         const fetches: Promise<Response>[] = [
-          fetch(`/api/crawler-visits?domain=${encodeURIComponent(domain)}&days=${days}`),
+          fetch(`/api/crawler-visits?domain=${encodeURIComponent(domain)}&days=${days}`, { signal: controller.signal }),
         ];
         // Only fetch tracking key if not provided via prop
-        if (trackingReadyProp === undefined) {
-          fetches.push(fetch(`/api/user/tracking-key?domain=${encodeURIComponent(domain)}`));
+        if (shouldFetchTrackingState) {
+          fetches.push(fetch(`/api/user/tracking-key?domain=${encodeURIComponent(domain)}`, { signal: controller.signal }));
         }
 
         const results = await Promise.all(fetches);
         const crawlerRes = results[0];
+        let nextProviderTimeline: ProviderTimelineRow[] = cached?.providerTimeline ?? [];
+        let nextProviderSummaries: ProviderTrafficSummary[] = cached?.providerSummaries ?? [];
+        let nextTotalVisits = cached?.totalVisits ?? 0;
+
         if (crawlerRes.ok) {
           const data = await crawlerRes.json();
-          setProviderTimeline(data.providerTimeline ?? []);
-          setProviderSummaries(data.providerSummaries ?? []);
-          setTotalVisits(data.totalVisits ?? 0);
+          nextProviderTimeline = data.providerTimeline ?? [];
+          nextProviderSummaries = data.providerSummaries ?? [];
+          nextTotalVisits = data.totalVisits ?? 0;
+          if (!cancelled) {
+            setProviderTimeline(nextProviderTimeline);
+            setProviderSummaries(nextProviderSummaries);
+            setTotalVisits(nextTotalVisits);
+          }
         }
 
-        if (trackingReadyProp === undefined && results[1]?.ok) {
+        let nextTrackingReady = shouldFetchTrackingState
+          ? cached?.trackingReady ?? false
+          : Boolean(trackingReadyPropRef.current);
+        let nextTrackingLastUsedAt = shouldFetchTrackingState
+          ? cached?.trackingLastUsedAt ?? null
+          : trackingLastUsedAtPropRef.current ?? null;
+        if (shouldFetchTrackingState && results[1]?.ok) {
           const data = await results[1].json();
-          setInternalTrackingReady(Boolean(data.siteKey));
-          setInternalLastUsedAt(typeof data.lastUsedAt === 'string' ? data.lastUsedAt : null);
+          nextTrackingReady = Boolean(data.siteKey);
+          nextTrackingLastUsedAt = typeof data.lastUsedAt === 'string' ? data.lastUsedAt : null;
+          if (!cancelled) {
+            setInternalTrackingReady(nextTrackingReady);
+            setInternalLastUsedAt(nextTrackingLastUsedAt);
+          }
         }
-      } catch { /* silently fail */ } finally { setLoading(false); }
+
+        writeCrawlerPanelCache(domain, days, {
+          providerTimeline: nextProviderTimeline,
+          providerSummaries: nextProviderSummaries,
+          totalVisits: nextTotalVisits,
+          trackingReady: nextTrackingReady,
+          trackingLastUsedAt: nextTrackingLastUsedAt,
+        });
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     })();
-  }, [domain, days, trackingReadyProp]);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [domain, days]);
+
+  useEffect(() => {
+    if (trackingReadyProp === undefined && trackingLastUsedAtProp === undefined) return;
+
+    writeCrawlerPanelCache(domain, days, {
+      providerTimeline,
+      providerSummaries,
+      totalVisits,
+      trackingReady: Boolean(trackingReadyProp),
+      trackingLastUsedAt: trackingLastUsedAtProp ?? null,
+    });
+  }, [days, domain, providerSummaries, providerTimeline, totalVisits, trackingLastUsedAtProp, trackingReadyProp]);
 
   if (loading) {
     return (
@@ -293,6 +409,7 @@ export function AICrawlerPanel({
                 <Tooltip
                   content={<CrawlerChartTooltip />}
                   cursor={{ stroke: 'rgba(255,255,255,0.06)' }}
+                  wrapperStyle={{ pointerEvents: 'none' }}
                 />
                 {chartProviders.map(provider => (
                   <Line
@@ -425,7 +542,7 @@ function CrawlerChartTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 shadow-lg">
+    <div className="pointer-events-none select-none rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 shadow-lg">
       <p className="text-[11px] font-medium text-zinc-400 mb-1.5">{label}</p>
       {payload
         .filter(p => p.value > 0)

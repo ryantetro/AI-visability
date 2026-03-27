@@ -221,7 +221,7 @@ export default function LandingB() {
           <div className="mt-10 space-y-6">
             {[
               { q: 'Is the audit really free?', a: 'Yes — full audit with score and dimension breakdown. You only pay for auto-generated fix files.' },
-              { q: 'How is this different from SEO tools?', a: 'Traditional SEO tools check Google signals. AISO checks AI-specific signals: llms.txt, AI bot access, entity clarity, and structured data that AI models use to recommend businesses.' },
+              { q: 'How is this different from SEO tools?', a: 'Traditional SEO tools check Google signals. airadr checks AI-specific signals: llms.txt, AI bot access, entity clarity, and structured data that AI models use to recommend businesses.' },
               { q: 'What if my site blocks crawlers?', a: 'We fall back to HTTP crawling and score what we can. Checks that require full access return UNKNOWN (no penalty) with guidance on how to fix access.' },
               { q: 'Do you store my site content?', a: 'Crawl data is cached for 24 hours for re-scoring, then deleted. We never publish or share your site content.' },
             ].map((item) => (

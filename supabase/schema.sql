@@ -37,8 +37,11 @@ create table if not exists user_profiles (
   free_scan_limit integer not null default 3,
   stripe_customer_id text unique,
   stripe_subscription_id text,
+  stripe_subscription_schedule_id text,
   plan_expires_at timestamptz,
   plan_cancel_at_period_end boolean not null default false,
+  pending_plan    text,
+  pending_plan_effective_at timestamptz,
   plan_updated_at timestamptz,
   created_at      timestamptz default now(),
   updated_at      timestamptz default now()
@@ -278,6 +281,7 @@ create table if not exists team_members (
   user_id   text not null references user_profiles(id) on delete cascade,
   role      text not null default 'member'
               check (role in ('owner', 'member')),
+  plan_access_rank integer,
   joined_at timestamptz not null default now(),
   unique(team_id, user_id)
 );

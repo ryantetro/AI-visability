@@ -3,7 +3,14 @@ import { getPlanPriceCents } from '@/lib/pricing';
 import { randomUUID } from 'node:crypto';
 
 // Track mock checkout sessions
-const sessions = new Map<string, { scanId: string; paid: boolean; plan: string }>();
+const sessions = new Map<string, {
+  scanId: string;
+  paid: boolean;
+  plan: string;
+  userId?: string;
+  customerId?: string;
+  subscriptionId?: string;
+}>();
 
 export const mockPayment: PaymentService = {
   async createCheckout(scanId: string, plan: PaymentPlan = 'starter_monthly'): Promise<CheckoutSession> {
@@ -25,7 +32,17 @@ export const mockPayment: PaymentService = {
     }
     // In mock mode, mark as paid on verify
     session.paid = true;
-    return { paid: true, scanId: session.scanId, plan: session.plan };
+    return {
+      paid: true,
+      scanId: session.scanId,
+      plan: session.plan,
+      userId: session.userId,
+      customerId: session.customerId,
+      subscriptionId: session.subscriptionId,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      scheduleId: null,
+    };
   },
 };
 
@@ -37,7 +54,14 @@ export async function createMockSubscriptionCheckout(
 ): Promise<CheckoutSession> {
   const sessionId = randomUUID();
   const scanId = `upgrade_${userId}`;
-  sessions.set(sessionId, { scanId, paid: false, plan });
+  sessions.set(sessionId, {
+    scanId,
+    paid: false,
+    plan,
+    userId,
+    customerId: `cus_mock_${userId}`,
+    subscriptionId: `sub_mock_${sessionId}`,
+  });
   return {
     id: sessionId,
     scanId,

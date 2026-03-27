@@ -4,7 +4,7 @@ import { FloatingFeedback } from '@/components/ui/floating-feedback';
 import { LeaderboardContent } from './leaderboard-content';
 
 export const metadata = {
-  title: 'Leaderboard | AISO',
+  title: 'Leaderboard | airadr',
   description: 'Track the top public reports. See how your site stacks up and explore what makes the leaders stand out.',
 };
 

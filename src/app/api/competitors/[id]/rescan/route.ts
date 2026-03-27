@@ -1,7 +1,8 @@
 import { after } from 'next/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
-import { getCompetitor, updateCompetitorScan } from '@/lib/competitor-service';
+import { getUserAccess } from '@/lib/access';
+import { countCompetitors, getCompetitor, updateCompetitorScan } from '@/lib/competitor-service';
 import { startScan, getClientIp } from '@/lib/scan-workflow';
 
 export async function POST(
@@ -25,6 +26,17 @@ export async function POST(
   }
 
   try {
+    const access = await getUserAccess(user.id, user.email);
+    const competitorCount = await countCompetitors(user.id, competitor.domain);
+    if (access.maxCompetitors >= 0 && competitorCount > access.maxCompetitors) {
+      return NextResponse.json(
+        {
+          error: `This domain is over the ${access.tier} plan competitor limit. Remove competitors until it fits your plan before rescanning.`,
+        },
+        { status: 403 },
+      );
+    }
+
     const ip = getClientIp(request.headers);
     const scanResult = await startScan({
       url: competitor.competitorUrl,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
+import { resolveBillingContext } from '@/lib/billing';
 import { canUseStripe, createPortalSession } from '@/lib/services/stripe-payment';
 
 export async function POST(request: NextRequest) {
@@ -21,7 +22,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const portalUrl = await createPortalSession(user.id, user.email, returnPath);
+    const context = await resolveBillingContext(user.id, user.email);
+    if (!context.canManageBilling) {
+      return NextResponse.json(
+        { error: `Only the ${context.billingOwner.teamName ?? 'billing'} owner can manage billing.` },
+        { status: 403 },
+      );
+    }
+
+    const portalUrl = await createPortalSession(
+      context.billingOwner.userId,
+      context.billingOwner.email ?? user.email,
+      { returnPath },
+    );
     return NextResponse.json({ url: portalUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create portal session';

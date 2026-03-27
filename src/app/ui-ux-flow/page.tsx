@@ -20,9 +20,9 @@ import {
 } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'UI / UX Flow Atlas | AISO',
+  title: 'UI / UX Flow Atlas | airadr',
   description:
-    'Visual product documentation for the current AISO application flow, routes, states, and conversion path.',
+    'Visual product documentation for the current airadr application flow, routes, states, and conversion path.',
 };
 
 const entryVariants = [
@@ -302,7 +302,7 @@ export default function UiUxFlowPage() {
                 UI / UX Flow Atlas
               </p>
               <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-                A visual map of how the entire AISO product currently works.
+                A visual map of how the entire airadr product currently works.
               </h1>
               <p className="mt-5 max-w-3xl text-base leading-7 text-[var(--text-secondary)] sm:text-lg">
                 This is a product-facing snapshot of the live application as mapped from the current codebase on

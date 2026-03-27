@@ -217,7 +217,7 @@ export default function LandingC() {
               { q: 'How long does it take?', a: 'About 30 seconds. We crawl up to 10 pages with real browser rendering.' },
               { q: 'What is llms.txt?', a: 'A proposed standard file (like robots.txt) that describes your site for AI models. We generate it from your actual content.' },
               { q: 'Is my data safe?', a: 'Crawl data is cached 24 hours then deleted. We never share your content.' },
-              { q: 'How is this different from SEO?', a: 'Traditional SEO optimizes for Google. AISO optimizes for ChatGPT, Perplexity, Gemini, and Claude — which use different signals.' },
+              { q: 'How is this different from SEO?', a: 'Traditional SEO optimizes for Google. airadr optimizes for ChatGPT, Perplexity, Gemini, and Claude — which use different signals.' },
             ].map((item) => (
               <div key={item.q}>
                 <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>{item.q}</h3>

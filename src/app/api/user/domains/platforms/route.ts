@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
-import { validatePlatformSelection, getSelectedPlatforms, saveSelectedPlatforms } from '@/lib/platform-gating';
+import { PLANS } from '@/lib/pricing';
+import {
+  validatePlatformSelection,
+  getDefaultPlatforms,
+  getSelectedPlatforms,
+  saveSelectedPlatforms,
+} from '@/lib/platform-gating';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -48,10 +54,20 @@ export async function PATCH(request: NextRequest) {
   }
 
   const access = await getUserAccess(user.id, user.email);
+  const currentSelection = await getSelectedPlatforms(user.id, normalizedDomain)
+    ?? getDefaultPlatforms(access.tier);
+  const requestedValidCount = [...new Set(platforms.filter((platform) => typeof platform === 'string'))].length;
   const validated = validatePlatformSelection(platforms, access.tier);
 
   if (validated.length === 0) {
     return NextResponse.json({ error: 'At least one valid platform must be selected' }, { status: 400 });
+  }
+
+  if (requestedValidCount > access.maxPlatforms && currentSelection.length <= access.maxPlatforms) {
+    return NextResponse.json(
+      { error: `Your ${PLANS[access.tier].name} plan allows up to ${access.maxPlatforms} platform${access.maxPlatforms === 1 ? '' : 's'}. Upgrade for more.` },
+      { status: 403 },
+    );
   }
 
   await saveSelectedPlatforms(user.id, normalizedDomain, validated);

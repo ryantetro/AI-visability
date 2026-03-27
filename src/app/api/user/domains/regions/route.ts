@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
-import { validateRegionSelection, getSelectedRegions, saveSelectedRegions } from '@/lib/region-gating';
+import { PLANS } from '@/lib/pricing';
+import {
+  getDefaultRegions,
+  getSelectedRegions,
+  saveSelectedRegions,
+  validateRegionSelection,
+} from '@/lib/region-gating';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -48,10 +54,20 @@ export async function PATCH(request: NextRequest) {
   }
 
   const access = await getUserAccess(user.id, user.email);
+  const currentSelection = await getSelectedRegions(user.id, normalizedDomain)
+    ?? getDefaultRegions(access.tier);
+  const requestedValidCount = [...new Set(regions.filter((region) => typeof region === 'string'))].length;
   const validated = validateRegionSelection(regions, access.tier);
 
   if (validated.length === 0) {
     return NextResponse.json({ error: 'At least one valid region must be selected' }, { status: 400 });
+  }
+
+  if (requestedValidCount > access.maxRegions && currentSelection.length <= access.maxRegions) {
+    return NextResponse.json(
+      { error: `Your ${PLANS[access.tier].name} plan allows up to ${access.maxRegions} region${access.maxRegions === 1 ? '' : 's'}. Upgrade for more.` },
+      { status: 403 },
+    );
   }
 
   await saveSelectedRegions(user.id, normalizedDomain, validated);

@@ -17,7 +17,7 @@ export function ShareButtons({ scanId, score, bandLabel, domain, compact = false
   const [copiedPost, setCopiedPost] = useState(false);
 
   const shareUrl = typeof window === 'undefined' ? '' : `${window.location.origin}/score/${scanId}`;
-  const shareText = `${domain} scored ${score} on AISO (${bandLabel}). See the public score: ${shareUrl}`;
+  const shareText = `${domain} scored ${score} on airadr (${bandLabel}). See the public score: ${shareUrl}`;
 
   const handleCopy = async () => {
     if (!shareUrl) return;

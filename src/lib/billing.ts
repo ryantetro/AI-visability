@@ -21,6 +21,7 @@ import {
 } from '@/lib/team-management';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getOrCreateProfile, type UserProfile } from '@/lib/user-profile';
+import { canUseStripe, syncStripeSubscriptionForUser } from '@/lib/services/stripe-payment';
 
 export type LimitCategory =
   | 'domains'
@@ -313,9 +314,9 @@ export function resolvePlanChangeDecision(
     decision = 'guided_pending_change';
   } else if (context.billingProfile.stripe_subscription_schedule_id) {
     decision = 'guided_schedule_attached';
-  } else if (targetTier < currentTier) {
+  } else if (TIER_LEVEL[targetTier] < TIER_LEVEL[currentTier]) {
     decision = 'guided_downgrade';
-  } else if (targetTier > currentTier) {
+  } else if (TIER_LEVEL[targetTier] > TIER_LEVEL[currentTier]) {
     decision = 'stripe_upgrade';
   } else {
     decision = 'stripe_cycle_switch';
@@ -385,7 +386,24 @@ async function getBillingProfileById(userId: string, fallbackEmail?: string): Pr
     .maybeSingle();
 
   if (data) {
-    return data as BillingProfileRecord;
+    const profile = data as BillingProfileRecord;
+
+    if (profile.stripe_customer_id && !profile.stripe_subscription_id && canUseStripe()) {
+      const synced = await syncStripeSubscriptionForUser(userId, profile.stripe_customer_id);
+      if (synced) {
+        return {
+          ...profile,
+          plan: synced.plan ?? profile.plan,
+          stripe_subscription_id: synced.subscriptionId,
+          stripe_subscription_schedule_id: synced.scheduleId,
+          plan_expires_at: synced.currentPeriodEnd,
+          plan_cancel_at_period_end: synced.cancelAtPeriodEnd,
+          updated_at: new Date().toISOString(),
+        };
+      }
+    }
+
+    return profile;
   }
 
   if (!fallbackEmail) {

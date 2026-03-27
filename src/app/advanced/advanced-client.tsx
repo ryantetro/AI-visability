@@ -16,6 +16,7 @@ import {
   Search,
   Sparkles,
   Users,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { MiniInfoTile } from '@/components/app/dashboard-primitives';
@@ -87,6 +88,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
     pendingDomain,
     debugPaidPreview,
     checkoutBanner,
+    dismissCheckoutBanner,
     inputFaviconUrl,
   } = useDomainContext();
 
@@ -127,7 +129,20 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
 
         {checkoutBanner && (
           <div className="mb-4 rounded-2xl border border-[#25c972]/30 bg-[#25c972]/10 px-4 py-3 text-sm text-[#25c972]">
-            <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 shrink-0" />{checkoutBanner}</div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="min-w-0">{checkoutBanner}</p>
+              </div>
+              <button
+                type="button"
+                onClick={dismissCheckoutBanner}
+                aria-label="Dismiss message"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#25c972]/80 transition-colors hover:bg-[#25c972]/12 hover:text-[#9af1be]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         )}
 

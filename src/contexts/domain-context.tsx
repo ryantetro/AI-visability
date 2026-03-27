@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ensureProtocol, getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
+import { invalidateBillingStatus } from '@/hooks/use-billing-status';
 import { invalidatePlanCache, usePlan } from '@/hooks/use-plan';
 import { getCurrentAppPath } from '@/lib/app-paths';
 import {
@@ -71,11 +72,13 @@ interface DomainContextValue {
   paidOverride: boolean;
   debugPaidPreview: boolean;
   checkoutBanner: string | null;
+  dismissCheckoutBanner: () => void;
   inputFaviconUrl: string | null;
 }
 
 const DomainContext = createContext<DomainContextValue | null>(null);
 const PENDING_DOMAIN_STORAGE_KEY = 'aiso_pending_domain_upgrade';
+const CHECKOUT_BANNER_DURATION_MS = 12000;
 
 export function useDomainContext() {
   const ctx = useContext(DomainContext);
@@ -131,6 +134,9 @@ export function DomainContextProvider({
     const qs = params.toString();
     const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, '', nextUrl);
+  }, []);
+  const dismissCheckoutBanner = useCallback(() => {
+    setCheckoutBanner(null);
   }, []);
 
   // Caches for instant domain switching
@@ -280,6 +286,7 @@ export function DomainContextProvider({
         if (active && data.paid) {
           setPaidOverride(true);
           invalidatePlanCache();
+          invalidateBillingStatus();
           const pendingDomainFromStorage = typeof window !== 'undefined'
             ? window.sessionStorage.getItem(PENDING_DOMAIN_STORAGE_KEY)
             : null;
@@ -319,6 +326,16 @@ export function DomainContextProvider({
       setCheckoutBanner('Fix My Site order confirmed! Our team will begin optimizing your site within 1-2 business days.');
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!checkoutBanner) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setCheckoutBanner(null);
+    }, CHECKOUT_BANNER_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [checkoutBanner]);
 
   // --- Computed values ---
   const paidDomains = useMemo(() => {
@@ -618,6 +635,7 @@ export function DomainContextProvider({
 
             setPaidOverride(true);
             invalidatePlanCache();
+            invalidateBillingStatus();
             const nextManual = addPendingDomainToManualDomains(manualDomains, pendingDomain);
             setManualDomains(nextManual);
             saveStoredDomains(nextManual);
@@ -740,13 +758,14 @@ export function DomainContextProvider({
     paidOverride,
     debugPaidPreview,
     checkoutBanner,
+    dismissCheckoutBanner,
     inputFaviconUrl,
   }), [
     monitoredSites, trackedSites, scannedSites, selectedDomain, selectDomain, addDomainInput, handleAddDomain, addTrackedDomain, handleRemoveDomain,
     addError, confirmChecked, hasPaidAccess, report, files, workspaceLoading, loadError, recentScans,
     recentLoading, expandedSite, actionError, reauditLoading, handleReaudit, handleRunFirstScan,
     monitoringConnected, monitoringLoading, handleEnableMonitoring, handleDisableMonitoring, unlockModalOpen, handleUnlockComplete,
-    unlockLoading, pendingDomain, paidOverride, debugPaidPreview, checkoutBanner, inputFaviconUrl,
+    unlockLoading, pendingDomain, paidOverride, debugPaidPreview, checkoutBanner, dismissCheckoutBanner, inputFaviconUrl,
   ]);
 
   return (

@@ -8,8 +8,13 @@ export interface UserProfile {
   plan: string;
   scans_used: number;
   free_scan_limit: number;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  stripe_subscription_schedule_id?: string | null;
   plan_expires_at: string | null;
   plan_cancel_at_period_end: boolean;
+  pending_plan?: string | null;
+  pending_plan_effective_at?: string | null;
   plan_updated_at: string | null;
   created_at: string;
   updated_at: string;

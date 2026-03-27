@@ -7,7 +7,7 @@ export function generateRobotsTxt(data: CrawlData): string {
     : null;
 
   const aiDirectives = `
-# AI Search Bot Directives (added by AISO)
+# AI Search Bot Directives (added by airadr)
 User-agent: GPTBot
 Allow: /
 

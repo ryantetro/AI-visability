@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   ArrowUpRight,
   CheckCircle2,
@@ -17,6 +18,7 @@ import {
   Search,
   Sparkles,
   Users,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -27,6 +29,7 @@ import { LockedFeatureOverlay } from '@/components/ui/locked-feature-overlay';
 import { cn } from '@/lib/utils';
 import { useDomainContext } from '@/contexts/domain-context';
 import { useAuth } from '@/hooks/use-auth';
+import { useBillingStatus } from '@/hooks/use-billing-status';
 import { usePlan } from '@/hooks/use-plan';
 import { canAccess, NAV_GATES, type PlanTier } from '@/lib/pricing';
 import { formatPlatformLabel } from '@/lib/platform-detection';
@@ -56,6 +59,7 @@ export function WorkspaceShell({
   const searchParams = useSearchParams();
   const { user: authUser, loading: authLoading } = useAuth();
   const { tier, loading: planLoading } = usePlan();
+  const billingStatus = useBillingStatus();
 
   // Client-side auth guard — redirect to login if no authenticated user
   useEffect(() => {
@@ -91,6 +95,7 @@ export function WorkspaceShell({
     unlockLoading,
     debugPaidPreview,
     checkoutBanner,
+    dismissCheckoutBanner,
   } = useDomainContext();
 
   const minTier = requiredTier ?? (NAV_GATES[sectionKey] as PlanTier) ?? 'free';
@@ -203,7 +208,90 @@ export function WorkspaceShell({
       <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
         {checkoutBanner && (
           <div className="mb-4 rounded-2xl border border-[#25c972]/30 bg-[#25c972]/10 px-4 py-3 text-sm text-[#25c972]">
-            <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 shrink-0" />{checkoutBanner}</div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="min-w-0">{checkoutBanner}</p>
+              </div>
+              <button
+                type="button"
+                onClick={dismissCheckoutBanner}
+                aria-label="Dismiss message"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#25c972]/80 transition-colors hover:bg-[#25c972]/12 hover:text-[#9af1be]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {billingStatus.status?.pendingChange && (
+          <div className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-300/8 px-4 py-3 text-sm text-amber-100">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-200" />
+                  <span>
+                    {billingStatus.status.pendingChange.targetLabel} is scheduled for{' '}
+                    {billingStatus.status.pendingChange.effectiveAt
+                      ? new Date(billingStatus.status.pendingChange.effectiveAt).toLocaleDateString()
+                      : 'the next renewal'}.
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-amber-50/80">
+                  {billingStatus.status.readiness.viewerIssues.length > 0
+                    ? `${billingStatus.status.readiness.viewerIssues.length} cleanup item${billingStatus.status.readiness.viewerIssues.length === 1 ? '' : 's'} still need attention.`
+                    : 'No blockers are currently assigned to you.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {(billingStatus.status.readiness.viewerIssues.length > 0
+                  ? billingStatus.status.readiness.viewerIssues
+                  : billingStatus.status.readiness.issues
+                ).slice(0, 2).map((issue) => (
+                  <Link
+                    key={`${issue.category}:${issue.memberUserId ?? 'shared'}:${issue.domain ?? 'global'}`}
+                    href={issue.cleanupHref}
+                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-black/35"
+                  >
+                    {issue.cleanupLabel}
+                  </Link>
+                ))}
+                <Link
+                  href="/settings#general"
+                  className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-black/35"
+                >
+                  Billing details
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {billingStatus.status?.overageMode === 'cleanup_required' && (
+          <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-300" />
+                  <span>Some actions are temporarily in cleanup-only mode.</span>
+                </div>
+                <p className="mt-1 text-xs text-red-100/75">
+                  Additive actions are blocked until the active plan limits are back in range.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {billingStatus.status.overageIssues.slice(0, 2).map((issue) => (
+                  <Link
+                    key={`${issue.category}:${issue.memberUserId ?? 'shared'}:${issue.domain ?? 'global'}`}
+                    href={issue.cleanupHref}
+                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-black/35"
+                  >
+                    {issue.cleanupLabel}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -256,7 +344,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
       {/* Welcome header */}
-      <h1 className="text-3xl font-bold tracking-tight text-white">Welcome to AISO</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-white">Welcome to airadr</h1>
       <p className="mt-2 text-[14px] text-zinc-400">Get your AI visibility score in three simple steps</p>
 
       {/* 3-step visual flow */}

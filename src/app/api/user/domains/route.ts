@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getSupabaseClient } from '@/lib/supabase';
-import { getOrCreateProfile, getUserUsage } from '@/lib/user-profile';
+import { getUserAccess } from '@/lib/access';
 import { getEffectiveUserIds } from '@/lib/team-management';
 
 export async function GET(request: NextRequest) {
@@ -48,9 +48,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Enforce plan-based domain limit (counted across all team members)
-  const profile = await getOrCreateProfile(user.id, user.email);
-  const usage = getUserUsage(profile);
-  const maxDomains = usage.domains;
+  const access = await getUserAccess(user.id, user.email);
+  const maxDomains = access.maxDomains;
 
   const supabase = getSupabaseClient();
   const userIds = await getEffectiveUserIds(user.id);
@@ -62,7 +61,7 @@ export async function POST(request: NextRequest) {
 
   if ((count ?? 0) >= maxDomains) {
     return NextResponse.json(
-      { error: `Your ${usage.tier} plan allows ${maxDomains} domain${maxDomains === 1 ? '' : 's'}. Upgrade for more.` },
+      { error: `Your ${access.tier} plan allows ${maxDomains} domain${maxDomains === 1 ? '' : 's'}. Upgrade for more.` },
       { status: 403 }
     );
   }

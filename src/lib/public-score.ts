@@ -1,6 +1,7 @@
 import { getDatabase } from '@/lib/services/registry';
 import { ScoreResult } from '@/types/score';
 import { MentionSummary, AIEngine } from '@/types/ai-mentions';
+import type { ScanJob } from '@/types/scan';
 import { getDomain } from '@/lib/url-utils';
 import { normalizeMentionSummary } from '@/lib/ai-mentions/summary';
 
@@ -50,10 +51,12 @@ export interface PublicScoreSummary {
   pillars: PublicPillarScore[];
 }
 
-export async function getPublicScoreSummary(scanId: string): Promise<PublicScoreSummary | null> {
-  const db = getDatabase();
-  const scan = await db.getScan(scanId);
+export type PublicScoreScanLike = Pick<
+  ScanJob,
+  'id' | 'url' | 'status' | 'completedAt' | 'scoreResult' | 'mentionSummary'
+>;
 
+export function buildPublicScoreSummaryFromScan(scan: PublicScoreScanLike | null | undefined): PublicScoreSummary | null {
   if (!scan || scan.status !== 'complete' || !scan.scoreResult || !scan.completedAt) {
     return null;
   }
@@ -114,4 +117,10 @@ export async function getPublicScoreSummary(scanId: string): Promise<PublicScore
     topFixes,
     pillars,
   };
+}
+
+export async function getPublicScoreSummary(scanId: string): Promise<PublicScoreSummary | null> {
+  const db = getDatabase();
+  const scan = await db.getScan(scanId);
+  return buildPublicScoreSummaryFromScan(scan);
 }

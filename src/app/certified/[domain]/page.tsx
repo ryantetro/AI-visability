@@ -17,13 +17,13 @@ export async function generateMetadata({ params }: CertifiedPageProps) {
 
   if (!certified) {
     return {
-      title: 'Certified Score Not Found | AISO',
+      title: 'Certified Score Not Found | airadr',
     };
   }
 
   return {
-    title: `${certified.summary.domain} Certified Score | AISO`,
-    description: `${certified.summary.domain} is publicly verified on AISO with an overall score of ${certified.summary.percentage}.`,
+    title: `${certified.summary.domain} Certified Score | airadr`,
+    description: `${certified.summary.domain} is publicly verified on airadr with an overall score of ${certified.summary.percentage}.`,
   };
 }
 
@@ -52,7 +52,7 @@ export default async function CertifiedDomainPage({ params }: CertifiedPageProps
                 {certified.summary.domain}
               </h1>
               <p className="app-body app-measure mt-4 text-[var(--text-secondary)]">
-                This domain verified ownership and opted into AISO public proof. The score below reflects the latest completed scan using the AI-first scoring model.
+                This domain verified ownership and opted into airadr public proof. The score below reflects the latest completed scan using the AI-first scoring model.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">

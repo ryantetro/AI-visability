@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service | AISO',
-  description: 'Terms covering site audits, generated digital deliverables, and use of the AISO platform.',
+  title: 'Terms of Service | airadr',
+  description: 'Terms covering site audits, generated digital deliverables, and use of the airadr platform.',
 };
 
 export default function TermsPage() {
@@ -17,7 +17,7 @@ export default function TermsPage() {
           <section>
             <h2 className="app-h3 font-semibold" style={{ color: 'var(--text-primary)' }}>Authority to Audit</h2>
             <p className="mt-2">
-              By submitting a website to AISO, you represent that you own, operate, or are authorized to request an audit for that site.
+              By submitting a website to airadr, you represent that you own, operate, or are authorized to request an audit for that site.
             </p>
           </section>
           <section>
@@ -29,7 +29,7 @@ export default function TermsPage() {
           <section>
             <h2 className="app-h3 font-semibold" style={{ color: 'var(--text-primary)' }}>No Ranking Guarantee</h2>
             <p className="mt-2">
-              AISO provides diagnostic scores, recommendations, and generated implementation files. We do not guarantee placement, traffic, visibility, ranking, or citation outcomes in AI search products.
+              airadr provides diagnostic scores, recommendations, and generated implementation files. We do not guarantee placement, traffic, visibility, ranking, or citation outcomes in AI search products.
             </p>
           </section>
           <section>

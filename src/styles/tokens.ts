@@ -1,5 +1,5 @@
 /**
- * AISO Brand Design Tokens
+ * airadr Brand Design Tokens
  *
  * Visual direction: Dark command center
  * Primary color: Electric cobalt
@@ -240,7 +240,7 @@ export const motion = {
 // ─── Brand Voice ─────────────────────────────────────────────────
 
 export const brand = {
-  name: 'AISO',
+  name: 'airadr',
   tagline: 'AI Search Optimization',
   descriptor: 'Make your business visible to AI',
 

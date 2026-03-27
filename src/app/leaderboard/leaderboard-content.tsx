@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink, Loader2, Medal, Trophy } from 'lucide-react';
 import { getFaviconUrl } from '@/lib/url-utils';
@@ -43,32 +43,49 @@ function scoreColor(score: number): string {
 
 export function LeaderboardContent({ entries: initialEntries }: { entries: LeaderboardEntry[] }) {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
-  const [entries, setEntries] = useState<LeaderboardEntry[]>(initialEntries);
   const [loading, setLoading] = useState(false);
+  const [cachedEntries, setCachedEntries] = useState<Partial<Record<Exclude<TimeFilter, 'all'>, LeaderboardEntry[]>>>({});
+  const displayedEntries =
+    timeFilter === 'all'
+      ? initialEntries
+      : cachedEntries[timeFilter] ?? initialEntries;
 
   useEffect(() => {
-    if (timeFilter === 'all') {
-      setEntries(initialEntries);
+    if (timeFilter === 'all' || cachedEntries[timeFilter]) {
       return;
     }
 
-    let active = true;
-    setLoading(true);
+    const controller = new AbortController();
 
-    fetch(`/api/leaderboard?filter=${timeFilter}&limit=100`)
+    fetch(`/api/leaderboard?filter=${timeFilter}&limit=100`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: LeaderboardEntry[]) => {
-        if (active) setEntries(data);
+        setCachedEntries((current) => ({ ...current, [timeFilter]: data }));
       })
-      .catch(() => {
-        if (active) setEntries([]);
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        setCachedEntries((current) => ({ ...current, [timeFilter]: [] }));
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
 
-    return () => { active = false; };
-  }, [timeFilter, initialEntries]);
+    return () => {
+      controller.abort();
+    };
+  }, [cachedEntries, timeFilter]);
+
+  function handleFilterChange(nextFilter: TimeFilter) {
+    if (nextFilter === 'all' || cachedEntries[nextFilter]) {
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    setTimeFilter(nextFilter);
+  }
 
   return (
     <div className="mt-8">
@@ -78,7 +95,7 @@ export function LeaderboardContent({ entries: initialEntries }: { entries: Leade
             <button
               key={key}
               type="button"
-              onClick={() => setTimeFilter(key)}
+              onClick={() => handleFilterChange(key)}
               className={cn(
                 'rounded-md px-4 py-2 text-[13px] font-medium transition-colors',
                 timeFilter === key
@@ -92,11 +109,7 @@ export function LeaderboardContent({ entries: initialEntries }: { entries: Leade
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-        </div>
-      ) : entries.length === 0 ? (
+      {displayedEntries.length === 0 ? (
         <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-6 py-16 text-center">
           <p className="text-sm text-[var(--text-muted)]">
             {timeFilter === '24h'
@@ -114,6 +127,12 @@ export function LeaderboardContent({ entries: initialEntries }: { entries: Leade
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]">
+          {loading && (
+            <div className="flex items-center justify-end gap-2 border-b border-white/[0.08] px-4 py-2 text-[11px] font-medium text-[var(--text-muted)]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Refreshing rankings...
+            </div>
+          )}
           <table className="w-full table-fixed border-collapse">
             <colgroup>
               <col style={{ width: '3%' }} />
@@ -142,7 +161,7 @@ export function LeaderboardContent({ entries: initialEntries }: { entries: Leade
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => (
+              {displayedEntries.map((entry) => (
                 <tr
                   key={entry.domain}
                   className="border-b border-white/[0.04] transition-colors last:border-0 hover:bg-white/[0.02]"
@@ -176,6 +195,8 @@ export function LeaderboardContent({ entries: initialEntries }: { entries: Leade
                           src={getFaviconUrl(entry.domain, 32)}
                           alt=""
                           className="h-5 w-5 object-contain"
+                          loading="lazy"
+                          decoding="async"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             const fallback = e.currentTarget.nextElementSibling;

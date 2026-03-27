@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import type { CSSProperties } from 'react';
 
@@ -23,6 +24,8 @@ type AisoBrandProps = {
   textClassName?: string;
   textStyle?: CSSProperties;
   label?: string;
+  wordmarkVariant?: 'dark' | 'light';
+  wordmarkScale?: number;
 };
 
 export function AisoBrand({
@@ -30,13 +33,26 @@ export function AisoBrand({
   logoClassName,
   textClassName,
   textStyle,
-  label = 'AISO',
+  label = 'airadr',
+  wordmarkVariant = 'dark',
+  wordmarkScale = 1.32,
 }: AisoBrandProps) {
   return (
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <AisoLogo className={cn('h-7 w-7', logoClassName)} />
-      <span className={cn('text-[15px] font-semibold tracking-tight text-white', textClassName)} style={textStyle}>
-        {label}
+      <span
+        className={cn('inline-flex items-center text-[15px] leading-none', textClassName)}
+        style={textStyle}
+      >
+        <Image
+          src={wordmarkVariant === 'light' ? '/airadr-wordmark-light.svg' : '/airadr-wordmark-dark.svg'}
+          alt={label}
+          width={190}
+          height={48}
+          className="block h-[1.05em] w-auto max-w-none"
+          loading="eager"
+          style={{ transform: `scale(${wordmarkScale})`, transformOrigin: 'left center' }}
+        />
       </span>
     </span>
   );

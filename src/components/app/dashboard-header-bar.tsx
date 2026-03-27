@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Loader2, LogOut, Megaphone, Zap } from 'lucide-react';
+import { Loader2, LogOut, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { planStringToTier, PLANS } from '@/lib/pricing';
 import { buildLoginHref, getCurrentAppPath } from '@/lib/app-paths';
@@ -114,14 +114,6 @@ export function DashboardHeaderBar() {
 
       {/* Right — user profile */}
       <div className="flex items-center gap-3">
-        <Link
-          href="/featured"
-          className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-transparent px-3 py-1.5 text-[12px] font-medium text-zinc-400 transition-colors hover:border-white/20 hover:text-white sm:inline-flex"
-        >
-          <Megaphone className="h-3 w-3 text-[#25c972]" />
-          Get featured
-        </Link>
-
         {loading ? (
           <div className="h-8 w-8 rounded-full bg-white/[0.04]" />
         ) : user ? (
