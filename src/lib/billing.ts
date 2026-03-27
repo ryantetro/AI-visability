@@ -6,7 +6,10 @@ import {
   getPlanDisplayName,
   isPaymentPlanString,
   planStringToTier,
+  TIER_LEVEL,
+  AI_PLATFORMS,
 } from '@/lib/pricing';
+import { REGIONS } from '@/lib/region-gating';
 import { getAccountAccessOverride, isUnlimitedPlanLimit } from '@/lib/account-access-overrides';
 import { getUserAccess } from '@/lib/access';
 import {
@@ -885,6 +888,299 @@ export async function buildPlanUsageSnapshot(
     viewerIssues,
     sameEntitlements,
   };
+}
+
+export interface TrimResult {
+  trimmed: boolean;
+  details: {
+    domains_hidden: string[];
+    competitors_removed: Record<string, number>;
+    platforms_adjusted: Record<string, { removed: string[] }>;
+    regions_adjusted: Record<string, { removed: string[] }>;
+    prompts_removed: Record<string, number>;
+    invitations_revoked: number;
+    members_suspended: string[];
+  };
+}
+
+/**
+ * Deterministically trim workspace resources to fit within a plan's limits.
+ * Called by the Stripe webhook handler when a plan tier drops.
+ * Idempotent: running twice produces the same result.
+ */
+export async function trimWorkspaceToFit(
+  userId: string,
+  newPlan: string,
+  oldPlan: string,
+): Promise<TrimResult> {
+  const supabase = getSupabaseClient();
+  const newTier = planStringToTier(newPlan);
+  const limits = PLANS[newTier];
+  const maxDomains = normalizeLimit(limits.domains);
+  const maxCompetitors = normalizeLimit(limits.competitors);
+  const maxPlatforms = normalizeLimit(limits.platforms);
+  const maxRegions = normalizeLimit(limits.regions);
+  const maxPrompts = normalizeLimit(limits.prompts);
+  const maxSeats = normalizeLimit(limits.seats);
+
+  const details: TrimResult['details'] = {
+    domains_hidden: [],
+    competitors_removed: {},
+    platforms_adjusted: {},
+    regions_adjusted: {},
+    prompts_removed: {},
+    invitations_revoked: 0,
+    members_suspended: [],
+  };
+
+  // Resolve team context
+  const { data: teamRow } = await supabase
+    .from('team_members')
+    .select('team_id, role')
+    .eq('user_id', userId)
+    .eq('role', 'owner')
+    .limit(1)
+    .maybeSingle();
+
+  const teamId = teamRow?.team_id ?? null;
+
+  // Get all effective user IDs (owner + active team members)
+  const effectiveUserIds = [userId];
+  if (teamId) {
+    const { data: members } = await supabase
+      .from('team_members')
+      .select('user_id, role, plan_access_rank, joined_at, id')
+      .eq('team_id', teamId)
+      .eq('status', 'active');
+    if (members) {
+      for (const m of members) {
+        if (m.user_id !== userId) effectiveUserIds.push(m.user_id);
+      }
+    }
+  }
+
+  // ── 1. Trim domains ──────────────────────────────────────────
+  if (maxDomains !== null) {
+    const { data: domains } = await supabase
+      .from('user_domains')
+      .select('id, domain, updated_at')
+      .in('user_id', effectiveUserIds)
+      .eq('hidden', false)
+      .order('updated_at', { ascending: false });
+
+    if (domains && domains.length > maxDomains) {
+      const toHide = domains.slice(maxDomains);
+      const hideIds = toHide.map((d) => d.id);
+      await supabase
+        .from('user_domains')
+        .update({ hidden: true, updated_at: new Date().toISOString() })
+        .in('id', hideIds);
+      details.domains_hidden = toHide.map((d) => d.domain);
+    }
+  }
+
+  // Get active (non-hidden) domains for per-domain trimming
+  const { data: activeDomains } = await supabase
+    .from('user_domains')
+    .select('id, domain, user_id, selected_platforms, selected_regions')
+    .in('user_id', effectiveUserIds)
+    .eq('hidden', false);
+
+  const activeDomainList = activeDomains ?? [];
+
+  // ── 2. Trim competitors ──────────────────────────────────────
+  // Fetch all competitors in one query, then trim per-domain in memory
+  if (maxCompetitors !== null) {
+    const activeDomainNames = activeDomainList.map((d) => d.domain);
+    const { data: allComps } = await supabase
+      .from('user_competitors')
+      .select('id, competitor_domain, domain, user_id, created_at')
+      .in('user_id', effectiveUserIds)
+      .in('domain', activeDomainNames)
+      .order('created_at', { ascending: false });
+
+    if (allComps) {
+      // Group by domain
+      const compsByDomain = new Map<string, typeof allComps>();
+      for (const c of allComps) {
+        const list = compsByDomain.get(c.domain) ?? [];
+        list.push(c);
+        compsByDomain.set(c.domain, list);
+      }
+
+      const allRemoveIds: string[] = [];
+      for (const [domain, comps] of compsByDomain) {
+        if (comps.length > maxCompetitors) {
+          const toRemove = comps.slice(maxCompetitors);
+          allRemoveIds.push(...toRemove.map((c) => c.id));
+          details.competitors_removed[domain] = toRemove.length;
+        }
+      }
+
+      if (allRemoveIds.length > 0) {
+        await supabase.from('user_competitors').delete().in('id', allRemoveIds);
+      }
+    }
+  }
+
+  // ── 3. Trim platforms ────────────────────────────────────────
+  if (maxPlatforms !== null) {
+    for (const ud of activeDomainList) {
+      const currentPlatforms: string[] = ud.selected_platforms ?? [...AI_PLATFORMS];
+      if (currentPlatforms.length > maxPlatforms) {
+        // Keep first N in AI_PLATFORMS priority order
+        const kept = AI_PLATFORMS.filter((p) => currentPlatforms.includes(p)).slice(0, maxPlatforms);
+        const removed = currentPlatforms.filter((p) => !kept.includes(p as typeof AI_PLATFORMS[number]));
+        await supabase
+          .from('user_domains')
+          .update({ selected_platforms: [...kept], updated_at: new Date().toISOString() })
+          .eq('id', ud.id);
+        if (removed.length > 0) {
+          details.platforms_adjusted[ud.domain] = { removed };
+        }
+      }
+    }
+  }
+
+  // ── 4. Trim regions ──────────────────────────────────────────
+  if (maxRegions !== null) {
+    for (const ud of activeDomainList) {
+      const currentRegions: string[] = ud.selected_regions ?? ['us-en'];
+      if (currentRegions.length > maxRegions) {
+        // Keep first N in REGIONS priority order
+        const regionOrder = REGIONS.map((r) => r.id);
+        const kept = regionOrder.filter((r) => currentRegions.includes(r)).slice(0, maxRegions);
+        const removed = currentRegions.filter((r) => !kept.includes(r));
+        await supabase
+          .from('user_domains')
+          .update({ selected_regions: kept, updated_at: new Date().toISOString() })
+          .eq('id', ud.id);
+        if (removed.length > 0) {
+          details.regions_adjusted[ud.domain] = { removed };
+        }
+      }
+    }
+  }
+
+  // ── 5. Trim prompts ──────────────────────────────────────────
+  // Fetch all prompts in one query, then trim per-user in memory
+  if (maxPrompts !== null) {
+    const { data: allPrompts } = await supabase
+      .from('monitored_prompts')
+      .select('id, user_id, created_at')
+      .in('user_id', effectiveUserIds)
+      .order('created_at', { ascending: false });
+
+    if (allPrompts) {
+      const promptsByUser = new Map<string, typeof allPrompts>();
+      for (const p of allPrompts) {
+        const list = promptsByUser.get(p.user_id) ?? [];
+        list.push(p);
+        promptsByUser.set(p.user_id, list);
+      }
+
+      const allRemoveIds: string[] = [];
+      for (const [uid, prompts] of promptsByUser) {
+        if (prompts.length > maxPrompts) {
+          const toRemove = prompts.slice(maxPrompts);
+          allRemoveIds.push(...toRemove.map((p) => p.id));
+          details.prompts_removed[uid] = toRemove.length;
+        }
+      }
+
+      if (allRemoveIds.length > 0) {
+        await supabase.from('monitored_prompts').delete().in('id', allRemoveIds);
+      }
+    }
+  }
+
+  // ── 6. Trim pending invitations ──────────────────────────────
+  if (teamId && maxSeats !== null) {
+    const { data: invitations } = await supabase
+      .from('team_invitations')
+      .select('id, created_at')
+      .eq('team_id', teamId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+
+    const { data: activeMembers } = await supabase
+      .from('team_members')
+      .select('id')
+      .eq('team_id', teamId)
+      .eq('status', 'active');
+
+    const memberCount = activeMembers?.length ?? 1;
+    const inviteCount = invitations?.length ?? 0;
+    const totalSeats = memberCount + inviteCount;
+
+    if (totalSeats > maxSeats && invitations && invitations.length > 0) {
+      const invitesToRevoke = Math.min(invitations.length, totalSeats - maxSeats);
+      const revokeIds = invitations.slice(0, invitesToRevoke).map((i) => i.id);
+      await supabase
+        .from('team_invitations')
+        .update({ status: 'revoked', updated_at: new Date().toISOString() })
+        .in('id', revokeIds);
+      details.invitations_revoked = invitesToRevoke;
+    }
+  }
+
+  // ── 7. Suspend excess team members ───────────────────────────
+  if (teamId && maxSeats !== null) {
+    const { data: activeMembers } = await supabase
+      .from('team_members')
+      .select('id, user_id, role, plan_access_rank, joined_at')
+      .eq('team_id', teamId)
+      .eq('status', 'active')
+      .order('plan_access_rank', { ascending: true, nullsFirst: false })
+      .order('joined_at', { ascending: true });
+
+    if (activeMembers && activeMembers.length > maxSeats) {
+      // Owner is always protected — separate them out
+      const owner = activeMembers.find((m) => m.role === 'owner');
+      const nonOwners = activeMembers.filter((m) => m.role !== 'owner');
+      // Keep (maxSeats - 1) non-owners (1 slot reserved for owner)
+      const keepCount = Math.max(0, maxSeats - 1);
+      const toSuspend = nonOwners.slice(keepCount);
+      if (toSuspend.length > 0) {
+        const suspendIds = toSuspend.map((m) => m.id);
+        await supabase
+          .from('team_members')
+          .update({ status: 'suspended' })
+          .in('id', suspendIds);
+        details.members_suspended = toSuspend.map((m) => m.user_id);
+      }
+    }
+  }
+
+  // ── Write trim log and update profile ────────────────────────
+  const trimmed = details.domains_hidden.length > 0
+    || Object.keys(details.competitors_removed).length > 0
+    || Object.keys(details.platforms_adjusted).length > 0
+    || Object.keys(details.regions_adjusted).length > 0
+    || Object.keys(details.prompts_removed).length > 0
+    || details.invitations_revoked > 0
+    || details.members_suspended.length > 0;
+
+  if (trimmed) {
+    await supabase.from('workspace_trim_log').insert({
+      user_id: userId,
+      from_plan: oldPlan,
+      to_plan: newPlan,
+      details,
+    });
+  }
+
+  await supabase
+    .from('user_profiles')
+    .update({
+      last_workspace_trim_at: trimmed ? new Date().toISOString() : null,
+      trim_banner_dismissed: false,
+      trim_failed: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  return { trimmed, details };
 }
 
 export async function getBillingStatus(userId: string, email: string): Promise<BillingStatus> {
