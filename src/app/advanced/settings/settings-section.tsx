@@ -1,20 +1,33 @@
 'use client';
 
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Copy, CreditCard, ExternalLink, KeyRound, Lock, Mail, RefreshCw, Trash2, UserMinus, UserPlus, Users, Zap } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Copy, CreditCard, ExternalLink, KeyRound, Loader2, Lock, Mail, RefreshCw, Trash2, UserMinus, UserPlus, Users, Zap } from 'lucide-react';
 import { isUnlimitedPlanLimit } from '@/lib/account-access-overrides';
 import { cn } from '@/lib/utils';
 import { buildBotTrackingInstallPrompt, buildBotTrackingSnippet, type BotTrackingRuntime } from '@/lib/llm-prompts';
 import { formatRelativeTime, formatShortDate } from '@/app/advanced/lib/utils';
 import { usePlan } from '@/hooks/use-plan';
+import { invalidateBillingStatus, useBillingStatus } from '@/hooks/use-billing-status';
 import { useAuth } from '@/hooks/use-auth';
-import { PLANS, AI_PLATFORMS, PLATFORM_LABELS, type AIPlatform, canAccess } from '@/lib/pricing';
+import {
+  AI_PLATFORMS,
+  PAYMENT_PLAN_IDS,
+  PLANS,
+  PLATFORM_LABELS,
+  canAccess,
+  getPlanDisplayName,
+  isPaymentPlanString,
+  planStringToTier,
+  type AIPlatform,
+  type PaymentPlanString,
+} from '@/lib/pricing';
 import { useTeam } from '@/hooks/use-team';
 import { invalidatePlanCache } from '@/hooks/use-plan';
 import { REGIONS } from '@/lib/region-gating';
 import { useDomainContext } from '@/contexts/domain-context';
 import { buildLoginHref, getCurrentAppPath } from '@/lib/app-paths';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import type { LimitIssue, PlanChangePreviewResponse } from '@/lib/billing';
 
 interface SettingsSectionProps {
   domain: string;
@@ -36,6 +49,8 @@ type OpportunityAlertState = {
   lastOpportunityAlertAt: number | null;
   hydrated: boolean;
 };
+
+const CHANGE_PLAN_OPTIONS: PaymentPlanString[] = [...PAYMENT_PLAN_IDS];
 
 function normalizeAppUrl(url: string) {
   return url.replace(/\/$/, '');
@@ -59,6 +74,34 @@ function formatRemainingAccess(timestamp?: number | null) {
 
   const diffMonths = Math.round(diffDays / 30);
   return diffMonths <= 1 ? 'About 1 month left' : `About ${diffMonths} months left`;
+}
+
+function formatMoney(amountCents: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(amountCents / 100);
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function buildIssueKey(issue: LimitIssue) {
+  return `${issue.category}:${issue.memberUserId ?? 'shared'}:${issue.domain ?? 'global'}`;
+}
+
+function uniqueIssues(issues: LimitIssue[]) {
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = buildIssueKey(issue);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** Convert a 2-letter country code to its flag emoji */
@@ -151,8 +194,20 @@ export function SettingsSection({
   onDisableMonitoring,
 }: SettingsSectionProps) {
   const [portalLoading, setPortalLoading] = useState(false);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [stripePlanRedirectLoading, setStripePlanRedirectLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [cancelPlanModalOpen, setCancelPlanModalOpen] = useState(false);
+  const [changePlanModalOpen, setChangePlanModalOpen] = useState(false);
+  const [changePlanLoading, setChangePlanLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [changePlanError, setChangePlanError] = useState<string | null>(null);
+  const [changePlanSuccess, setChangePlanSuccess] = useState<string | null>(null);
+  const [selectedTargetPlan, setSelectedTargetPlan] = useState<PaymentPlanString | null>(null);
+  const [changePlanPreview, setChangePlanPreview] = useState<PlanChangePreviewResponse | null>(null);
+  const previewCacheRef = useRef<Record<string, PlanChangePreviewResponse>>({});
+  const previewAbortRef = useRef<AbortController | null>(null);
+  const [memberPrioritySaving, setMemberPrioritySaving] = useState<string | null>(null);
   const [trackingRuntime, setTrackingRuntime] = useState<BotTrackingRuntime>('next');
   const [trackingKey, setTrackingKey] = useState<TrackingKeyState>({
     siteKey: null,
@@ -196,10 +251,13 @@ export function SettingsSection({
     teamRole,
     planExpiresAt,
     planCancelAtPeriodEnd,
+    refresh: refreshPlan,
   } = usePlan();
   const { user } = useAuth();
   const planConfig = PLANS[tier];
+  const [changePlanCycle, setChangePlanCycle] = useState<'monthly' | 'annual'>(plan.includes('annual') ? 'annual' : 'monthly');
   const teamData = useTeam();
+  const billingStatus = useBillingStatus();
   const [teamNameInput, setTeamNameInput] = useState('');
   const [teamCreating, setTeamCreating] = useState(false);
   const [teamError, setTeamError] = useState<string | null>(null);
@@ -212,6 +270,37 @@ export function SettingsSection({
   const [teamActionLoading, setTeamActionLoading] = useState(false);
 
   const hasMultiSeat = canAccess(tier, 'pro');
+  const pendingChange = billingStatus.status?.pendingChange ?? null;
+  const canManageBilling = billingStatus.status?.canManageBilling ?? tier !== 'free';
+  const activeReadiness = billingStatus.status?.activeReadiness ?? null;
+  const readiness = billingStatus.status?.readiness ?? null;
+  const readinessIssues = readiness ? uniqueIssues(readiness.issues) : [];
+  const viewerReadinessIssues = readiness ? uniqueIssues(readiness.viewerIssues) : [];
+  const viewerOverageIssues = billingStatus.status ? uniqueIssues(billingStatus.status.overageIssues) : [];
+  const activeIssues = activeReadiness ? uniqueIssues(activeReadiness.issues) : [];
+  const visibleBillingIssues = canManageBilling ? readinessIssues : viewerReadinessIssues;
+  const currentPlanOptions = useMemo(() => (
+    CHANGE_PLAN_OPTIONS
+  ), [tier]);
+  const defaultTargetPlan = useMemo(() => {
+    if (pendingChange?.targetPlan) {
+      return pendingChange.targetPlan;
+    }
+
+    // Pick the first plan of a different tier, matching the current billing cycle
+    const cycle = plan.includes('annual') ? 'annual' : 'monthly';
+    const differentTierPlan = currentPlanOptions.find((planId) => {
+      const t = planStringToTier(planId);
+      return t !== tier && t !== 'free' && planId.includes(cycle);
+    });
+    if (differentTierPlan) return differentTierPlan;
+
+    // Fallback: any plan of a different tier
+    return (currentPlanOptions.find((planId) => {
+      const t = planStringToTier(planId);
+      return t !== tier && t !== 'free';
+    }) ?? null) as PaymentPlanString | null;
+  }, [currentPlanOptions, pendingChange?.targetPlan, plan, tier]);
 
   const handleCreateTeam = async () => {
     if (!teamNameInput.trim()) return;
@@ -227,7 +316,8 @@ export function SettingsSection({
       if (!res.ok) throw new Error(data.error || 'Failed to create team');
       setTeamNameInput('');
       invalidatePlanCache();
-      await teamData.refresh();
+      invalidateBillingStatus();
+      await Promise.all([teamData.refresh(), billingStatus.refresh()]);
     } catch (err) {
       setTeamError(err instanceof Error ? err.message : 'Failed to create team');
     } finally {
@@ -251,7 +341,8 @@ export function SettingsSection({
       setInviteEmail('');
       setInviteSuccess(true);
       setTimeout(() => setInviteSuccess(false), 3000);
-      await teamData.refresh();
+      invalidateBillingStatus();
+      await Promise.all([teamData.refresh(), billingStatus.refresh()]);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : 'Failed to send invitation');
     } finally {
@@ -267,7 +358,8 @@ export function SettingsSection({
       const res = await fetch(`/api/teams/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to remove member');
-      await teamData.refresh();
+      invalidateBillingStatus();
+      await Promise.all([teamData.refresh(), billingStatus.refresh()]);
     } catch (err) {
       setTeamError(err instanceof Error ? err.message : 'Failed to remove member');
     } finally {
@@ -282,7 +374,8 @@ export function SettingsSection({
       const res = await fetch(`/api/teams/invite/${encodeURIComponent(invitationId)}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to revoke invitation');
-      await teamData.refresh();
+      invalidateBillingStatus();
+      await Promise.all([teamData.refresh(), billingStatus.refresh()]);
     } catch (err) {
       setTeamError(err instanceof Error ? err.message : 'Failed to revoke invitation');
     } finally {
@@ -299,7 +392,8 @@ export function SettingsSection({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to leave team');
       invalidatePlanCache();
-      await teamData.refresh();
+      invalidateBillingStatus();
+      await Promise.all([teamData.refresh(), billingStatus.refresh()]);
     } catch (err) {
       setTeamError(err instanceof Error ? err.message : 'Failed to leave team');
     } finally {
@@ -316,7 +410,8 @@ export function SettingsSection({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to dissolve team');
       invalidatePlanCache();
-      await teamData.refresh();
+      invalidateBillingStatus();
+      await Promise.all([teamData.refresh(), billingStatus.refresh()]);
     } catch (err) {
       setTeamError(err instanceof Error ? err.message : 'Failed to dissolve team');
     } finally {
@@ -325,6 +420,34 @@ export function SettingsSection({
   };
   const { monitoredSites, handleUnlockComplete } = useDomainContext();
   const displayEmail = user?.email ?? email;
+  const activePromptMetric = activeReadiness?.metrics.find((metric) => metric.category === 'prompts') ?? null;
+  const billingOwnerEmail = billingStatus.status?.billingOwner.email ?? null;
+  const pendingEffectiveTimestamp = parseIsoTimestamp(pendingChange?.effectiveAt ?? null);
+  const pendingEffectiveLabel = formatShortDate(pendingEffectiveTimestamp);
+  const pendingRemainingLabel = formatRemainingAccess(pendingEffectiveTimestamp);
+  const changeTargetIsSamePlan = selectedTargetPlan === plan
+    || (selectedTargetPlan != null && planStringToTier(selectedTargetPlan) === tier);
+  const stripeHostedPlanChange = Boolean(changePlanPreview?.change.canUseStripe);
+  const guidedFallbackPlanChange = Boolean(
+    changePlanPreview
+      && !changePlanPreview.change.canUseStripe
+      && (changePlanPreview.change.decision === 'stripe_upgrade' || changePlanPreview.change.decision === 'stripe_cycle_switch'),
+  );
+  const selectedTargetTier = selectedTargetPlan ? planStringToTier(selectedTargetPlan) : null;
+  const selectedTargetIsDowngrade = Boolean(
+    selectedTargetTier
+      && selectedTargetTier !== tier
+      && canAccess(tier, selectedTargetTier),
+  );
+  const canScheduleGuidedChange = Boolean(
+    selectedTargetPlan
+      && !changeTargetIsSamePlan
+      && (selectedTargetIsDowngrade || guidedFallbackPlanChange)
+      && !stripeHostedPlanChange,
+  );
+  const seatPriorityMembers = teamData.members.filter((member) => member.role !== 'owner');
+  const seatPriorityIssues = (pendingChange ? visibleBillingIssues : (canManageBilling ? activeIssues : viewerOverageIssues))
+    .filter((issue) => issue.category === 'seats' || issue.category === 'pending_invites');
 
   const billingCycle = plan.includes('annual') ? 'Annual' : plan.includes('monthly') ? 'Monthly' : '';
   const planExpiresAtTimestamp = parseIsoTimestamp(planExpiresAt);
@@ -334,9 +457,11 @@ export function SettingsSection({
   const trackedDomainsValue = isUnlimitedPlanLimit(maxDomains)
     ? `${monitoredSites.length} / Unlimited`
     : `${monitoredSites.length} / ${maxDomains}`;
-  const trackedPromptsValue = isUnlimitedPlanLimit(maxPrompts)
-    ? '-- / Unlimited'
-    : `-- / ${maxPrompts}`;
+  const trackedPromptsValue = activePromptMetric
+    ? `${activePromptMetric.current} / ${isUnlimitedPlanLimit(maxPrompts) ? 'Unlimited' : maxPrompts}`
+    : isUnlimitedPlanLimit(maxPrompts)
+      ? '-- / Unlimited'
+      : `-- / ${maxPrompts}`;
   const snippetAppUrl =
     typeof window !== 'undefined' &&
     window.location.origin &&
@@ -383,10 +508,261 @@ export function SettingsSection({
     await handleOpenBillingPortal();
   };
 
+  const handleReactivatePlan = async () => {
+    setReactivateLoading(true);
+    setBillingError(null);
+    setChangePlanSuccess(null);
+    try {
+      const res = await fetch('/api/billing/reactivate', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to reactivate this subscription');
+      }
+
+      setChangePlanSuccess('Your current plan will keep renewing automatically again.');
+      invalidatePlanCache();
+      invalidateBillingStatus();
+      await Promise.all([billingStatus.refresh(), teamData.refresh()]);
+    } catch (error) {
+      setBillingError(error instanceof Error ? error.message : 'Failed to reactivate this subscription');
+    } finally {
+      setReactivateLoading(false);
+    }
+  };
+
+  const syncStripeHostedPlanChange = useCallback(async (targetPlan: PaymentPlanString) => {
+    setChangePlanModalOpen(false);
+    setChangePlanError(null);
+    setBillingError(null);
+    setChangePlanSuccess(`Stripe confirmed your request. Syncing ${getPlanDisplayName(targetPlan)} in the dashboard...`);
+
+    invalidatePlanCache();
+    invalidateBillingStatus();
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const [status] = await Promise.all([
+        billingStatus.refresh(),
+        refreshPlan(),
+        teamData.refresh(),
+      ]);
+
+      if (status?.currentPlan === targetPlan) {
+        setChangePlanSuccess(`${getPlanDisplayName(targetPlan)} is now active.`);
+        return;
+      }
+
+      if (attempt < 3) {
+        await wait(1200);
+      }
+    }
+
+    setChangePlanSuccess(`Stripe accepted the change to ${getPlanDisplayName(targetPlan)}. The dashboard may take a few more seconds to reflect it.`);
+  }, [billingStatus, refreshPlan, teamData]);
+
+  const handleContinuePlanChangeInStripe = async () => {
+    if (!selectedTargetPlan) return;
+
+    setStripePlanRedirectLoading(true);
+    setChangePlanError(null);
+    setBillingError(null);
+    setChangePlanSuccess(null);
+
+    try {
+      const returnPath = getCurrentAppPath('/settings');
+      const res = await fetch('/api/billing/change-plan/stripe-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPlan: selectedTargetPlan, returnPath }),
+      });
+      if (res.status === 401) {
+        window.location.href = buildLoginHref(returnPath);
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to open Stripe for this plan change');
+      }
+      if (typeof data.url === 'string' && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      throw new Error('Stripe did not return a hosted change-plan URL.');
+    } catch (error) {
+      setChangePlanError(error instanceof Error ? error.message : 'Failed to open Stripe for this plan change');
+    } finally {
+      setStripePlanRedirectLoading(false);
+    }
+  };
+
+  const handlePreviewPlanChange = useCallback(async (targetPlan: PaymentPlanString) => {
+    // Abort any in-flight preview request
+    if (previewAbortRef.current) previewAbortRef.current.abort();
+
+    setSelectedTargetPlan(targetPlan);
+    setChangePlanError(null);
+
+    // Serve from cache instantly
+    const cached = previewCacheRef.current[targetPlan];
+    if (cached) {
+      setChangePlanPreview(cached);
+      return;
+    }
+
+    setPreviewLoading(true);
+    setChangePlanPreview(null);
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
+    try {
+      const res = await fetch('/api/billing/change-plan/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPlan }),
+        signal: controller.signal,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to preview this plan change');
+      }
+      const snapshot = data as PlanChangePreviewResponse;
+      previewCacheRef.current[targetPlan] = snapshot;
+      // Only apply if this is still the selected plan (not stale)
+      if (previewAbortRef.current === controller) {
+        setChangePlanPreview(snapshot);
+      }
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
+      setChangePlanPreview(null);
+      setChangePlanError(error instanceof Error ? error.message : 'Failed to preview this plan change');
+    } finally {
+      if (previewAbortRef.current === controller) {
+        setPreviewLoading(false);
+        previewAbortRef.current = null;
+      }
+    }
+  }, []);
+
+  const handleSchedulePlanChange = async () => {
+    if (!selectedTargetPlan) return;
+    setChangePlanLoading(true);
+    setChangePlanError(null);
+    setChangePlanSuccess(null);
+    try {
+      const res = await fetch('/api/billing/change-plan/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPlan: selectedTargetPlan }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to schedule this plan change');
+      }
+
+      setChangePlanSuccess(`Scheduled ${getPlanDisplayName(selectedTargetPlan)} for the next billing period.`);
+      invalidateBillingStatus();
+      await billingStatus.refresh();
+      invalidatePlanCache();
+      setChangePlanModalOpen(false);
+    } catch (error) {
+      setChangePlanError(error instanceof Error ? error.message : 'Failed to schedule this plan change');
+    } finally {
+      setChangePlanLoading(false);
+    }
+  };
+
+  const handleCancelScheduledPlanChange = async () => {
+    setChangePlanLoading(true);
+    setBillingError(null);
+    try {
+      const res = await fetch('/api/billing/change-plan/cancel', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to cancel the scheduled plan change');
+      }
+      setChangePlanSuccess('Scheduled plan change canceled.');
+      invalidateBillingStatus();
+      await billingStatus.refresh();
+    } catch (error) {
+      setBillingError(error instanceof Error ? error.message : 'Failed to cancel the scheduled plan change');
+    } finally {
+      setChangePlanLoading(false);
+    }
+  };
+
+  const handleUpdateMemberPriority = async (userId: string, nextRank: number) => {
+    setTeamError(null);
+    setMemberPrioritySaving(userId);
+    try {
+      const res = await fetch(`/api/teams/members/${encodeURIComponent(userId)}/priority`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planAccessRank: nextRank }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to update member priority');
+      await Promise.all([teamData.refresh(), billingStatus.refresh()]);
+    } catch (error) {
+      setTeamError(error instanceof Error ? error.message : 'Failed to update member priority');
+    } finally {
+      setMemberPrioritySaving(null);
+    }
+  };
+
   useEffect(() => {
     if (appUrl || typeof window === 'undefined') return;
     setAppUrl(normalizeAppUrl(window.location.origin));
   }, [appUrl]);
+
+  // Modal open/close lifecycle — cleanup on close, auto-select on open
+  const hasAutoSelectedRef = useRef(false);
+
+  useEffect(() => {
+    if (!changePlanModalOpen) {
+      // Cleanup on close
+      if (previewAbortRef.current) {
+        previewAbortRef.current.abort();
+        previewAbortRef.current = null;
+      }
+      previewCacheRef.current = {};
+      setSelectedTargetPlan(null);
+      setChangePlanPreview(null);
+      setChangePlanError(null);
+      setPreviewLoading(false);
+      hasAutoSelectedRef.current = false;
+      return;
+    }
+
+    // Auto-select once when modal opens — never override user clicks
+    if (hasAutoSelectedRef.current) return;
+    hasAutoSelectedRef.current = true;
+
+    // Reset billing cycle to match current plan
+    const cycle = plan.includes('annual') ? 'annual' : 'monthly';
+    setChangePlanCycle(cycle);
+
+    if (defaultTargetPlan) {
+      void handlePreviewPlanChange(defaultTargetPlan);
+    }
+  }, [changePlanModalOpen, defaultTargetPlan, handlePreviewPlanChange, plan]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const billingState = params.get('billing');
+    const targetPlanParam = params.get('target_plan');
+    if (billingState !== 'plan_updated' || !targetPlanParam || !isPaymentPlanString(targetPlanParam)) {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('billing');
+    url.searchParams.delete('target_plan');
+    window.history.replaceState({}, '', url.toString());
+
+    void syncStripeHostedPlanChange(targetPlanParam);
+  }, [syncStripeHostedPlanChange]);
 
   // Load selected platforms for this domain
   useEffect(() => {
@@ -807,7 +1183,7 @@ export function SettingsSection({
           {hasScheduledCancellation && (
             <FieldRow
               label="Access until"
-              description="After this date, your workspace will move to the Free plan unless you reactivate in Stripe."
+              description="After this date, your workspace will move to the Free plan unless you keep renewal turned on."
               value={accessEndsOnLabel}
             />
           )}
@@ -816,7 +1192,8 @@ export function SettingsSection({
             value={trackedDomainsValue}
           />
           <FieldRow
-            label="Prompts tracked"
+            label="Saved prompts"
+            description={teamId ? 'Highest saved prompt count for a team member.' : 'Total saved prompts on this account.'}
             value={trackedPromptsValue}
           />
           {hasScheduledCancellation && (
@@ -831,7 +1208,7 @@ export function SettingsSection({
                         : 'Your current plan stays available through the end of this billing period.'}
                     </p>
                     <p className="mt-1 text-[12px] leading-5 text-zinc-400">
-                      You can still use the dashboard normally until access ends, and you can reactivate anytime from Stripe Billing.
+                      You can still use the dashboard normally until access ends. Use Keep Current Plan below to remove the scheduled cancellation instantly.
                     </p>
                   </div>
                   {remainingAccessLabel && (
@@ -839,6 +1216,93 @@ export function SettingsSection({
                       {remainingAccessLabel}
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!canManageBilling && billingOwnerEmail && (
+            <div className="border-b border-white/[0.06] px-5 py-4">
+              <div className="rounded-2xl border border-sky-300/15 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.14),rgba(255,255,255,0.02)_60%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.015)_100%)] p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100/80">Managed by owner</p>
+                <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                  Billing for this workspace is managed by <span className="text-white">{billingOwnerEmail}</span>.
+                </p>
+                <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                  You can still see upcoming downgrade requirements here, but only the billing owner can schedule or cancel plan changes.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {pendingChange && !hasScheduledCancellation && (
+            <div className="border-b border-white/[0.06] px-5 py-4">
+              <div className="rounded-2xl border border-[#25c972]/20 bg-[radial-gradient(circle_at_top,rgba(37,201,114,0.16),rgba(255,255,255,0.02)_62%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.015)_100%)] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="max-w-xl">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#9ef0c1]">Plan change scheduled</p>
+                    <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                      {pendingChange.targetLabel} is scheduled for {pendingEffectiveLabel !== '--' ? pendingEffectiveLabel : 'your next billing renewal'}.
+                    </p>
+                    <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                      {readiness?.blockers
+                        ? `${readiness.blockers} cleanup item${readiness.blockers === 1 ? '' : 's'} still need attention before the lower plan becomes active.`
+                        : 'Your workspace is already aligned with the scheduled plan change.'}
+                    </p>
+                  </div>
+                  {pendingRemainingLabel && (
+                    <div className="inline-flex items-center rounded-full border border-[#25c972]/20 bg-black/20 px-3 py-1.5 text-[11px] font-medium text-[#bff5d6]">
+                      {pendingRemainingLabel}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(pendingChange || viewerOverageIssues.length > 0) && (
+            <div className="border-b border-white/[0.06] px-5 py-4">
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                      {pendingChange ? 'Downgrade readiness' : 'Active cleanup required'}
+                    </p>
+                    <p className="mt-2 text-[13px] leading-6 text-zinc-200">
+                      {pendingChange
+                        ? 'We’ll keep guiding you until every blocker is resolved or the scheduled change becomes active.'
+                        : 'Some features are in cleanup-only mode because this workspace is already over the active plan limits.'}
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center rounded-full border border-white/[0.08] bg-black/20 px-3 py-1.5 text-[11px] font-medium text-zinc-200">
+                    {pendingChange
+                      ? `${visibleBillingIssues.length} issue${visibleBillingIssues.length === 1 ? '' : 's'}`
+                      : `${viewerOverageIssues.length} blocker${viewerOverageIssues.length === 1 ? '' : 's'}`}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2.5">
+                  {(pendingChange ? visibleBillingIssues : viewerOverageIssues).slice(0, 5).map((issue) => (
+                    <a
+                      key={buildIssueKey(issue)}
+                      href={issue.cleanupHref}
+                      className="group flex items-start justify-between rounded-2xl border border-white/[0.06] bg-black/20 px-3.5 py-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.03]"
+                    >
+                      <div className="pr-4">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            'inline-flex h-2 w-2 rounded-full',
+                            issue.severity === 'advisory' ? 'bg-amber-300' : 'bg-red-300',
+                          )} />
+                          <p className="text-[12px] font-medium text-zinc-100">{issue.title}</p>
+                        </div>
+                        <p className="mt-1 text-[12px] leading-5 text-zinc-400">{issue.description}</p>
+                      </div>
+                      <span className="shrink-0 text-[11px] font-medium text-zinc-400 transition-colors group-hover:text-white">
+                        {issue.cleanupLabel}
+                      </span>
+                    </a>
+                  ))}
                 </div>
               </div>
             </div>
@@ -903,18 +1367,63 @@ export function SettingsSection({
                 <CreditCard className="h-3.5 w-3.5" />
                 Upgrade Plan
               </button>
+            ) : !canManageBilling ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-sky-300/15 bg-sky-300/10 px-3 py-1.5 text-[11px] font-medium text-sky-100/90">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-200" />
+                Billing owner only
+              </span>
             ) : (
               <>
+                {!hasScheduledCancellation && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChangePlanError(null);
+                      setChangePlanSuccess(null);
+                      setChangePlanModalOpen(true);
+                    }}
+                    disabled={changePlanLoading || stripePlanRedirectLoading}
+                    className={btnPrimary}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    {pendingChange ? 'Update Scheduled Change' : 'Change Plan'}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={handleOpenBillingPortal}
-                  disabled={portalLoading}
+                  onClick={hasScheduledCancellation ? () => void handleReactivatePlan() : handleOpenBillingPortal}
+                  disabled={portalLoading || reactivateLoading}
                   className={btnPrimary}
                 >
                   <CreditCard className="h-3.5 w-3.5" />
-                  {portalLoading ? 'Opening...' : hasScheduledCancellation ? 'Manage in Stripe' : 'Manage Billing'}
+                  {hasScheduledCancellation
+                    ? reactivateLoading
+                      ? 'Keeping plan...'
+                      : 'Keep Current Plan'
+                    : portalLoading
+                      ? 'Opening...'
+                      : 'Billing & Invoices'}
                 </button>
-                {hasScheduledCancellation ? (
+                {hasScheduledCancellation && (
+                  <button
+                    type="button"
+                    onClick={handleOpenBillingPortal}
+                    disabled={portalLoading || reactivateLoading}
+                    className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
+                  >
+                    {portalLoading ? 'Opening Stripe...' : 'Billing & Invoices'}
+                  </button>
+                )}
+                {pendingChange && !hasScheduledCancellation ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleCancelScheduledPlanChange()}
+                    disabled={changePlanLoading}
+                    className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
+                  >
+                    {changePlanLoading ? 'Canceling...' : 'Cancel Scheduled Change'}
+                  </button>
+                ) : hasScheduledCancellation ? (
                   <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/15 bg-amber-300/10 px-3 py-1.5 text-[11px] font-medium text-amber-100/90">
                     <span className="h-1.5 w-1.5 rounded-full bg-amber-200" />
                     Cancellation scheduled
@@ -932,13 +1441,365 @@ export function SettingsSection({
               </>
             )}
           </div>
-          {billingError && (
+          {(billingError || billingStatus.error || changePlanSuccess) && (
             <div className="border-t border-white/[0.06] px-5 py-3">
-              <p className="text-[12px] text-red-400">{billingError}</p>
+              {billingError && <p className="text-[12px] text-red-400">{billingError}</p>}
+              {!billingError && billingStatus.error && <p className="text-[12px] text-red-400">{billingStatus.error}</p>}
+              {!billingError && !billingStatus.error && changePlanSuccess && <p className="text-[12px] text-[#25c972]">{changePlanSuccess}</p>}
+            </div>
+          )}
+          {hasScheduledCancellation && !billingError && !billingStatus.error && (
+            <div className="border-t border-white/[0.06] px-5 py-3">
+              <p className="text-[12px] text-zinc-500">
+                Keep Current Plan uses Stripe directly in-app. Stripe Billing is still available for payment methods and invoices.
+              </p>
             </div>
           )}
         </Card>
       </section>
+
+      <Sheet open={changePlanModalOpen} onOpenChange={setChangePlanModalOpen}>
+        <SheetContent
+          side="center"
+          showClose={false}
+          className="max-h-[calc(100vh-2rem)] max-w-2xl border-white/[0.08] bg-[#0c0c0e] p-0 shadow-[0_32px_120px_rgba(0,0,0,0.55)]"
+        >
+          <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.75rem]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-5">
+              <div>
+                <SheetTitle className="text-[16px] font-semibold tracking-[-0.01em] text-white">
+                  Change plan
+                </SheetTitle>
+                <SheetDescription className="mt-1 text-[12px] text-zinc-500">
+                  Choose a plan below. Simple upgrades continue in Stripe, while downgrades stay here so we can verify limits first.
+                </SheetDescription>
+              </div>
+              <SheetClose
+                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+                aria-label="Close"
+              >
+                <span className="text-lg leading-none">&times;</span>
+              </SheetClose>
+            </div>
+
+            <div className="min-h-0 overflow-y-auto px-6 pb-6 pt-5">
+              {/* Billing cycle toggle */}
+              <div className="flex justify-center">
+                <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChangePlanCycle('monthly');
+                      if (selectedTargetPlan?.includes('annual')) {
+                        const newPlan = selectedTargetPlan.replace('annual', 'monthly') as PaymentPlanString;
+                        void handlePreviewPlanChange(newPlan);
+                      }
+                    }}
+                    className={cn(
+                      'rounded-md px-4 py-1.5 text-[12px] font-medium transition-colors',
+                      changePlanCycle === 'monthly'
+                        ? 'bg-white/[0.1] text-white'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    )}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChangePlanCycle('annual');
+                      if (selectedTargetPlan?.includes('monthly')) {
+                        const newPlan = selectedTargetPlan.replace('monthly', 'annual') as PaymentPlanString;
+                        void handlePreviewPlanChange(newPlan);
+                      }
+                    }}
+                    className={cn(
+                      'rounded-md px-4 py-1.5 text-[12px] font-medium transition-colors',
+                      changePlanCycle === 'annual'
+                        ? 'bg-white/[0.1] text-white'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    )}
+                  >
+                    Annual
+                    <span className="ml-1.5 rounded-full bg-[#25c972]/15 px-1.5 py-0.5 text-[9px] font-bold text-[#25c972]">
+                      Save ~20%
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Plan cards */}
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                {(['starter', 'pro', 'growth'] as const).map((cardTier) => {
+                  const cardPlan = PLANS[cardTier];
+                  const planId = `${cardTier}_${changePlanCycle}` as PaymentPlanString;
+                  const isCurrent = cardTier === tier;
+                  const isSelected = !isCurrent && selectedTargetPlan === planId;
+                  const isDowngrade = !isCurrent && canAccess(tier, cardTier);
+                  const monthlyPrice = changePlanCycle === 'annual' && cardPlan.annualPrice > 0
+                    ? Math.round(cardPlan.annualPrice / 12)
+                    : cardPlan.monthlyPrice;
+
+                  if (!currentPlanOptions.includes(planId)) return null;
+
+                  return (
+                    <button
+                      key={planId}
+                      type="button"
+                      onClick={() => { if (!isCurrent) void handlePreviewPlanChange(planId); }}
+                      disabled={isCurrent}
+                      className={cn(
+                        'relative flex flex-col rounded-2xl border p-4 text-left transition-all',
+                        isCurrent
+                          ? 'border-white/[0.12] bg-white/[0.04] cursor-default opacity-60'
+                          : isSelected
+                            ? 'border-[#25c972]/40 bg-[#25c972]/[0.08] ring-1 ring-[#25c972]/20 cursor-pointer'
+                            : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15] hover:bg-white/[0.04] cursor-pointer'
+                      )}
+                    >
+                      {/* Badge: Current or Selected */}
+                      {isCurrent ? (
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/[0.12] bg-[#0c0c0e] px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
+                          Your plan
+                        </span>
+                      ) : isSelected ? (
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#25c972] px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-black">
+                          {isDowngrade ? 'Switch to' : 'Upgrade to'}
+                        </span>
+                      ) : null}
+
+                      <p className={cn('text-[13px] font-semibold', isCurrent ? 'text-zinc-400' : 'text-white')}>{cardPlan.name}</p>
+
+                      <div className="mt-2 flex items-baseline gap-0.5">
+                        <span className={cn('text-[22px] font-bold', isCurrent ? 'text-zinc-500' : 'text-white')}>${monthlyPrice}</span>
+                        <span className="text-[11px] text-zinc-500">/mo</span>
+                      </div>
+                      {changePlanCycle === 'annual' && (
+                        <p className="mt-0.5 text-[10px] text-zinc-600">
+                          {formatMoney(cardPlan.annualPrice * 100)}/yr
+                        </p>
+                      )}
+
+                      <ul className="mt-3 flex-1 space-y-1.5">
+                        {cardPlan.features.slice(0, 4).map((f) => (
+                          <li key={f} className={cn('flex items-start gap-1.5 text-[11px] leading-4', isCurrent ? 'text-zinc-600' : 'text-zinc-400')}>
+                            <Check className={cn('mt-0.5 h-3 w-3 shrink-0', isCurrent ? 'text-zinc-600' : 'text-[#25c972]/60')} />
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+
+                      {!isCurrent && !isSelected && (
+                        <p className="mt-3 text-center text-[11px] font-medium text-zinc-500">
+                          Select
+                        </p>
+                      )}
+                      {isSelected && (
+                        <p className="mt-3 text-center text-[11px] font-medium text-[#25c972]">
+                          Selected
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Transition summary — clear "from → to" */}
+              {selectedTargetPlan && !changeTargetIsSamePlan && (() => {
+                const targetTier = planStringToTier(selectedTargetPlan);
+                const targetConfig = PLANS[targetTier];
+                const isDown = canAccess(tier, targetTier) && tier !== targetTier;
+                const targetMonthly = changePlanCycle === 'annual' && targetConfig.annualPrice > 0
+                  ? Math.round(targetConfig.annualPrice / 12)
+                  : targetConfig.monthlyPrice;
+                return (
+                  <div className={cn(
+                    'mt-4 flex items-center justify-center gap-3 rounded-xl border px-4 py-3',
+                    isDown ? 'border-amber-400/15 bg-amber-400/[0.04]' : 'border-[#25c972]/15 bg-[#25c972]/[0.04]'
+                  )}>
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase tracking-wider text-zinc-500">Current</p>
+                      <p className="text-[13px] font-semibold text-zinc-300">{planConfig.name}</p>
+                    </div>
+                    <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', isDown ? 'bg-amber-400/15' : 'bg-[#25c972]/15')}>
+                      {isDown
+                        ? <ArrowDown className="h-3 w-3 text-amber-300" />
+                        : <ArrowUp className="h-3 w-3 text-[#25c972]" />
+                      }
+                    </div>
+                    <div className="text-center">
+                      <p className={cn('text-[10px] uppercase tracking-wider', isDown ? 'text-amber-400/70' : 'text-[#25c972]/70')}>{isDown ? 'Downgrade' : 'Upgrade'}</p>
+                      <p className="text-[13px] font-semibold text-white">{targetConfig.name} <span className="font-normal text-zinc-500">${targetMonthly}/mo</span></p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Readiness panel — shows when a plan is selected */}
+              {selectedTargetPlan && !changeTargetIsSamePlan && (
+                <div className="mt-3">
+                  {previewLoading && !changePlanPreview ? (
+                    <div className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] py-8 text-[12px] text-zinc-500">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Checking readiness...
+                    </div>
+                  ) : changePlanPreview && (
+                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[12px] font-medium text-zinc-400">
+                            {stripeHostedPlanChange
+                              ? 'Stripe-hosted change'
+                              : changePlanPreview.sameEntitlements
+                                ? 'Billing cycle change only — same features.'
+                                : selectedTargetIsDowngrade
+                                  ? 'Auto-adjust preview'
+                                  : 'Guided limit check'}
+                          </p>
+                          <p className="mt-1 text-[12px] leading-5 text-zinc-500">
+                            {changePlanPreview.change.reason}
+                          </p>
+                          {selectedTargetIsDowngrade && !changePlanPreview.sameEntitlements && (
+                            <p className="mt-1 text-[11px] leading-4 text-zinc-500">
+                              These items will be automatically adjusted when your plan changes. You can resolve them now if you prefer.
+                            </p>
+                          )}
+                        </div>
+                        <span className={cn(
+                          'rounded-full px-2.5 py-1 text-[10px] font-medium',
+                          stripeHostedPlanChange
+                            ? 'bg-sky-400/10 text-sky-300'
+                            : changePlanPreview.blockers
+                              ? selectedTargetIsDowngrade
+                                ? 'bg-sky-400/10 text-sky-300'
+                                : 'bg-amber-400/10 text-amber-300'
+                              : 'bg-[#25c972]/10 text-[#25c972]'
+                        )}>
+                          {stripeHostedPlanChange
+                            ? 'Stripe'
+                            : changePlanPreview.blockers
+                              ? selectedTargetIsDowngrade
+                                ? `${changePlanPreview.blockers + changePlanPreview.advisories} auto-adjustment${(changePlanPreview.blockers + changePlanPreview.advisories) === 1 ? '' : 's'}`
+                                : `${changePlanPreview.blockers} blocker${changePlanPreview.blockers === 1 ? '' : 's'}`
+                              : 'Ready'}
+                        </span>
+                      </div>
+
+                      {stripeHostedPlanChange ? (
+                        <div className="mt-3 rounded-lg border border-sky-300/10 bg-sky-400/[0.05] px-3 py-3">
+                          <p className="text-[12px] leading-5 text-zinc-200">
+                            Stripe will confirm the final billing details securely before applying this change.
+                          </p>
+                          <p className="mt-1 text-[11px] leading-5 text-zinc-500">
+                            We&apos;ll bring you back here and refresh the workspace automatically after Stripe finishes.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {(changePlanPreview.metrics ?? []).length > 0 && (
+                            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                              {(changePlanPreview.metrics ?? []).map((metric) => (
+                                <div key={metric.category} className="rounded-lg border border-white/[0.05] bg-black/20 px-3 py-2">
+                                  <p className="text-[10px] uppercase tracking-wider text-zinc-600">{metric.label}</p>
+                                  <p className={cn(
+                                    'mt-1 text-[13px] font-semibold',
+                                    metric.status === 'over_limit' ? 'text-amber-300' : 'text-white'
+                                  )}>
+                                    {metric.current} / {metric.limit ?? '∞'}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {(changePlanPreview.issues ?? []).length > 0 && (
+                            <div className="mt-3 space-y-1.5">
+                              {changePlanPreview.issues.slice(0, 4).map((issue) => (
+                                <a
+                                  key={buildIssueKey(issue)}
+                                  href={issue.cleanupHref}
+                                  className="group flex items-center justify-between rounded-lg border border-white/[0.05] bg-black/20 px-3 py-2 transition-colors hover:border-white/[0.1]"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className={cn(
+                                      'inline-flex h-1.5 w-1.5 rounded-full',
+                                      issue.severity === 'advisory' ? 'bg-amber-300' : 'bg-red-300',
+                                    )} />
+                                    <span className="text-[11px] text-zinc-300">{issue.title}</span>
+                                  </div>
+                                  <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300">{issue.cleanupLabel}</span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
+
+                          {(changePlanPreview.issues ?? []).length === 0 && !changePlanPreview.sameEntitlements && (
+                            <p className="mt-3 flex items-center gap-2 text-[11px] text-[#25c972]/80">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              No blockers — ready for the guided change flow.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {changePlanError && (
+                <p className="mt-3 text-[12px] text-red-400">{changePlanError}</p>
+              )}
+
+              {/* Footer actions */}
+              <div className="mt-5 flex items-center justify-between gap-3">
+                <div>
+                  {pendingChange && (
+                    <button
+                      type="button"
+                      onClick={() => void handleCancelScheduledPlanChange()}
+                      disabled={changePlanLoading || stripePlanRedirectLoading}
+                      className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
+                    >
+                      Cancel scheduled change
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setChangePlanModalOpen(false)}
+                    disabled={changePlanLoading || stripePlanRedirectLoading}
+                    className="rounded-lg px-4 py-2 text-[12px] font-medium text-zinc-400 transition-colors hover:text-white disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stripeHostedPlanChange
+                      ? () => void handleContinuePlanChangeInStripe()
+                      : () => void handleSchedulePlanChange()}
+                    disabled={stripeHostedPlanChange
+                      ? stripePlanRedirectLoading || !selectedTargetPlan || changeTargetIsSamePlan
+                      : changePlanLoading || !selectedTargetPlan || changeTargetIsSamePlan}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#25c972] px-5 py-2 text-[12px] font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+                  >
+                    {(changePlanLoading || stripePlanRedirectLoading) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    {stripeHostedPlanChange
+                      ? stripePlanRedirectLoading
+                        ? 'Opening Stripe...'
+                        : 'Continue in Stripe'
+                      : pendingChange
+                        ? 'Update change'
+                        : 'Confirm change'}
+                    {stripeHostedPlanChange ? <ExternalLink className="h-3.5 w-3.5" /> : null}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={cancelPlanModalOpen} onOpenChange={setCancelPlanModalOpen}>
         <SheetContent
@@ -1091,32 +1952,72 @@ export function SettingsSection({
                 }
               />
 
+              {seatPriorityIssues.length > 0 && (
+                <div className="border-b border-white/[0.06] px-5 py-4">
+                  <div className="rounded-2xl border border-amber-300/15 bg-amber-300/8 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100/80">Seat priority</p>
+                    <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                      This scheduled downgrade is tighter than the current seat usage. Pending invites count first, then lower-priority members move into cleanup-only access if the team is still over the cap.
+                    </p>
+                    <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                      Use the priority selectors below to decide which members keep full access first.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Members list */}
               <div className="border-b border-white/[0.06] px-5 py-4">
                 <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Members</p>
                 <div className="space-y-2">
                   {teamData.members.map((member) => (
                     <div key={member.user_id} className="flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] text-zinc-200">{member.email || member.user_id}</span>
-                        <span className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                          member.role === 'owner'
-                            ? 'bg-[#6c63ff]/20 text-[#6c63ff]'
-                            : 'bg-white/[0.06] text-zinc-500'
-                        )}>
-                          {member.role}
-                        </span>
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] text-zinc-200">{member.email || member.user_id}</span>
+                            <span className={cn(
+                              'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                              member.role === 'owner'
+                                ? 'bg-[#6c63ff]/20 text-[#6c63ff]'
+                                : 'bg-white/[0.06] text-zinc-500'
+                            )}>
+                              {member.role}
+                            </span>
+                          </div>
+                          {member.role !== 'owner' && (
+                            <div className="mt-1 flex items-center gap-2">
+                              <span className="text-[11px] text-zinc-500">Priority</span>
+                              <select
+                                value={member.plan_access_rank ?? 1}
+                                onChange={(event) => void handleUpdateMemberPriority(member.user_id, Number(event.target.value))}
+                                disabled={memberPrioritySaving === member.user_id}
+                                className="rounded-lg border border-white/[0.08] bg-black/30 px-2.5 py-1 text-[11px] text-zinc-200 focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-50"
+                              >
+                                {seatPriorityMembers.map((_, index) => (
+                                  <option key={index + 1} value={index + 1}>
+                                    {index + 1}
+                                  </option>
+                                ))}
+                              </select>
+                              {memberPrioritySaving === member.user_id && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" />
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       {member.role !== 'owner' && (
-                        <button
-                          type="button"
-                          onClick={() => void handleRemoveMember(member.user_id)}
-                          disabled={memberRemoving === member.user_id}
-                          className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
-                        >
-                          <UserMinus className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => void handleRemoveMember(member.user_id)}
+                            disabled={memberRemoving === member.user_id}
+                            className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                          >
+                            <UserMinus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
