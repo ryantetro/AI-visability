@@ -276,6 +276,9 @@ export function SettingsSection({
   const canManageBilling = billingStatus.status?.canManageBilling ?? tier !== 'free';
   const activeReadiness = billingStatus.status?.activeReadiness ?? null;
   const readiness = billingStatus.status?.readiness ?? null;
+  const billingCurrentPlan = billingStatus.status?.currentPlan ?? plan;
+  const billingCurrentTier = billingStatus.status?.currentTier ?? tier;
+  const billingPlanConfig = PLANS[billingCurrentTier];
   const readinessIssues = readiness ? uniqueIssues(readiness.issues) : [];
   const viewerReadinessIssues = readiness ? uniqueIssues(readiness.viewerIssues) : [];
   const viewerOverageIssues = billingStatus.status ? uniqueIssues(billingStatus.status.overageIssues) : [];
@@ -283,26 +286,34 @@ export function SettingsSection({
   const visibleBillingIssues = canManageBilling ? readinessIssues : viewerReadinessIssues;
   const currentPlanOptions = useMemo(() => (
     CHANGE_PLAN_OPTIONS
-  ), [tier]);
+  ), []);
   const defaultTargetPlan = useMemo(() => {
     if (pendingChange?.targetPlan) {
       return pendingChange.targetPlan;
     }
 
+    const currentCycle = billingCurrentPlan.includes('annual') ? 'annual' : 'monthly';
+    const alternateCycle = currentCycle === 'annual' ? 'monthly' : 'annual';
+    const sameTierCycleSwitch = currentPlanOptions.find((planId) => (
+      planId !== billingCurrentPlan
+      && planStringToTier(planId) === billingCurrentTier
+      && planId.includes(alternateCycle)
+    ));
+    if (sameTierCycleSwitch) return sameTierCycleSwitch;
+
     // Pick the first plan of a different tier, matching the current billing cycle
-    const cycle = plan.includes('annual') ? 'annual' : 'monthly';
     const differentTierPlan = currentPlanOptions.find((planId) => {
       const t = planStringToTier(planId);
-      return t !== tier && t !== 'free' && planId.includes(cycle);
+      return t !== billingCurrentTier && t !== 'free' && planId.includes(currentCycle);
     });
     if (differentTierPlan) return differentTierPlan;
 
     // Fallback: any plan of a different tier
     return (currentPlanOptions.find((planId) => {
       const t = planStringToTier(planId);
-      return t !== tier && t !== 'free';
+      return t !== billingCurrentTier && t !== 'free';
     }) ?? null) as PaymentPlanString | null;
-  }, [currentPlanOptions, pendingChange?.targetPlan, plan, tier]);
+  }, [billingCurrentPlan, billingCurrentTier, currentPlanOptions, pendingChange?.targetPlan]);
 
   const handleCreateTeam = async () => {
     if (!teamNameInput.trim()) return;
@@ -427,8 +438,7 @@ export function SettingsSection({
   const pendingEffectiveTimestamp = parseIsoTimestamp(pendingChange?.effectiveAt ?? null);
   const pendingEffectiveLabel = formatShortDate(pendingEffectiveTimestamp);
   const pendingRemainingLabel = formatRemainingAccess(pendingEffectiveTimestamp);
-  const changeTargetIsSamePlan = selectedTargetPlan === plan
-    || (selectedTargetPlan != null && planStringToTier(selectedTargetPlan) === tier);
+  const changeTargetIsSamePlan = selectedTargetPlan === billingCurrentPlan;
   const stripeHostedPlanChange = Boolean(changePlanPreview?.change.canUseStripe);
   const guidedFallbackPlanChange = Boolean(
     changePlanPreview
@@ -438,8 +448,8 @@ export function SettingsSection({
   const selectedTargetTier = selectedTargetPlan ? planStringToTier(selectedTargetPlan) : null;
   const selectedTargetIsDowngrade = Boolean(
     selectedTargetTier
-      && selectedTargetTier !== tier
-      && canAccess(tier, selectedTargetTier),
+      && selectedTargetTier !== billingCurrentTier
+      && canAccess(billingCurrentTier, selectedTargetTier),
   );
   const canScheduleGuidedChange = Boolean(
     selectedTargetPlan
@@ -451,7 +461,7 @@ export function SettingsSection({
   const seatPriorityIssues = (pendingChange ? visibleBillingIssues : (canManageBilling ? activeIssues : viewerOverageIssues))
     .filter((issue) => issue.category === 'seats' || issue.category === 'pending_invites');
 
-  const billingCycle = plan.includes('annual') ? 'Annual' : plan.includes('monthly') ? 'Monthly' : '';
+  const billingCycle = billingCurrentPlan.includes('annual') ? 'Annual' : billingCurrentPlan.includes('monthly') ? 'Monthly' : '';
   const planExpiresAtTimestamp = parseIsoTimestamp(planExpiresAt);
   const accessEndsOnLabel = formatShortDate(planExpiresAtTimestamp);
   const remainingAccessLabel = formatRemainingAccess(planExpiresAtTimestamp);
@@ -740,13 +750,13 @@ export function SettingsSection({
     hasAutoSelectedRef.current = true;
 
     // Reset billing cycle to match current plan
-    const cycle = plan.includes('annual') ? 'annual' : 'monthly';
+    const cycle = billingCurrentPlan.includes('annual') ? 'annual' : 'monthly';
     setChangePlanCycle(cycle);
 
     if (defaultTargetPlan) {
       void handlePreviewPlanChange(defaultTargetPlan);
     }
-  }, [changePlanModalOpen, defaultTargetPlan, handlePreviewPlanChange, plan]);
+  }, [billingCurrentPlan, changePlanModalOpen, defaultTargetPlan, handlePreviewPlanChange]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1341,8 +1351,8 @@ export function SettingsSection({
                     </p>
                     <p className="mt-2 text-[13px] leading-6 text-zinc-200">
                       {pendingChange
-                        ? 'We’ll keep guiding you until every blocker is resolved or the scheduled change becomes active.'
-                        : 'Some features are in cleanup-only mode because this workspace is already over the active plan limits.'}
+                        ? 'Your workspace will be automatically adjusted when the plan change takes effect.'
+                        : 'Some features are limited because this workspace exceeds the current plan limits.'}
                     </p>
                   </div>
                   <div className="inline-flex items-center rounded-full border border-white/[0.08] bg-black/20 px-3 py-1.5 text-[11px] font-medium text-zinc-200">
@@ -1427,7 +1437,7 @@ export function SettingsSection({
           )}
           {tier === 'growth' && (
             <div className="border-b border-white/[0.06] px-5 py-4">
-              <p className="text-[12px] text-[#25c972]">You're on the Growth plan — full access to all features</p>
+              <p className="text-[12px] text-[#25c972]">You&apos;re on the Growth plan — full access to all features</p>
             </div>
           )}
 
@@ -1605,9 +1615,9 @@ export function SettingsSection({
                 {(['starter', 'pro', 'growth'] as const).map((cardTier) => {
                   const cardPlan = PLANS[cardTier];
                   const planId = `${cardTier}_${changePlanCycle}` as PaymentPlanString;
-                  const isCurrent = cardTier === tier;
+                  const isCurrent = planId === billingCurrentPlan;
                   const isSelected = !isCurrent && selectedTargetPlan === planId;
-                  const isDowngrade = !isCurrent && canAccess(tier, cardTier);
+                  const isDowngrade = !isCurrent && canAccess(billingCurrentTier, cardTier);
                   const monthlyPrice = changePlanCycle === 'annual' && cardPlan.annualPrice > 0
                     ? Math.round(cardPlan.annualPrice / 12)
                     : cardPlan.monthlyPrice;
@@ -1680,7 +1690,7 @@ export function SettingsSection({
               {selectedTargetPlan && !changeTargetIsSamePlan && (() => {
                 const targetTier = planStringToTier(selectedTargetPlan);
                 const targetConfig = PLANS[targetTier];
-                const isDown = canAccess(tier, targetTier) && tier !== targetTier;
+                const isDown = canAccess(billingCurrentTier, targetTier) && billingCurrentTier !== targetTier;
                 const targetMonthly = changePlanCycle === 'annual' && targetConfig.annualPrice > 0
                   ? Math.round(targetConfig.annualPrice / 12)
                   : targetConfig.monthlyPrice;
@@ -1691,7 +1701,7 @@ export function SettingsSection({
                   )}>
                     <div className="text-center">
                       <p className="text-[10px] uppercase tracking-wider text-zinc-500">Current</p>
-                      <p className="text-[13px] font-semibold text-zinc-300">{planConfig.name}</p>
+                      <p className="text-[13px] font-semibold text-zinc-300">{billingPlanConfig.name}</p>
                     </div>
                     <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', isDown ? 'bg-amber-400/15' : 'bg-[#25c972]/15')}>
                       {isDown
@@ -2028,7 +2038,7 @@ export function SettingsSection({
                   <div className="rounded-2xl border border-amber-300/15 bg-amber-300/8 p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100/80">Seat priority</p>
                     <p className="mt-2 text-[13px] leading-6 text-zinc-100">
-                      This scheduled downgrade is tighter than the current seat usage. Pending invites count first, then lower-priority members move into cleanup-only access if the team is still over the cap.
+                      This scheduled downgrade is tighter than the current seat usage. Pending invites are revoked first, then lower-priority members are suspended when the plan change takes effect.
                     </p>
                     <p className="mt-1 text-[12px] leading-5 text-zinc-400">
                       Use the priority selectors below to decide which members keep full access first.
@@ -2549,7 +2559,7 @@ export function SettingsSection({
             <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">How it works</p>
             <ol className="mt-2.5 space-y-1.5 text-[12px] leading-5 text-zinc-500">
               <li>1. Checks <code className="text-zinc-400">User-Agent</code> for AI bots and <code className="text-zinc-400">Referer</code> for AI engine click-throughs.</li>
-              <li>2. Posts to AISO with your site key — domain is resolved server-side.</li>
+              <li>2. Posts to airadr with your site key — domain is resolved server-side.</li>
               <li>3. Bot visits appear in AI Crawler Traffic; human referrals appear in AI Referral Traffic.</li>
             </ol>
             <p className="mt-2 text-[11px] text-zinc-600">
