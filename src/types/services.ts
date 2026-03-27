@@ -1,5 +1,6 @@
 import { ScanJob } from './scan';
 import type { AIEngine } from './ai-mentions';
+import type { AiCrawlerProvider } from '@/lib/ai-crawlers';
 
 export interface DatabaseService {
   getScan(id: string): Promise<ScanJob | null>;
@@ -169,7 +170,7 @@ export interface ReferralVisitService {
 }
 
 export interface OpportunityAlertProviderSummary {
-  provider: string;
+  provider: AiCrawlerProvider;
   visits: number;
 }
 

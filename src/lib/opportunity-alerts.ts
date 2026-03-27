@@ -1,4 +1,4 @@
-import { AI_CRAWLER_PROVIDER_ORDER, getCrawlerProvider } from '@/lib/ai-crawlers';
+import { AI_CRAWLER_PROVIDER_ORDER, getCrawlerProvider, type AiCrawlerProvider } from '@/lib/ai-crawlers';
 import { getCrawlerVisits, getDatabase, getReferralVisits } from '@/lib/services/registry';
 import type {
   CrawlerVisit,
@@ -22,7 +22,7 @@ function normalizePath(path: string) {
 }
 
 function summarizeProviders(crawlerVisits: CrawlerVisit[]): OpportunityAlertProviderSummary[] {
-  const counts = new Map<string, number>();
+  const counts = new Map<AiCrawlerProvider, number>();
 
   for (const visit of crawlerVisits) {
     const provider = getCrawlerProvider(visit.botName);
