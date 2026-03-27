@@ -16,6 +16,8 @@ export interface TeamMember {
   team_id: string;
   user_id: string;
   role: 'owner' | 'member';
+  status: 'active' | 'suspended';
+  plan_access_rank: number | null;
   joined_at: string;
   email?: string;
 }
@@ -68,7 +70,7 @@ export async function createTeam(
   // only one will succeed here.
   const { error: memberError } = await supabase
     .from('team_members')
-    .insert({ team_id: team.id, user_id: ownerId, role: 'owner' });
+    .insert({ team_id: team.id, user_id: ownerId, role: 'owner', plan_access_rank: 0 });
 
   if (memberError) {
     // Rollback team creation
@@ -90,6 +92,7 @@ export async function getTeamForUser(userId: string): Promise<TeamForUser | null
     .from('team_members')
     .select('role, team_id, teams(*)')
     .eq('user_id', userId)
+    .eq('status', 'active')
     .limit(1)
     .single();
 
@@ -109,8 +112,10 @@ export async function getTeamMembers(teamId: string): Promise<TeamMember[]> {
 
   const { data, error } = await supabase
     .from('team_members')
-    .select('id, team_id, user_id, role, joined_at, user_profiles(email)')
+    .select('id, team_id, user_id, role, status, plan_access_rank, joined_at, user_profiles(email)')
     .eq('team_id', teamId)
+    .eq('status', 'active')
+    .order('plan_access_rank', { ascending: true, nullsFirst: false })
     .order('joined_at', { ascending: true });
 
   if (error || !data) return [];
@@ -120,6 +125,8 @@ export async function getTeamMembers(teamId: string): Promise<TeamMember[]> {
     team_id: row.team_id,
     user_id: row.user_id,
     role: row.role as 'owner' | 'member',
+    status: (row.status as 'active' | 'suspended') ?? 'active',
+    plan_access_rank: typeof row.plan_access_rank === 'number' ? row.plan_access_rank : null,
     joined_at: row.joined_at,
     email: (row.user_profiles as unknown as { email: string })?.email ?? undefined,
   }));
@@ -217,7 +224,12 @@ export async function acceptInvitation(
   // Insert member — the UNIQUE index on team_members(user_id) prevents race conditions
   const { error: memberError } = await supabase
     .from('team_members')
-    .insert({ team_id: invitation.team_id, user_id: userId, role: 'member' });
+    .insert({
+      team_id: invitation.team_id,
+      user_id: userId,
+      role: 'member',
+      plan_access_rank: await getNextTeamMemberRank(invitation.team_id),
+    });
 
   if (memberError) {
     if (memberError.code === '23505') {
@@ -349,4 +361,67 @@ export async function canAddSeat(teamId: string, maxSeats: number): Promise<bool
   const pendingInvites = await listPendingInvitations(teamId);
 
   return (currentMembers + pendingInvites.length) < maxSeats;
+}
+
+export async function getNextTeamMemberRank(teamId: string): Promise<number> {
+  const supabase = getSupabaseClient();
+
+  const { data } = await supabase
+    .from('team_members')
+    .select('plan_access_rank')
+    .eq('team_id', teamId)
+    .order('plan_access_rank', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  const currentMax = typeof data?.plan_access_rank === 'number' ? data.plan_access_rank : 0;
+  return currentMax + 1;
+}
+
+export async function updateTeamMemberAccessRank(
+  teamId: string,
+  userId: string,
+  planAccessRank: number,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('id, user_id, role, plan_access_rank, joined_at')
+    .eq('team_id', teamId)
+    .neq('role', 'owner')
+    .order('plan_access_rank', { ascending: true, nullsFirst: false })
+    .order('joined_at', { ascending: true });
+
+  if (error || !data) throw new Error(error?.message ?? 'Failed to update team member priority');
+
+  const members = data.map((row) => ({
+    id: row.id,
+    user_id: row.user_id,
+    role: row.role as 'member',
+    plan_access_rank: typeof row.plan_access_rank === 'number' ? row.plan_access_rank : null,
+    joined_at: row.joined_at,
+  }));
+
+  const target = members.find((member) => member.user_id === userId);
+  if (!target) {
+    throw new Error('Team member not found');
+  }
+
+  const ordered = members.filter((member) => member.user_id !== userId);
+  const nextIndex = Math.max(0, Math.min(planAccessRank - 1, ordered.length));
+  ordered.splice(nextIndex, 0, target);
+
+  const updates = ordered.map((member, index) => (
+    supabase
+      .from('team_members')
+      .update({ plan_access_rank: index + 1 })
+      .eq('id', member.id)
+  ));
+
+  const results = await Promise.all(updates);
+  const failed = results.find((result) => result.error);
+  if (failed?.error) {
+    throw new Error(failed.error.message ?? 'Failed to update team member priority');
+  }
 }

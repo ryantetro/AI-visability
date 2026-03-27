@@ -135,7 +135,7 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
 };
 
 /** Tier hierarchy for access checks */
-const TIER_LEVEL: Record<PlanTier, number> = {
+export const TIER_LEVEL: Record<PlanTier, number> = {
   free: 0,
   starter: 1,
   pro: 2,
