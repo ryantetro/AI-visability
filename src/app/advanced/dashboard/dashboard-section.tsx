@@ -20,6 +20,7 @@ import { getFaviconUrl } from '@/lib/url-utils';
 import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
 import { scoreColor, barFillColor, formatRelativeTime, getScoreColor } from '../lib/utils';
 import { ENGINE_COLORS } from '../lib/constants';
+import { computeAverageRank, computeProminenceFallback, formatAverageRankDisplay } from '../lib/mention-utils';
 import { AI_ENGINES, AI_ENGINE_META, getAIEngineLabel } from '@/lib/ai-engines';
 import { MonitoringTrendsPanel } from '../panels/monitoring-trends-panel';
 import { PromptAnalyticsPanel } from '../panels/prompt-analytics-panel';
@@ -143,11 +144,10 @@ export function DashboardSection({
     })
     .join(' \u00b7 ');
 
-  // Average position from citations
-  const positions = mentionResults
-    .flatMap((r) => (r.citationUrls ?? []).filter((c) => c.isOwnDomain).map(() => mentionResults.indexOf(r)))
-    .filter((_, i) => i < 20);
-  const avgRank = positions.length > 0 ? Math.round(positions.reduce((a, b) => a + b, 0) / positions.length) + 1 : null;
+  // Average rank from explicit ranked-list placements
+  const avgRank = computeAverageRank(mentionResults);
+  const avgRankDisplay = formatAverageRankDisplay(avgRank);
+  const prominenceFallback = avgRank == null ? computeProminenceFallback(mentionResults) : null;
 
   // Top prompts — get top 5 by mention
   const promptMentions = mentionResults
@@ -292,14 +292,29 @@ export function DashboardSection({
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
             Average Rank
-            <InfoTooltip text="Your average position when AI engines cite your site. Lower is better — #1 means you're the first source cited." className="ml-1 align-middle" />
+            <InfoTooltip text="Your average position when AI engines place your brand in a ranked list. Lower is better — #1 means you are the top-ranked recommendation. We round the display up to the nearest whole position for a cleaner, conservative score. When no numeric rank is returned, we fall back to mention prominence." className="ml-1 align-middle" />
           </p>
           <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-4xl font-bold text-white">
-              {avgRank != null ? `#${avgRank}` : '--'}
-            </span>
+            {avgRankDisplay != null ? (
+              <span className="text-4xl font-bold text-white">#{avgRankDisplay}</span>
+            ) : prominenceFallback ? (
+              <>
+                <span className="text-2xl font-bold text-white">{prominenceFallback.label}</span>
+                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+                  {prominenceFallback.strongMentionPct}% strong
+                </span>
+              </>
+            ) : (
+              <span className="text-4xl font-bold text-white">--</span>
+            )}
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">{avgRank != null ? 'When mentioned by a model' : 'No citations detected yet'}</p>
+          <p className="mt-2 text-[11px] text-zinc-500">
+            {avgRankDisplay != null
+              ? 'Across ranked AI responses'
+              : prominenceFallback
+                ? prominenceFallback.detail
+                : 'No ranked placements detected yet'}
+          </p>
           {domain && (
             <p className="mt-3 text-[11px] text-zinc-600">
               Tracking: <span className="text-zinc-400">{domain}</span>

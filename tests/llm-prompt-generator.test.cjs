@@ -325,6 +325,16 @@ test('Marine Products (E-commerce/Marine) — template prompts are localized and
   // Location-aware prompts
   const hasLocation = /salt lake/i.test(allText);
   assert.ok(hasLocation, 'Expected location-aware prompts mentioning Salt Lake');
+  const rankingPrompts = prompts.filter((prompt) => /rank the top|top 5 .* in order/i.test(prompt.text));
+  assert.ok(rankingPrompts.length >= 2, `Expected >= 2 explicit ranking prompts, got ${rankingPrompts.length}`);
+  assert.ok(
+    rankingPrompts.some((prompt) => /marine|watersports|wakeboard|boat/i.test(prompt.text)),
+    'Expected at least one ranking prompt to stay marine-specific',
+  );
+  assert.ok(
+    !allText.includes('marine products is one of the leading'),
+    'Expected USP-derived prompts to use clean fragments instead of raw marketing sentences',
+  );
 
   console.log(`\n=== Marine Products template prompts (${prompts.length}) ===`);
   for (const p of prompts) {
@@ -349,6 +359,35 @@ test('template prompts have diverse category coverage', () => {
     // Must have direct category
     assert.ok(categories.has('direct'), `${profile.brand}: Missing 'direct' category`);
   }
+});
+
+test('template prompts bias toward buyer-intent and comparison categories', () => {
+  const crawl = createStripeCrawl();
+  const profile = buildBusinessProfile(crawl);
+  const prompts = generatePrompts(crawl, profile);
+
+  const buyerIntent = prompts.filter((prompt) => prompt.category === 'buyer-intent').length;
+  const comparison = prompts.filter((prompt) => prompt.category === 'comparison').length;
+  const category = prompts.filter((prompt) => prompt.category === 'category').length;
+
+  assert.ok(buyerIntent >= 2, `Expected >= 2 buyer-intent prompts, got ${buyerIntent}`);
+  assert.ok(comparison >= 2, `Expected >= 2 comparison prompts, got ${comparison}`);
+  assert.ok(category <= Math.max(3, buyerIntent + 1), `Category prompts should not dominate the mix (got ${category})`);
+});
+
+test('template prompts use competitor-aware phrasing when competitor seeds exist', () => {
+  const crawl = createPostgameCrawl();
+  crawl.homepage.externalLinks.push('https://hudl.com');
+  const profile = buildBusinessProfile(crawl);
+  profile.scanCompetitorSeeds = ['Hudl', 'Catapult'];
+
+  const prompts = generatePrompts(crawl, profile);
+  const comparisonText = prompts
+    .filter((prompt) => prompt.category === 'comparison')
+    .map((prompt) => prompt.text.toLowerCase())
+    .join(' ');
+
+  assert.match(comparisonText, /hudl|catapult|compare|alternative/);
 });
 
 test('all template prompts pass isValidPromptText', () => {

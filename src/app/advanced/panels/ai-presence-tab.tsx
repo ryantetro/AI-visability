@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { ENGINE_COLORS } from '../lib/constants';
 import { EngineIcon, BrandFavicon } from './shared';
 import {
+  computeAverageRank,
   computeVisibilityPct,
   computeShareOfVoicePct,
   computeSentimentScore,
@@ -144,6 +145,7 @@ type MentionSummary = NonNullable<DashboardReportData['mentionSummary']>;
 
 export function AiPresenceTab({ report, domain }: { report: DashboardReportData; domain: string }) {
   const ms = report.mentionSummary;
+  const aiState = report.enrichments?.aiMentions;
   const [trackedLeaderboard, setTrackedLeaderboard] = useState<Array<{ name: string; count: number; visibilityPct: number; avgPosition: number | null; source: 'tracked' }>>([]);
 
   useEffect(() => {
@@ -160,15 +162,8 @@ export function AiPresenceTab({ report, domain }: { report: DashboardReportData;
             name: competitor.competitorDomain,
             count: 0,
             visibilityPct: competitor.scanData?.mentionSummary?.visibilityPct ?? 0,
-            avgPosition: competitor.scanData?.mentionSummary?.results?.filter((result) => result.position != null).length
-              ? Math.round(
-                (
-                  competitor.scanData.mentionSummary.results
-                    .filter((result) => result.position != null)
-                    .reduce((sum, result) => sum + (result.position ?? 0), 0) /
-                  competitor.scanData.mentionSummary.results.filter((result) => result.position != null).length
-                ) * 10
-              ) / 10
+            avgPosition: competitor.scanData?.mentionSummary?.results
+              ? computeAverageRank(competitor.scanData.mentionSummary.results)
               : null,
             source: 'tracked' as const,
           }))
@@ -214,10 +209,56 @@ export function AiPresenceTab({ report, domain }: { report: DashboardReportData;
     return merged;
   }, [ms, trackedLeaderboard]);
 
+  if (!ms && (aiState?.status === 'pending' || aiState?.status === 'running')) {
+    return (
+      <DashboardPanel className="p-5">
+        <p className="text-center text-sm text-zinc-300">AI mention testing is still running for this scan.</p>
+        <p className="mt-2 text-center text-sm text-zinc-500">
+          {aiState?.phase === 'prompt_generation'
+            ? 'Generating prompts'
+            : aiState?.phase === 'engine_testing'
+              ? 'Testing live AI engines'
+              : aiState?.phase === 'response_analysis'
+                ? 'Analyzing engine responses'
+                : 'Finalizing AI visibility metrics'}
+        </p>
+      </DashboardPanel>
+    );
+  }
+
   if (!ms) {
     return (
       <DashboardPanel className="p-5">
         <p className="text-center text-sm text-zinc-500">No AI mention data available. Run a scan to see your AI presence metrics.</p>
+      </DashboardPanel>
+    );
+  }
+
+  const mentionTestingUnavailable =
+    aiState?.status === 'failed' ||
+    aiState?.status === 'unavailable' ||
+    (ms.results?.length ?? 0) === 0 &&
+    Object.values(ms.engineStatus ?? {}).some((status) => status.status === 'error');
+  const mentionTestingDegraded = Boolean(aiState?.status === 'complete' && aiState?.metrics?.degraded);
+
+  if (mentionTestingUnavailable) {
+    const failingEngines = AI_ENGINES
+      .filter((engine) => ms.engineStatus?.[engine]?.status === 'error')
+      .map((engine) => engine);
+
+    return (
+      <DashboardPanel className="p-5">
+        <p className="text-center text-sm text-zinc-300">
+          AI mention testing did not finish for this scan.
+        </p>
+        <p className="mt-2 text-center text-sm text-zinc-500">
+          Live providers timed out or rate-limited the run, so this scan does not have a reliable AI visibility score yet.
+        </p>
+        {failingEngines.length > 0 && (
+          <p className="mt-3 text-center text-xs text-zinc-500">
+            Affected engines: {failingEngines.join(', ')}
+          </p>
+        )}
       </DashboardPanel>
     );
   }
@@ -230,6 +271,13 @@ export function AiPresenceTab({ report, domain }: { report: DashboardReportData;
 
   return (
     <div className="space-y-6">
+      {mentionTestingDegraded && (
+        <DashboardPanel className="p-4">
+          <p className="text-sm text-amber-200">
+            This AI mention run completed with fallback prompts or heuristic analysis after provider slowdowns.
+          </p>
+        </DashboardPanel>
+      )}
       <HeroSection
         ms={ms}
         visibilityPct={visibilityPct}

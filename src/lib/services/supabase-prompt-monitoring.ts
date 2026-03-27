@@ -38,10 +38,23 @@ interface ResultRow {
   domain: string;
   engine: AIEngine;
   mentioned: boolean;
+  mention_type: 'direct' | 'indirect' | 'not_mentioned' | null;
   position: number | null;
+  position_context: 'listed_ranking' | 'prominent' | 'passing' | 'absent' | null;
   sentiment: string | null;
+  sentiment_label: 'positive' | 'neutral' | 'negative' | 'mixed' | null;
+  sentiment_strength: number | null;
+  sentiment_reasoning: string | null;
+  key_quote: string | null;
   citation_present: boolean;
   citation_urls: unknown[] | null;
+  description_accuracy: 'accurate' | 'partial' | 'inaccurate' | null;
+  analysis_source: 'llm' | 'heuristic' | null;
+  competitors_json: Array<{ name: string; position: number | null }> | null;
+  monitoring_run_id: string | null;
+  run_weighted_score: number | string | null;
+  run_score_delta: number | string | null;
+  notable_score_change: boolean | null;
   raw_snippet: string | null;
   tested_at: string;
 }
@@ -61,16 +74,31 @@ function promptFromRow(row: PromptRow): MonitoredPrompt {
 }
 
 function resultFromRow(row: ResultRow): PromptResult {
+  const runWeightedScore = row.run_weighted_score == null ? null : Number(row.run_weighted_score);
+  const runScoreDelta = row.run_score_delta == null ? null : Number(row.run_score_delta);
   return {
     id: row.id,
     promptId: row.prompt_id,
     domain: row.domain,
     engine: row.engine,
     mentioned: row.mentioned,
+    mentionType: row.mention_type ?? (row.mentioned ? 'direct' : 'not_mentioned'),
     position: row.position,
+    positionContext: row.position_context,
     sentiment: row.sentiment,
+    sentimentLabel: row.sentiment_label,
+    sentimentStrength: row.sentiment_strength,
+    sentimentReasoning: row.sentiment_reasoning,
+    keyQuote: row.key_quote,
     citationPresent: row.citation_present,
     citationUrls: row.citation_urls,
+    descriptionAccuracy: row.description_accuracy,
+    analysisSource: row.analysis_source ?? 'heuristic',
+    competitorsJson: row.competitors_json,
+    monitoringRunId: row.monitoring_run_id,
+    runWeightedScore: Number.isFinite(runWeightedScore) ? runWeightedScore : null,
+    runScoreDelta: Number.isFinite(runScoreDelta) ? runScoreDelta : null,
+    notableScoreChange: row.notable_score_change ?? false,
     rawSnippet: row.raw_snippet,
     testedAt: row.tested_at,
   };
@@ -174,10 +202,23 @@ export const supabasePromptMonitoring: PromptMonitoringService = {
         domain: result.domain,
         engine: result.engine,
         mentioned: result.mentioned,
+        mention_type: result.mentionType,
         position: result.position,
+        position_context: result.positionContext,
         sentiment: result.sentiment,
+        sentiment_label: result.sentimentLabel,
+        sentiment_strength: result.sentimentStrength,
+        sentiment_reasoning: result.sentimentReasoning,
+        key_quote: result.keyQuote,
         citation_present: result.citationPresent,
         citation_urls: result.citationUrls,
+        description_accuracy: result.descriptionAccuracy,
+        analysis_source: result.analysisSource,
+        competitors_json: result.competitorsJson,
+        monitoring_run_id: result.monitoringRunId,
+        run_weighted_score: result.runWeightedScore,
+        run_score_delta: result.runScoreDelta,
+        notable_score_change: result.notableScoreChange,
         raw_snippet: result.rawSnippet,
         tested_at: result.testedAt,
       }),
@@ -250,6 +291,9 @@ export const supabasePromptMonitoring: PromptMonitoringService = {
         engine: appearance.engine,
         prompt_id: appearance.promptId,
         position: appearance.position,
+        previous_position: appearance.previousPosition,
+        movement_delta: appearance.movementDelta,
+        is_new_competitor: appearance.isNewCompetitor,
         co_mentioned: appearance.coMentioned,
         week_start: appearance.weekStart,
       }),

@@ -1,4 +1,9 @@
 export type AIEngine = 'chatgpt' | 'perplexity' | 'gemini' | 'claude';
+export type MentionType = 'direct' | 'indirect' | 'not_mentioned';
+export type MentionSentiment = 'positive' | 'neutral' | 'negative' | 'mixed';
+export type PositionContext = 'listed_ranking' | 'prominent' | 'passing' | 'absent';
+export type DescriptionAccuracy = 'accurate' | 'partial' | 'inaccurate';
+export type AnalysisSource = 'llm' | 'heuristic';
 
 export interface MentionPrompt {
   id: string;
@@ -78,18 +83,32 @@ export interface CitationUrl {
   isCompetitor: boolean;
 }
 
+export interface CompetitorPosition {
+  name: string;
+  position: number | null;
+}
+
 export interface MentionResult {
   engine: AIEngine;
   prompt: MentionPrompt;
   mentioned: boolean;
+  mentionType: MentionType;
   position: number | null;
+  positionContext: PositionContext | null;
   sentiment: 'positive' | 'neutral' | 'negative' | null;
+  sentimentLabel: MentionSentiment | null;
+  sentimentStrength: number;
+  sentimentReasoning: string | null;
+  keyQuote: string | null;
   citationPresent: boolean;
   citationUrls: CitationUrl[];
   descriptionAccurate: boolean;
+  descriptionAccuracy: DescriptionAccuracy | null;
   competitors: string[];
+  competitorsWithPositions: CompetitorPosition[];
   rawSnippet: string;
   testedAt: number;
+  analysisSource: AnalysisSource;
 }
 
 export interface EngineBreakdown {
@@ -124,6 +143,14 @@ export interface TopicPerformance {
 export interface SentimentSummary {
   overallSentiment: 'positive' | 'neutral' | 'negative';
   positiveScore: number;
+  averageStrength: number;
+  sentimentBreakdown: Record<AIEngine, {
+    sentiment: MentionSentiment | 'not-found';
+    averageStrength: number;
+    sampleQuote: string | null;
+  }>;
+  keyPositiveQuotes: string[];
+  keyNegativeQuotes: string[];
   positives: string[];
   negatives: string[];
 }
@@ -131,8 +158,16 @@ export interface SentimentSummary {
 export interface ShareOfVoiceData {
   brandMentions: number;
   totalMentions: number;
+  brandProminence: number;
+  totalProminence: number;
   shareOfVoicePct: number;
-  byEngine: Record<AIEngine, { brandMentions: number; totalMentions: number; sovPct: number }>;
+  byEngine: Record<AIEngine, {
+    brandMentions: number;
+    totalMentions: number;
+    brandProminence: number;
+    totalProminence: number;
+    sovPct: number;
+  }>;
 }
 
 export interface CompetitorLeaderboardEntry {

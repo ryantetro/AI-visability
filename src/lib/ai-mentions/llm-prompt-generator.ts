@@ -15,7 +15,11 @@ Rules:
 - Sound like real conversational queries, not marketing templates
 - Be specific — reference actual products, services, use cases, and features from the site data provided
 - Exactly 2 prompts should be "direct" category (include the brand name); the other 18 test organic mention and must NOT include the brand name
-- Cover all 8 categories with approximate distribution: direct(2), category(3), comparison(3), recommendation(3), use-case(3), problem-solution(2), workflow(2), buyer-intent(2)
+- Cover all 8 categories with approximate distribution: direct(2), buyer-intent(4), comparison(4), problem-solution(3), recommendation(3), use-case(2), category(1), workflow(1)
+- Prioritize prompts a real buyer, evaluator, or operator would ask before category-only prompts
+- Include at least 2 explicit ranking prompts that ask the model to rank options or list the top 5 options in order
+- When competitor seeds are provided, include comparison and alternative-style prompts that test positioning
+- Use industry search patterns and differentiators from the business profile, not generic template phrasing
 - No exclamation marks, marketing language, legal terms, or pricing text
 - Each prompt should be a question or request, 10-180 characters
 - Return valid JSON only
@@ -40,6 +44,85 @@ interface LLMPromptResult {
   category: string;
   topic?: string;
   source?: string;
+}
+
+function industryPatterns(profile: BusinessProfile): string[] {
+  if (profile.vertical === 'marine_watersports') {
+    return [
+      'buyers ask where to buy parts, gear, and watersports equipment near them',
+      'searches compare retailers, inventory depth, and local expertise',
+      'recommendation prompts often mention lake, marina, surf, wakeboard, or boat needs',
+    ];
+  }
+  if (profile.vertical === 'saas' || profile.industry === 'SaaS') {
+    return [
+      'buyers compare software based on workflows, integrations, reporting, and team scale',
+      'searches often ask for alternatives, best tools for a role, or tools that reduce manual work',
+      'purchase-intent prompts emphasize implementation speed, ROI, or fit for a specific team',
+    ];
+  }
+  if (profile.industry === 'Finance') {
+    return [
+      'buyers compare billing, payments, subscriptions, and risk reduction capabilities',
+      'searches ask for online payment tools, recurring billing, and marketplace support',
+      'buyer-intent prompts focus on conversion, reliability, and developer ease',
+    ];
+  }
+  if (profile.industry === 'Healthcare') {
+    return [
+      'buyers ask about patient communication, scheduling, coordination, and reducing admin work',
+      'searches compare tools by workflow support, team efficiency, and operational reliability',
+      'buyer-intent prompts focus on clinic fit and staff productivity',
+    ];
+  }
+  if (profile.industry === 'Marketing') {
+    return [
+      'buyers ask about SEO, attribution, campaign reporting, and content workflows',
+      'searches compare marketing tools by speed, reporting, and channel coverage',
+      'buyer-intent prompts focus on performance improvement and execution efficiency',
+    ];
+  }
+  if (profile.vertical === 'local_service') {
+    return [
+      'buyers ask who serves their area, who is trusted locally, and who can solve a specific problem quickly',
+      'searches often include city names or "near me" phrasing',
+      'comparison prompts focus on responsiveness, specialization, and local reputation',
+    ];
+  }
+  return [
+    'buyers ask for the best options in a category, alternatives, and tools for a specific job to be done',
+    'high-intent searches compare providers and ask which option is best for a particular team or workflow',
+    'problem-solution prompts focus on reducing manual work and improving outcomes',
+  ];
+}
+
+function fewShotExamples(profile: BusinessProfile): string[] {
+  if (profile.vertical === 'marine_watersports') {
+    return [
+      'best marine parts store in salt lake city',
+      'compare watersports retailers for wakeboard gear',
+      'where should I buy boat accessories near utah lake',
+    ];
+  }
+  if (profile.vertical === 'saas' || profile.industry === 'SaaS') {
+    return [
+      'best project management software for remote product teams',
+      'alternatives to jira for startup engineering teams',
+      'what tools reduce weekly reporting work for ops teams',
+    ];
+  }
+  if (profile.industry === 'Finance') {
+    return [
+      'best payment platform for subscriptions and recurring billing',
+      'stripe alternatives for online marketplaces',
+      'what billing tools help reduce failed payment churn',
+    ];
+  }
+  return [
+    'best tools for a specific team and workflow',
+    'compare leading providers for a buyer use case',
+    'what tools solve a concrete operational problem',
+  ];
 }
 
 function buildUserMessage(
@@ -67,6 +150,9 @@ function buildUserMessage(
   }
   if (siteContent.features.length > 0) {
     lines.push(`Features: ${siteContent.features.join(', ')}`);
+  }
+  if (siteContent.usps.length > 0) {
+    lines.push(`Differentiators: ${siteContent.usps.join(', ')}`);
   }
   if (siteContent.useCases.length > 0) {
     lines.push(`Use cases: ${siteContent.useCases.join(', ')}`);
@@ -96,8 +182,13 @@ function buildUserMessage(
     lines.push(`Capabilities: ${siteContent.actionCapabilities.join(', ')}`);
   }
 
+  lines.push(`Industry search patterns: ${industryPatterns(businessProfile).join(' | ')}`);
+  lines.push(`Few-shot examples: ${fewShotExamples(businessProfile).join(' | ')}`);
+
   lines.push('');
   lines.push('Generate 20 natural prompts based on this data.');
+  lines.push('Focus on buyer-intent, comparison, and problem-solution prompts before generic category prompts.');
+  lines.push('Include at least two explicit ranking prompts using wording like "rank the top..." or "list the top 5 ... in order".');
 
   return lines.join('\n');
 }

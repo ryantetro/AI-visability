@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { getDatabase } from '@/lib/services/registry';
-import { buildPublicScoreSummaryFromScan, type PublicScoreScanLike, type PublicScoreSummary } from '@/lib/public-score';
+import {
+  buildPublicScoreSummaryFromScan,
+  getPublicScoreSummary,
+  type PublicScoreScanLike,
+  type PublicScoreSummary,
+} from '@/lib/public-score';
 import { getDomain } from '@/lib/url-utils';
 
 export interface DomainVerificationRecord {

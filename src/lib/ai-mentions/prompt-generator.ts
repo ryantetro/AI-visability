@@ -4,13 +4,24 @@ import { extractSiteContent } from './content-extractor';
 
 export const MIN_PROMPTS = 15;
 export const MAX_PROMPTS = 25;
+const TARGET_CATEGORY_COUNTS: Partial<Record<MentionPrompt['category'], number>> = {
+  direct: 2,
+  'buyer-intent': 4,
+  comparison: 4,
+  'problem-solution': 3,
+  recommendation: 3,
+  'use-case': 2,
+  category: 1,
+  workflow: 1,
+};
 
-const SAFE_SOURCES = new Set(['core', 'fallback', 'backfill']);
 const KEYWORD_STOPWORDS = new Set([
   'the', 'and', 'for', 'with', 'from', 'your', 'that', 'this', 'what', 'best', 'top', 'about',
   'products', 'product', 'services', 'service', 'company', 'companies', 'business', 'businesses',
   'online', 'today', 'leading', 'available', 'tools', 'tool', 'solutions', 'solution', 'gear',
 ]);
+const PROMPT_STOREFRONT_UI_PATTERN = /\b(your cart|shopping cart|cart subtotal|view cart|my account|account login|sign in|log in|proceed to checkout|continue shopping|track order|product details|compare products|recently viewed|you may also like|customers also bought|related products|write a review|customer reviews|shipping & returns|shipping and returns|sort by|filter by|in stock|out of stock|sku|quantity)\b/i;
+const PROMPT_STOREFRONT_FRAGMENT_PATTERN = /\b(best|top|buy|compare|where should i buy|what is the best)\s+(your|my|our)\b/i;
 
 export function isValidPromptText(text: string): boolean {
   if (text.length < 10 || text.length > 200) return false;
@@ -23,9 +34,15 @@ export function isValidPromptText(text: string): boolean {
 
   // CTA / pricing noise
   if (/\b(cancel anytime|best value|sign up|free trial|get started|buy now|add to cart|subscribe now|money back|no credit card|per month|per year|most popular)\b/i.test(text)) return false;
+  if (PROMPT_STOREFRONT_UI_PATTERN.test(text) || PROMPT_STOREFRONT_FRAGMENT_PATTERN.test(text)) return false;
+  if (/^(best|top)\s+(your|my|our)\b/i.test(text.trim())) return false;
 
   // Truncated text ending with short word + "?"  (e.g. "...yo?")
-  if (/\b\w{1,2}\?$/.test(text)) return false;
+  const shortQuestionEnding = text.match(/\b(\w{1,2})\?$/);
+  if (shortQuestionEnding) {
+    const endingWord = shortQuestionEnding[1].toLowerCase();
+    if (endingWord !== 'do') return false;
+  }
 
   // Measurement/spec text in prompts (raw measurements like 1/4", 3/8", unit patterns)
   if (/\d+[/"']\s*\w/.test(text) || /\d+\s*(?:mm|cm|lbs|oz|ft|in\.?|kg|ml|gal)\b/i.test(text)) return false;
@@ -239,6 +256,59 @@ function categoryPhrasesForProfile(industry: string, profile: ReturnType<typeof 
   return [`${industry} companies`, `${industry} providers`];
 }
 
+function compactListPhrase(value: string): string {
+  const parts = value
+    .split(/,\s*|\s+and\s+/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length <= 1) return value.trim();
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+
+  return `${parts[0]}, ${parts[1]}, and ${parts[2]}`;
+}
+
+function normalizeUspPromptFragment(usp: string, brand: string): string | null {
+  const normalizedBrand = brand.trim().toLowerCase();
+  const cleaned = usp
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.!?]+$/, '');
+
+  if (!cleaned || cleaned.length < 8) return null;
+
+  const withoutBrandLead = cleaned.replace(
+    new RegExp(`^${normalizedBrand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+is\\s+`, 'i'),
+    '',
+  );
+
+  const phraseCandidates = [
+    withoutBrandLead.match(/\b(?:known for|specializ(?:e|es|ing) in|focused on)\s+(.+)$/i)?.[1],
+    withoutBrandLead.match(/\b(?:dealer|dealers|provider|providers|retailer|retailers|supplier|suppliers|specialist|specialists)\s+of\s+(.+)$/i)?.[1],
+    withoutBrandLead.match(/\b(?:offering|offers)\s+(.+)$/i)?.[1],
+  ].filter((value): value is string => Boolean(value));
+
+  const rawCandidate = phraseCandidates[0] || withoutBrandLead;
+  const trimmedCandidate = rawCandidate
+    .replace(/^(?:one of the|the|a|an)\s+/i, '')
+    .replace(/^(?:leading|top-rated|award-winning|trusted|best-in-class|premier)\s+/i, '')
+    .replace(/\b(?:in the country|nationwide|worldwide)\b.*$/i, '')
+    .replace(/\b(?:located|based)\s+in\s+.+$/i, '')
+    .replace(/\bserving\s+.+$/i, '')
+    .replace(/[,:;]\s*$/g, '')
+    .trim();
+
+  if (!trimmedCandidate) return null;
+  if (/\bis\b/i.test(trimmedCandidate)) return null;
+  if (PROMPT_STOREFRONT_UI_PATTERN.test(trimmedCandidate)) return null;
+
+  const compacted = compactListPhrase(trimmedCandidate);
+  const words = compacted.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+
+  return compacted.slice(0, 70).replace(/[,\s]+$/g, '').trim();
+}
+
 export function buildBusinessProfile(crawl: CrawlData): BusinessProfile {
   const brand = inferBusinessName(crawl);
   const industry = inferIndustry(crawl);
@@ -296,6 +366,191 @@ interface PromptBase {
   source: string;
 }
 
+function detectPromptFamily(profile: BusinessProfile): 'saas' | 'ecommerce' | 'healthcare' | 'finance' | 'marketing' | 'local_service' | 'marine' | 'general' {
+  if (profile.vertical === 'marine_watersports') return 'marine';
+  if (profile.vertical === 'local_service') return 'local_service';
+  if (profile.vertical === 'saas' || profile.industry === 'SaaS') return 'saas';
+  if (profile.vertical === 'ecommerce_platform' || profile.industry === 'E-commerce') return 'ecommerce';
+  if (profile.industry === 'Healthcare') return 'healthcare';
+  if (profile.industry === 'Finance') return 'finance';
+  if (profile.industry === 'Marketing') return 'marketing';
+  return 'general';
+}
+
+function buildVerticalSpecificPrompts(profile: BusinessProfile, year: number): PromptBase[] {
+  const family = detectPromptFamily(profile);
+  const location = profile.location;
+  const categoryPhrase = profile.categoryPhrases[0]?.toLowerCase() ?? profile.industry.toLowerCase();
+  const firstProduct = profile.productCategories[0]?.toLowerCase() ?? categoryPhrase;
+  const firstService = profile.serviceSignals[0]?.toLowerCase() ?? categoryPhrase;
+
+  switch (family) {
+    case 'saas':
+      return [
+        { text: `Best ${categoryPhrase} software for growing teams in ${year}`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare ${categoryPhrase} platforms for multi-team reporting`, category: 'comparison', source: 'backfill' },
+        { text: `What ${categoryPhrase} tools reduce manual reporting work?`, category: 'problem-solution', source: 'backfill' },
+      ];
+    case 'ecommerce':
+      return [
+        { text: `Best ${categoryPhrase} platforms for fast-growing online stores`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare ecommerce platforms for subscriptions and repeat purchases`, category: 'comparison', source: 'backfill' },
+        { text: `Which ecommerce platforms help brands improve checkout conversion?`, category: 'problem-solution', source: 'backfill' },
+      ];
+    case 'healthcare':
+      return [
+        { text: `Best healthcare software for patient communication and coordination`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare healthcare platforms for clinics that need better workflows`, category: 'comparison', source: 'backfill' },
+        { text: `What healthcare tools help reduce admin work for staff?`, category: 'problem-solution', source: 'backfill' },
+      ];
+    case 'finance':
+      return [
+        { text: `Best fintech platforms for online payments and recurring billing`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare payment platforms for marketplaces and subscriptions`, category: 'comparison', source: 'backfill' },
+        { text: `Which finance tools help companies reduce billing friction?`, category: 'problem-solution', source: 'backfill' },
+      ];
+    case 'marketing':
+      return [
+        { text: `Best marketing platforms for content, SEO, and campaign reporting`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare marketing tools for attribution and performance reporting`, category: 'comparison', source: 'backfill' },
+        { text: `What marketing software helps teams publish content faster?`, category: 'problem-solution', source: 'backfill' },
+      ];
+    case 'local_service':
+      return [
+        { text: `Best ${firstService}${location ? ` in ${location}` : ''}`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare ${profile.industry.toLowerCase()} providers${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' },
+        { text: `Who helps customers solve ${categoryPhrase}${location ? ` near ${location}` : ''}?`, category: 'problem-solution', source: 'backfill' },
+      ];
+    case 'marine':
+      return [
+        { text: `Best ${firstProduct}${location ? ` in ${location}` : ''}`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare marine parts and watersports retailers${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' },
+        { text: `Which marine retailers help boat owners find parts quickly?`, category: 'problem-solution', source: 'backfill' },
+      ];
+    default:
+      return [
+        { text: `Best ${categoryPhrase} options for buyers in ${year}`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare the leading ${categoryPhrase} providers`, category: 'comparison', source: 'backfill' },
+        { text: `What ${categoryPhrase} tools solve the biggest buyer problems?`, category: 'problem-solution', source: 'backfill' },
+      ];
+  }
+}
+
+function buildRankingPrompts(profile: BusinessProfile): PromptBase[] {
+  const family = detectPromptFamily(profile);
+  const location = profile.location;
+  const categoryPhrase = profile.categoryPhrases[0]?.toLowerCase() ?? profile.industry.toLowerCase();
+  const firstProduct = profile.productCategories[0]?.toLowerCase() ?? categoryPhrase;
+  const firstService = profile.serviceSignals[0]?.toLowerCase() ?? categoryPhrase;
+
+  switch (family) {
+    case 'marine':
+      return [
+        {
+          text: `Rank the top marine parts stores${location ? ` in ${location}` : ''}`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 watersports retailers${location ? ` near ${location}` : ''} in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
+    case 'local_service':
+      return [
+        {
+          text: `Rank the top ${firstService}${location ? ` in ${location}` : ''}`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 ${profile.industry.toLowerCase()} providers${location ? ` in ${location}` : ''} in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
+    case 'saas':
+      return [
+        {
+          text: `Rank the top ${categoryPhrase} platforms for growing teams`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 ${categoryPhrase} tools in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
+    case 'finance':
+      return [
+        {
+          text: `Rank the top payment and billing platforms for online businesses`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 fintech tools for subscriptions in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
+    case 'healthcare':
+      return [
+        {
+          text: `Rank the top healthcare workflow platforms for clinics`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 healthcare software tools for patient communication in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
+    case 'marketing':
+      return [
+        {
+          text: `Rank the top marketing platforms for SEO and reporting`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 content and attribution tools in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
+    case 'ecommerce':
+      return [
+        {
+          text: `Rank the top ecommerce platforms for fast-growing online stores`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 checkout and storefront platforms in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
+    default:
+      return [
+        {
+          text: `Rank the top ${categoryPhrase} providers${location ? ` in ${location}` : ''}`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 ${firstProduct} options${location ? ` in ${location}` : ''} in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
+  }
+}
+
 function makePrompt(
   base: PromptBase,
   id: string,
@@ -323,6 +578,8 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
   const profile = extractSiteContent(crawl);
   const year = new Date().getFullYear();
   const isMarineRetail = resolvedProfile.vertical === 'marine_watersports';
+  const verticalSpecific = buildVerticalSpecificPrompts(resolvedProfile, year);
+  const rankingPrompts = buildRankingPrompts(resolvedProfile);
 
   // --- Tier builders (each returns array of PromptBase) ---
 
@@ -443,8 +700,10 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
     });
   }
   for (const usp of profile.usps.slice(0, 1)) {
+    const uspFragment = normalizeUspPromptFragment(usp, businessName);
+    if (!uspFragment) continue;
     audiencePrompts.push({
-      text: `What ${industry.toLowerCase()} companies are known for ${usp.toLowerCase().slice(0, 60)}?`,
+      text: `What ${industry.toLowerCase()} companies are known for ${uspFragment.toLowerCase()}?`,
       category: 'category',
       source: 'audience',
     });
@@ -529,16 +788,18 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
     ...core,
     ...faqPrompts,
     ...productService,
-    ...useCasePrompts,
+    ...rankingPrompts,
     ...competitorPrompts,
     ...problemPrompts,
-    ...featurePrompts,
-    ...workflowPrompts,
-    ...audiencePrompts,
     ...buyerPrompts,
+    ...verticalSpecific,
+    ...useCasePrompts,
+    ...featurePrompts,
+    ...audiencePrompts,
     ...geoPrompts,
     ...integrationPrompts,
     ...industryTermPrompts,
+    ...workflowPrompts,
     ...blogPrompts,
     ...fallback,
   ];
@@ -547,9 +808,7 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
   let selected = ordered.slice(0, MAX_PROMPTS);
 
   // Filter out junk content-derived prompts (keep safe templates)
-  selected = selected.filter(
-    (p) => SAFE_SOURCES.has(p.source) || isValidPromptText(p.text)
-  );
+  selected = selected.filter((p) => isValidPromptText(p.text));
 
   // Backfill if below MIN_PROMPTS with intent-driven templates
   const ind = industry.toLowerCase();
@@ -564,6 +823,9 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
     resolvedProfile.vertical === 'marine_watersports'
       ? { text: `Where should I buy marine parts and wakeboards${location ? ` near ${location}` : ''}?`, category: 'buyer-intent', source: 'backfill' }
       : { text: `What problems does ${ind} software typically solve?`, category: 'recommendation', source: 'backfill' },
+    resolvedProfile.vertical === 'marine_watersports'
+      ? { text: `Rank the top marine and watersports retailers${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' }
+      : { text: `Rank the top ${categoryPhrase} tools${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' },
     { text: `Compare the leading ${resolvedProfile.vertical === 'marine_watersports' ? 'marine retail' : ind} solutions`, category: 'comparison', source: 'backfill' },
     { text: `What should I look for when evaluating ${resolvedProfile.vertical === 'marine_watersports' ? 'marine and watersports dealers' : `${ind} tools`}?`, category: 'recommendation', source: 'backfill' },
     { text: `Which ${resolvedProfile.vertical === 'marine_watersports' ? 'boating retailers' : `${ind} platforms`} are growing fastest right now?`, category: 'category', source: 'backfill' },
@@ -573,13 +835,27 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
     { text: `How is AI changing the ${resolvedProfile.vertical === 'marine_watersports' ? 'marine retail' : ind} industry?`, category: 'category', source: 'backfill' },
   ];
 
-  if (selected.length < MIN_PROMPTS) {
+  const selectedCounts = new Map<MentionPrompt['category'], number>();
+  for (const prompt of selected) {
+    selectedCounts.set(prompt.category, (selectedCounts.get(prompt.category) || 0) + 1);
+  }
+
+  const weightedBackfill = [
+    ...verticalSpecific,
+    ...genericBackfill,
+  ];
+
+  if (selected.length < MIN_PROMPTS || Object.entries(TARGET_CATEGORY_COUNTS).some(([category, target]) => (selectedCounts.get(category as MentionPrompt['category']) || 0) < (target || 0))) {
     const existing = new Set(selected.map((p) => p.text));
-    for (const backfill of genericBackfill) {
-      if (selected.length >= MIN_PROMPTS) break;
+    for (const backfill of weightedBackfill) {
+      const target = TARGET_CATEGORY_COUNTS[backfill.category] ?? 0;
+      const currentCount = selectedCounts.get(backfill.category) || 0;
+      if (selected.length >= MAX_PROMPTS) break;
+      if (target > 0 && currentCount >= target && selected.length >= MIN_PROMPTS) continue;
       if (!existing.has(backfill.text)) {
         selected.push(backfill);
         existing.add(backfill.text);
+        selectedCounts.set(backfill.category, currentCount + 1);
       }
     }
   }
@@ -591,6 +867,8 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
     seen.add(p.text);
     return true;
   });
+
+  selected = selected.filter((p) => isValidPromptText(p.text));
 
   // Convert to MentionPrompt[]
   return selected.map((base, i) =>

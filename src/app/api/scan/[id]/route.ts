@@ -7,8 +7,7 @@ import type { CrawlData } from '@/types/crawler';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
 import { getDomain, getFaviconUrl } from '@/lib/url-utils';
-import { normalizeMentionSummary } from '@/lib/ai-mentions/summary';
-import type { MentionSummary } from '@/types/ai-mentions';
+import { resolveScanState } from '@/lib/scan-state';
 
 interface PreviewHomepageData {
   assetUrls?: string[];
@@ -66,7 +65,7 @@ export async function GET(
 
   const serializedScore = scoreResult ? serializeScoreResult(scoreResult) : null;
   const assetPreview = buildAssetPreview(scan);
-  const mentionSummary = normalizeMentionSummary(scan.mentionSummary as MentionSummary | null | undefined);
+  const { progress, mentionSummary, enrichments } = resolveScanState(scan);
 
   // Derive hasPaid from plan-based access OR legacy scan.paid flag
   let hasPaid = !!scan.paid;
@@ -81,8 +80,8 @@ export async function GET(
     id: scan.id,
     url: scan.url,
     status: scan.status,
-    progress: scan.progress,
-    enrichments: scan.enrichments,
+    progress,
+    enrichments,
     score: scan.status === 'complete' ? scoreResult?.percentage : undefined,
     scores: serializedScore?.scores,
     webHealth: scan.status === 'complete' ? serializedScore?.webHealth ?? null : null,

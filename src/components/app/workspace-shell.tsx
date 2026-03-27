@@ -585,7 +585,7 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
           )}
 
           <p className="mt-5 text-center text-[11px] text-zinc-600">
-            This usually takes 1–2 minutes. The page will update automatically.
+            This usually takes 4–5 minutes. The page will update automatically.
           </p>
         </div>
       </div>

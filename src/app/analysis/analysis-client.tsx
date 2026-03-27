@@ -643,18 +643,33 @@ export function AnalysisPageContent() {
     label: string;
     status: 'pending' | 'running' | 'done' | 'error';
   }[];
+  const progressLanes = (data?.progress?.lanes ?? []) as Array<{
+    key: 'site_scan' | 'ai_mentions';
+    label: string;
+    status: 'pending' | 'running' | 'done' | 'error';
+    progressPct?: number;
+    currentStep?: string;
+    checks: Array<{
+      label: string;
+      status: 'pending' | 'running' | 'done' | 'error';
+    }>;
+  }>;
 
   const totalChecks = progressChecks.length;
   const doneChecks = progressChecks.filter((item) => item.status === 'done').length;
   const runningChecks = progressChecks.filter((item) => item.status === 'running').length;
   const errorChecks = progressChecks.filter((item) => item.status === 'error').length;
 
-  const progressPercent =
-    totalChecks > 0
+  const progressPercent = progressLanes.length > 0
+    ? Math.round(
+      progressLanes.reduce((sum, lane) => sum + (lane.progressPct ?? 0), 0) / progressLanes.length
+    )
+    : totalChecks > 0
       ? Math.round(((doneChecks + runningChecks * 0.5) / totalChecks) * 100)
       : 0;
 
   const currentStep =
+    progressLanes.find((lane) => lane.status === 'running')?.currentStep ??
     data?.progress?.currentStep ??
     progressChecks.find((item) => item.status === 'running')?.label ??
     (progressChecks.length > 0 ? progressChecks[progressChecks.length - 1]?.label : 'Initializing');
@@ -1286,7 +1301,39 @@ export function AnalysisPageContent() {
 
             {/* Checklist */}
             <div className="mt-5">
-              <ProgressChecklist checks={progressChecks} />
+              {progressLanes.length > 0 ? (
+                <div className="space-y-4">
+                  {progressLanes.map((lane) => (
+                    <div
+                      key={lane.key}
+                      className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">{lane.label}</p>
+                          <p className="mt-1 text-xs text-zinc-400">
+                            {lane.currentStep || currentStep}
+                          </p>
+                        </div>
+                        <span className="text-xs tabular-nums text-zinc-500">
+                          {lane.progressPct ?? 0}%
+                        </span>
+                      </div>
+                      <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div
+                          className="h-full rounded-full bg-white/40 transition-[width] duration-500"
+                          style={{ width: `${Math.max(0, Math.min(100, lane.progressPct ?? 0))}%` }}
+                        />
+                      </div>
+                      <div className="mt-4">
+                        <ProgressChecklist checks={lane.checks} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ProgressChecklist checks={progressChecks} />
+              )}
             </div>
           </section>
         )}

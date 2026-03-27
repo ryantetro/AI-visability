@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { getDatabase, getAlertService, getMentionTester, getPromptMonitoring } from '@/lib/services/registry';
-import { analyzeResponse } from '@/lib/ai-mentions/mention-analyzer';
+import { computeScore } from '@/lib/ai-mentions/mention-analyzer';
+import { analyzeResponsesWithLLM } from '@/lib/ai-mentions/llm-response-analyzer';
 import { listActiveMonitoringDomains, updateMonitoringDomain } from '@/lib/monitoring';
 import { getOpportunityAlertSummary, hasOpportunityAlertCooldownElapsed } from '@/lib/opportunity-alerts';
 import { startScan } from '@/lib/scan-workflow';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getDomain } from '@/lib/url-utils';
-import type { AIEngine, MentionPrompt } from '@/types/ai-mentions';
+import type { AIEngine, BusinessProfile, MentionPrompt, MentionResult } from '@/types/ai-mentions';
 import { getUserAccess } from '@/lib/access';
 import { getCurrentBillingReadiness } from '@/lib/billing';
 import { getScannableEngines, getSelectedPlatforms } from '@/lib/platform-gating';
 import { applyRegionContext, getSelectedRegions, DEFAULT_REGION_ID } from '@/lib/region-gating';
+import { buildBusinessProfile } from '@/lib/ai-mentions/prompt-generator';
+import type { CrawlData } from '@/types/crawler';
 
 const VALID_CATEGORIES: MentionPrompt['category'][] = [
   'direct', 'category', 'comparison', 'recommendation',
@@ -44,6 +48,73 @@ function getWeekStart(): string {
   const diff = now.getUTCDate() - day + (day === 0 ? -6 : 1); // Monday
   const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff));
   return monday.toISOString().slice(0, 10);
+}
+
+function normalizeCompetitorKey(value: string): string {
+  return value.toLowerCase().replace(/^www\./, '').replace(/[^a-z0-9]+/g, '');
+}
+
+async function resolveMonitoringBusinessProfile(domain: string): Promise<BusinessProfile> {
+  const db = getDatabase();
+  const latestScan = await db.findLatestScanByDomain(domain);
+
+  const crawlData = latestScan?.crawlData as CrawlData | undefined;
+  if (crawlData?.url) {
+    return buildBusinessProfile(crawlData);
+  }
+
+  const summary = latestScan?.mentionSummary as
+    | { competitorDiscovery?: { businessProfile?: BusinessProfile } }
+    | undefined;
+  if (summary?.competitorDiscovery?.businessProfile) {
+    return summary.competitorDiscovery.businessProfile;
+  }
+
+  const brand = domain
+    .replace(/\.(com|net|org|co|io|ai|app|biz|us|ca|dev|shop|store)$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  return {
+    brand,
+    domain,
+    industry: 'Technology',
+    location: undefined,
+    vertical: 'general',
+    businessType: 'unknown',
+    siteModel: 'unknown',
+    categoryPhrases: [],
+    productCategories: [],
+    serviceSignals: [],
+    geoSignals: [],
+    similarityKeywords: [],
+    scanCompetitorSeeds: [],
+  };
+}
+
+function getPreviousRunScore(results: Array<{ monitoringRunId: string | null; runWeightedScore: number | null }>): number | null {
+  for (const result of results) {
+    if (result.runWeightedScore != null) return result.runWeightedScore;
+  }
+  return null;
+}
+
+function getPreviousCompetitorPositionMap(results: Array<{
+  engine: AIEngine;
+  competitorsJson: Array<{ name: string; position: number | null }> | null;
+}>): Map<string, number | null> {
+  const map = new Map<string, number | null>();
+
+  for (const result of results) {
+    for (const competitor of result.competitorsJson ?? []) {
+      const key = `${result.engine}::${normalizeCompetitorKey(competitor.name)}`;
+      if (!map.has(key)) {
+        map.set(key, competitor.position ?? null);
+      }
+    }
+  }
+
+  return map;
 }
 
 export async function GET(request: NextRequest) {
@@ -226,6 +297,10 @@ export async function GET(request: NextRequest) {
         const active = prompts.filter((p) => p.active);
         if (active.length === 0) continue;
 
+        const previousResults = await pm.listPromptResults(domain, 500);
+        const businessProfile = await resolveMonitoringBusinessProfile(domain);
+        const pendingResponses: Array<{ promptId: string; engine: AIEngine; response: { engine: AIEngine; prompt: MentionPrompt; text: string; testedAt: number; citations?: string[]; searchResults?: Array<{ url: string; title?: string | null }> } }> = [];
+
         for (const prompt of active) {
           let promptEngines: AIEngine[] = allEngines;
           let primaryRegionId = DEFAULT_REGION_ID;
@@ -291,45 +366,92 @@ export async function GET(request: NextRequest) {
           for (const engine of promptEngines) {
             try {
               const response = await tester.query(engine, mentionPrompt);
-              const analysis = analyzeResponse(response, domain, domain);
-
-              await pm.savePromptResult({
-                promptId: prompt.id,
-                domain,
-                engine,
-                mentioned: analysis.mentioned,
-                position: analysis.position,
-                sentiment: analysis.sentiment,
-                citationPresent: analysis.citationPresent,
-                citationUrls: analysis.citationUrls,
-                rawSnippet: analysis.rawSnippet,
-                testedAt: new Date().toISOString(),
-              });
-
-              // Save competitor appearances
-              const weekStart = getWeekStart();
-              for (const comp of analysis.competitors) {
-                try {
-                  await pm.saveCompetitorAppearance({
-                    domain,
-                    competitor: comp,
-                    competitorDomain: null,
-                    engine,
-                    promptId: prompt.id,
-                    position: null,
-                    coMentioned: analysis.mentioned,
-                    weekStart,
-                  });
-                } catch {
-                  // non-critical — don't break on competitor save failure
-                }
-              }
-
-              promptsChecked++;
+              pendingResponses.push({ promptId: prompt.id, engine, response });
             } catch {
               promptErrors++;
             }
           }
+        }
+
+        if (pendingResponses.length === 0) continue;
+
+        const analyzedResults = await analyzeResponsesWithLLM(
+          pendingResponses.map((entry) => entry.response),
+          {
+            brand: businessProfile.brand,
+            domain,
+            businessProfile,
+          }
+        );
+
+        const monitoringRunId = randomUUID();
+        const runWeightedScore = computeScore(analyzedResults);
+        const previousRunScore = getPreviousRunScore(previousResults);
+        const runScoreDelta = previousRunScore != null
+          ? Math.round((runWeightedScore - previousRunScore) * 10) / 10
+          : null;
+        const notableScoreChange = runScoreDelta != null && Math.abs(runScoreDelta) > 10;
+        const previousPositions = getPreviousCompetitorPositionMap(previousResults);
+        const weekStart = getWeekStart();
+
+        for (let index = 0; index < analyzedResults.length; index++) {
+          const analysis = analyzedResults[index] as MentionResult;
+          const pending = pendingResponses[index];
+          const testedAt = new Date(analysis.testedAt).toISOString();
+
+          await pm.savePromptResult({
+            promptId: pending.promptId,
+            domain,
+            engine: pending.engine,
+            mentioned: analysis.mentioned,
+            mentionType: analysis.mentionType,
+            position: analysis.position,
+            positionContext: analysis.positionContext,
+            sentiment: analysis.sentiment,
+            sentimentLabel: analysis.sentimentLabel,
+            sentimentStrength: analysis.sentimentStrength,
+            sentimentReasoning: analysis.sentimentReasoning,
+            keyQuote: analysis.keyQuote,
+            citationPresent: analysis.citationPresent,
+            citationUrls: analysis.citationUrls,
+            descriptionAccuracy: analysis.descriptionAccuracy,
+            analysisSource: analysis.analysisSource,
+            competitorsJson: analysis.competitorsWithPositions,
+            monitoringRunId,
+            runWeightedScore,
+            runScoreDelta,
+            notableScoreChange,
+            rawSnippet: analysis.rawSnippet,
+            testedAt,
+          });
+
+          for (const competitor of analysis.competitorsWithPositions) {
+            try {
+              const competitorKey = `${pending.engine}::${normalizeCompetitorKey(competitor.name)}`;
+              const previousPosition = previousPositions.get(competitorKey) ?? null;
+              const movementDelta = previousPosition != null && competitor.position != null
+                ? previousPosition - competitor.position
+                : null;
+
+              await pm.saveCompetitorAppearance({
+                domain,
+                competitor: competitor.name,
+                competitorDomain: null,
+                engine: pending.engine,
+                promptId: pending.promptId,
+                position: competitor.position,
+                previousPosition,
+                movementDelta,
+                isNewCompetitor: !previousPositions.has(competitorKey),
+                coMentioned: analysis.mentioned,
+                weekStart,
+              });
+            } catch {
+              // non-critical — don't break on competitor save failure
+            }
+          }
+
+          promptsChecked++;
         }
       }
     } catch {

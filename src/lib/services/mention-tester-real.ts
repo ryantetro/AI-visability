@@ -7,11 +7,21 @@ import type {
 import { getAIEngineModel, getConfiguredAIEngines } from '@/lib/ai-engines';
 
 const ANTHROPIC_TIMEOUT_MS = Number(process.env.ANTHROPIC_TIMEOUT_MS || process.env.AI_ENGINE_TIMEOUT_MS || 20000);
+const ANTHROPIC_MIN_INTERVAL_MS = Number(process.env.ANTHROPIC_MIN_INTERVAL_MS || 15000);
+const ANTHROPIC_FALLBACK_RETRY_AFTER_MS = Number(process.env.ANTHROPIC_RETRY_AFTER_MS || 30000);
+const ANTHROPIC_MAX_RETRIES = 3;
+
+let anthropicQueue: Promise<void> = Promise.resolve();
+let anthropicNextAllowedAt = 0;
 
 interface QueryResult {
   text: string;
   citations?: string[];
   searchResults?: EngineSearchResult[];
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
@@ -25,6 +35,52 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
     });
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+function parseRetryAfterMs(res: Response): number | null {
+  const retryAfter = res.headers.get('retry-after');
+  if (!retryAfter) return null;
+
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const retryAt = Date.parse(retryAfter);
+  if (!Number.isNaN(retryAt)) {
+    return Math.max(0, retryAt - Date.now());
+  }
+
+  return null;
+}
+
+function setAnthropicNextAllowedAt(delayMs: number) {
+  anthropicNextAllowedAt = Math.max(
+    anthropicNextAllowedAt,
+    Date.now() + Math.max(delayMs, ANTHROPIC_MIN_INTERVAL_MS),
+  );
+}
+
+async function runAnthropicThrottled<T>(task: () => Promise<T>): Promise<T> {
+  const previous = anthropicQueue;
+  let release!: () => void;
+  anthropicQueue = new Promise((resolve) => {
+    release = resolve;
+  });
+
+  await previous;
+
+  try {
+    const waitMs = Math.max(0, anthropicNextAllowedAt - Date.now());
+    if (waitMs > 0) {
+      await sleep(waitMs);
+    }
+
+    anthropicNextAllowedAt = Date.now() + ANTHROPIC_MIN_INTERVAL_MS;
+    return await task();
+  } finally {
+    release();
   }
 }
 
@@ -52,20 +108,22 @@ async function queryOpenAI(prompt: string): Promise<QueryResult> {
 async function queryAnthropic(prompt: string): Promise<QueryResult> {
   const model = getAIEngineModel('claude');
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    }, ANTHROPIC_TIMEOUT_MS).catch((error) => {
+  for (let attempt = 0; attempt < ANTHROPIC_MAX_RETRIES; attempt += 1) {
+    const res = await runAnthropicThrottled(() =>
+      fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY!,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      }, ANTHROPIC_TIMEOUT_MS)
+    ).catch((error) => {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error(`Anthropic API timeout after ${ANTHROPIC_TIMEOUT_MS}ms`);
       }
@@ -80,9 +138,22 @@ async function queryAnthropic(prompt: string): Promise<QueryResult> {
     }
 
     const body = await res.text().catch(() => '');
-    const isTransient = res.status === 429 || res.status === 529 || res.status >= 500;
-    if (attempt === 0 && isTransient) {
-      console.warn(`[mention-tester-real] claude transient error ${res.status}, retrying once`);
+    const retryAfterMs = parseRetryAfterMs(res);
+    const isRateLimited = res.status === 429;
+    const isTransient = res.status === 529 || res.status >= 500;
+
+    if (isRateLimited && attempt < ANTHROPIC_MAX_RETRIES - 1) {
+      const jitterMs = Math.round(Math.random() * 2000);
+      const delayMs = (retryAfterMs ?? (ANTHROPIC_FALLBACK_RETRY_AFTER_MS * (attempt + 1))) + jitterMs;
+      setAnthropicNextAllowedAt(delayMs);
+      console.warn(`[mention-tester-real] claude rate-limited (${res.status}), retrying in ${delayMs}ms`);
+      continue;
+    }
+
+    if (isTransient && attempt < ANTHROPIC_MAX_RETRIES - 1) {
+      const delayMs = ANTHROPIC_FALLBACK_RETRY_AFTER_MS * (attempt + 1);
+      setAnthropicNextAllowedAt(delayMs);
+      console.warn(`[mention-tester-real] claude transient error ${res.status}, retrying in ${delayMs}ms`);
       continue;
     }
     throw new Error(`Anthropic API error: ${res.status}${body ? ` ${body.slice(0, 240)}` : ''}`);
@@ -173,6 +244,7 @@ const engineQueryMap: Record<AIEngine, (prompt: string) => Promise<QueryResult>>
 };
 
 export const realMentionTester: MentionTesterService = {
+  supportsProviderPacing: true,
   async query(engine: AIEngine, prompt: MentionPrompt): Promise<EngineResponse> {
     const queryFn = engineQueryMap[engine];
     try {

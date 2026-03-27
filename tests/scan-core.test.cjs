@@ -749,7 +749,7 @@ test('generateAllFiles adds platform-specific install instructions', async () =>
 });
 
 test(
-  'estimateRemainingSeconds returns pending defaults, bounded estimates, and omits completed scans',
+  'estimateRemainingSeconds returns pending defaults, extended estimates, and omits completed scans',
   () => {
     const pendingProgress = initialProgress();
     const pendingScan = {
@@ -778,7 +778,7 @@ test(
 
     assert.equal(estimateRemainingSeconds(pendingScan, 3_000), 30);
     assert.equal(estimateRemainingSeconds(midScan, 10_000), 35);
-    assert.equal(estimateRemainingSeconds(slowScan, 120_000), 45);
+    assert.equal(estimateRemainingSeconds(slowScan, 120_000), 960);
     assert.equal(
       estimateRemainingSeconds(
         {
@@ -932,6 +932,108 @@ test('report route includes web-health summary and copy-to-LLM payloads', async 
   assert.equal(payload.scores.aiVisibility, payload.score.scores.aiVisibility);
   assert.ok(payload.scores.overall >= 0);
   assert.ok(Array.isArray(payload.copyToLlm.fixPrompts));
+});
+
+test('report route returns 202 with normalized job lanes while AI mentions are still running', async () => {
+  const crawlData = createCrawlData();
+  const progress = initialProgress();
+  progress.status = 'scoring';
+  progress.currentStep = 'Testing AI mentions';
+  progress.checks[0].status = 'done';
+  progress.checks[1].status = 'done';
+  progress.checks[2].status = 'done';
+  progress.checks[3].status = 'running';
+  progress.checks[6].status = 'running';
+  progress.lanes[0].checks[0].status = 'done';
+  progress.lanes[0].checks[1].status = 'done';
+  progress.lanes[0].checks[2].status = 'running';
+  progress.lanes[0].currentStep = 'Checking Web Health';
+  progress.lanes[1].checks[0].status = 'done';
+  progress.lanes[1].checks[1].status = 'running';
+  progress.lanes[1].currentStep = 'Testing Claude 3/15';
+
+  await mockDb.saveScan({
+    id: 'report-pending-ai',
+    url: crawlData.url,
+    normalizedUrl: crawlData.normalizedUrl,
+    status: 'scoring',
+    progress,
+    createdAt: Date.now(),
+    crawlData,
+    scoreResult: scoreCrawlData(crawlData),
+    email: 'owner@example.com',
+    enrichments: {
+      webHealth: { status: 'running' },
+      aiMentions: {
+        status: 'running',
+        phase: 'engine_testing',
+        startedAt: Date.now(),
+        metrics: {
+          plannedPrompts: 15,
+          executedPrompts: 8,
+          responsesCollected: 19,
+          enginesPlanned: 3,
+          enginesCompleted: 1,
+          degraded: false,
+        },
+      },
+    },
+  });
+
+  const response = await reportRoute.GET(
+    createAuthedRequest('http://localhost/api/scan/report-pending-ai/report'),
+    {
+      params: Promise.resolve({ id: 'report-pending-ai' }),
+    }
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 202);
+  assert.equal(payload.pending, true);
+  assert.equal(payload.status, 'scoring');
+  assert.ok(Array.isArray(payload.progress.lanes));
+  assert.equal(payload.progress.lanes.length, 2);
+  assert.equal(payload.enrichments.aiMentions.status, 'running');
+  assert.equal(payload.enrichments.aiMentions.phase, 'engine_testing');
+  assert.equal(payload.progress.lanes[1].currentStep, 'Testing Claude 3/15');
+  assert.ok(typeof payload.estimatedRemainingSec === 'number');
+});
+
+test('report route backfills fallback AI mention data when a completed scan is missing mentionSummary', async () => {
+  const crawlData = createCrawlData();
+
+  await mockDb.saveScan({
+    id: 'report-fallback-mentions',
+    url: crawlData.url,
+    normalizedUrl: crawlData.normalizedUrl,
+    status: 'complete',
+    progress: {
+      status: 'complete',
+      checks: initialProgress().checks.map((check, index) => ({
+        ...check,
+        status: index === 6 ? 'error' : 'done',
+      })),
+    },
+    createdAt: Date.now(),
+    completedAt: Date.now(),
+    crawlData,
+    scoreResult: scoreCrawlData(crawlData),
+    email: 'owner@example.com',
+  });
+
+  const response = await reportRoute.GET(
+    createAuthedRequest('http://localhost/api/scan/report-fallback-mentions/report'),
+    {
+      params: Promise.resolve({ id: 'report-fallback-mentions' }),
+    }
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.ok(payload.mentionSummary);
+  assert.equal(payload.mentionSummary.overallScore, 0);
+  assert.equal(payload.mentionSummary.engineStatus.chatgpt.status, 'error');
+  assert.equal(payload.mentionSummary.engineStatus.claude.status, 'error');
 });
 
 test('public score summary only resolves for completed scans', async () => {

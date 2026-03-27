@@ -2,6 +2,73 @@ import type { DashboardReportData } from './types';
 import { polishSentimentBullets } from '@/lib/ai-mentions/sentiment-format';
 
 type MentionSummary = NonNullable<DashboardReportData['mentionSummary']>;
+type MentionSummaryResult = MentionSummary['results'][number];
+
+export function computeAverageRank(results: Array<Pick<MentionSummaryResult, 'mentioned' | 'position'>>): number | null {
+  const rankedMentions = results.filter((result) => result.mentioned && result.position != null);
+  if (rankedMentions.length === 0) return null;
+
+  return Math.round(
+    (
+      rankedMentions.reduce((sum, result) => sum + (result.position ?? 0), 0) /
+      rankedMentions.length
+    ) * 10
+  ) / 10;
+}
+
+export function formatAverageRankDisplay(averageRank: number | null): number | null {
+  if (averageRank == null) return null;
+  return Math.ceil(averageRank);
+}
+
+export interface ProminenceFallback {
+  label: 'Prominent' | 'Mixed' | 'Passing';
+  detail: string;
+  strongMentionPct: number;
+  strongMentionCount: number;
+  mentionedCount: number;
+}
+
+export function computeProminenceFallback(
+  results: Array<Pick<MentionSummaryResult, 'mentioned' | 'positionContext'>>,
+): ProminenceFallback | null {
+  const mentionedResults = results.filter((result) => result.mentioned);
+  if (mentionedResults.length === 0) return null;
+
+  const strongMentionCount = mentionedResults.filter(
+    (result) => result.positionContext === 'listed_ranking' || result.positionContext === 'prominent',
+  ).length;
+  const mentionedCount = mentionedResults.length;
+  const strongMentionPct = Math.round((strongMentionCount / mentionedCount) * 100);
+
+  if (strongMentionCount === 0) {
+    return {
+      label: 'Passing',
+      detail: 'Mentions were mostly passing references instead of ranked or prominent placements',
+      strongMentionPct,
+      strongMentionCount,
+      mentionedCount,
+    };
+  }
+
+  if (strongMentionPct >= 60) {
+    return {
+      label: 'Prominent',
+      detail: `${strongMentionCount}/${mentionedCount} mentions placed your brand prominently in the answer`,
+      strongMentionPct,
+      strongMentionCount,
+      mentionedCount,
+    };
+  }
+
+  return {
+    label: 'Mixed',
+    detail: `${strongMentionCount}/${mentionedCount} mentions placed your brand prominently in the answer`,
+    strongMentionPct,
+    strongMentionCount,
+    mentionedCount,
+  };
+}
 
 export function computeVisibilityPct(ms: MentionSummary): number {
   if (ms.visibilityPct != null) return ms.visibilityPct;
@@ -104,22 +171,8 @@ export function deriveTopicPerformance(ms: MentionSummary): DerivedTopicPerforma
 export function deriveSentimentBullets(ms: MentionSummary, brandContext?: string): { positives: string[]; negatives: string[] } {
   if (ms.sentimentSummary) {
     return {
-      positives: polishSentimentBullets(ms.sentimentSummary.positives, 'positive', {
-        brandContext,
-        summary: {
-          overallSentiment: ms.sentimentSummary.overallSentiment,
-          positiveScore: ms.sentimentSummary.positiveScore,
-        },
-        limit: 5,
-      }),
-      negatives: polishSentimentBullets(ms.sentimentSummary.negatives, 'negative', {
-        brandContext,
-        summary: {
-          overallSentiment: ms.sentimentSummary.overallSentiment,
-          positiveScore: ms.sentimentSummary.positiveScore,
-        },
-        limit: 5,
-      }),
+      positives: ms.sentimentSummary.positives.slice(0, 5),
+      negatives: ms.sentimentSummary.negatives.slice(0, 5),
     };
   }
 

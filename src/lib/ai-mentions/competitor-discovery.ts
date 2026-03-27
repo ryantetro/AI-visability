@@ -394,16 +394,20 @@ export function discoverCompetitors(
   }
 
   for (const result of results) {
-    for (const competitor of result.competitors) {
+    const positionedCompetitors = result.competitorsWithPositions.length > 0
+      ? result.competitorsWithPositions
+      : result.competitors.map((name) => ({ name, position: null }));
+
+    for (const competitor of positionedCompetitors) {
       aggregateCandidate(
         candidates,
-        competitor,
+        competitor.name,
         'ai_mentioned',
         result.prompt.category === 'comparison' ? 'medium' : 'low',
         `${result.engine}: ${result.prompt.text}`,
         result.prompt.id,
         result.engine,
-        result.position,
+        competitor.position,
       );
     }
   }

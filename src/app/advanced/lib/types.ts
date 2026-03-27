@@ -31,6 +31,29 @@ export interface DashboardReportData {
   id: string;
   url: string;
   hasPaid: boolean;
+  enrichments?: {
+    webHealth?: {
+      status: 'pending' | 'running' | 'complete' | 'unavailable';
+      startedAt?: number;
+      completedAt?: number;
+      error?: string;
+    };
+    aiMentions?: {
+      status: 'pending' | 'running' | 'complete' | 'failed' | 'unavailable';
+      phase: 'queued' | 'prompt_generation' | 'engine_testing' | 'response_analysis' | 'finalizing' | null;
+      startedAt?: number;
+      completedAt?: number;
+      error?: string;
+      metrics?: {
+        plannedPrompts?: number;
+        executedPrompts?: number;
+        responsesCollected?: number;
+        enginesPlanned?: number;
+        enginesCompleted?: number;
+        degraded?: boolean;
+      };
+    };
+  };
   score: {
     fixes: PrioritizedFix[];
     scores: {

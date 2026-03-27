@@ -433,6 +433,12 @@ export function DomainContextProvider({
     (async () => {
       try {
         const reportRes = await fetch(`/api/scan/${activeWorkspaceReportId}/report`);
+        if (reportRes.status === 202) {
+          const pendingPayload = (await reportRes.json().catch(() => ({}))) as ApiErrorPayload;
+          if (!active) return;
+          setLoadError(pendingPayload.error || 'Scan not complete');
+          return;
+        }
         if (!reportRes.ok) { const p = (await reportRes.json().catch(() => ({}))) as ApiErrorPayload; throw new Error(p.error || 'Failed to load report'); }
         const reportPayload = (await reportRes.json()) as DashboardReportData;
         if (!active) return;
@@ -451,12 +457,33 @@ export function DomainContextProvider({
     return () => { active = false; };
   }, [activeWorkspaceReportId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll when report fetch failed with "Scan not complete" (rescan in progress)
+  const shouldPollLoadedReport =
+    Boolean(
+      report?.enrichments?.webHealth?.status === 'running' ||
+      report?.enrichments?.aiMentions?.status === 'running'
+    );
+
+  // Poll while a rescan is in progress or while web-health enrichment is still finalizing.
   useEffect(() => {
-    if (loadError !== 'Scan not complete' || !activeWorkspaceReportId) return;
+    if (!activeWorkspaceReportId) return;
+    if (loadError !== 'Scan not complete' && !shouldPollLoadedReport) return;
+
     const interval = setInterval(async () => {
       try {
+        if (loadError === 'Scan not complete') {
+          const scanRes = await fetch(`/api/scan/${activeWorkspaceReportId}`);
+          if (!scanRes.ok) return;
+          const scanPayload = await scanRes.json() as RecentScanData & { status?: string };
+          if (scanPayload.status !== 'complete') {
+            return;
+          }
+        }
+
         const reportRes = await fetch(`/api/scan/${activeWorkspaceReportId}/report`);
+        if (reportRes.status === 202) {
+          setLoadError('Scan not complete');
+          return;
+        }
         if (!reportRes.ok) {
           const p = (await reportRes.json().catch(() => ({}))) as ApiErrorPayload;
           if (p.error !== 'Scan not complete') setLoadError(p.error || 'Failed to load report');
@@ -476,9 +503,9 @@ export function DomainContextProvider({
       } catch {
         // Keep polling on transient errors
       }
-    }, 2500);
+    }, loadError === 'Scan not complete' ? 3500 : 2500);
     return () => clearInterval(interval);
-  }, [loadError, activeWorkspaceReportId, refreshScanEntry]);
+  }, [loadError, activeWorkspaceReportId, refreshScanEntry, shouldPollLoadedReport]);
 
   // Use plan tier for paid access instead of scan-level flags
   const hasPaidAccess = debugPaidPreview || planIsPaid || paidOverride || Boolean(report?.hasPaid) || recentScans.some((s) => s.hasPaid);

@@ -56,6 +56,8 @@ function normalizeShareOfVoice(summary: MentionSummary): ShareOfVoiceData | unde
     acc[engine] = summary.shareOfVoice?.byEngine?.[engine] ?? {
       brandMentions: 0,
       totalMentions: 0,
+      brandProminence: 0,
+      totalProminence: 0,
       sovPct: 0,
     };
     return acc;
@@ -63,6 +65,8 @@ function normalizeShareOfVoice(summary: MentionSummary): ShareOfVoiceData | unde
 
   return {
     ...summary.shareOfVoice,
+    brandProminence: summary.shareOfVoice.brandProminence ?? 0,
+    totalProminence: summary.shareOfVoice.totalProminence ?? 0,
     byEngine,
   };
 }

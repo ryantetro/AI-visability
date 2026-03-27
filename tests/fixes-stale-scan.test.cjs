@@ -663,32 +663,51 @@ test('Fix 4: scan-workflow logs both available and disabled engines', async () =
   // We test this by verifying the logging logic works correctly
   const availableEngines = ['chatgpt', 'gemini'];
   const allEngines = ['chatgpt', 'claude', 'gemini', 'perplexity'];
-  const disabledEngines = allEngines.filter((e) => !availableEngines.includes(e));
+  const missingApiKeyEngines = allEngines.filter((e) => !availableEngines.includes(e));
+  const platformFilteredEngines = [];
 
-  const logMessage = `[scan-workflow] Starting AI mention testing. Available engines: ${availableEngines.join(', ') || 'none'}. Disabled (no API key): ${disabledEngines.join(', ') || 'none'}.`;
+  const logMessage = `[scan-workflow] Starting AI mention testing. Engines: ${availableEngines.join(', ') || 'none'}. Missing API key: ${missingApiKeyEngines.join(', ') || 'none'}. Filtered by platform settings: ${platformFilteredEngines.join(', ') || 'none'}.`;
 
-  assert.ok(logMessage.includes('Available engines: chatgpt, gemini'));
-  assert.ok(logMessage.includes('Disabled (no API key): claude, perplexity'));
+  assert.ok(logMessage.includes('Engines: chatgpt, gemini'));
+  assert.ok(logMessage.includes('Missing API key: claude, perplexity'));
+  assert.ok(logMessage.includes('Filtered by platform settings: none'));
 });
 
 test('Fix 4: log message handles no available engines', () => {
   const availableEngines = [];
   const allEngines = ['chatgpt', 'claude', 'gemini', 'perplexity'];
-  const disabledEngines = allEngines.filter((e) => !availableEngines.includes(e));
+  const missingApiKeyEngines = allEngines.filter((e) => !availableEngines.includes(e));
+  const platformFilteredEngines = [];
 
-  const logMessage = `[scan-workflow] Starting AI mention testing. Available engines: ${availableEngines.join(', ') || 'none'}. Disabled (no API key): ${disabledEngines.join(', ') || 'none'}.`;
+  const logMessage = `[scan-workflow] Starting AI mention testing. Engines: ${availableEngines.join(', ') || 'none'}. Missing API key: ${missingApiKeyEngines.join(', ') || 'none'}. Filtered by platform settings: ${platformFilteredEngines.join(', ') || 'none'}.`;
 
-  assert.ok(logMessage.includes('Available engines: none'));
-  assert.ok(logMessage.includes('Disabled (no API key): chatgpt, claude, gemini, perplexity'));
+  assert.ok(logMessage.includes('Engines: none'));
+  assert.ok(logMessage.includes('Missing API key: chatgpt, claude, gemini, perplexity'));
+  assert.ok(logMessage.includes('Filtered by platform settings: none'));
 });
 
 test('Fix 4: log message handles all engines available', () => {
   const availableEngines = ['chatgpt', 'claude', 'gemini', 'perplexity'];
   const allEngines = ['chatgpt', 'claude', 'gemini', 'perplexity'];
-  const disabledEngines = allEngines.filter((e) => !availableEngines.includes(e));
+  const missingApiKeyEngines = allEngines.filter((e) => !availableEngines.includes(e));
+  const platformFilteredEngines = [];
 
-  const logMessage = `[scan-workflow] Starting AI mention testing. Available engines: ${availableEngines.join(', ') || 'none'}. Disabled (no API key): ${disabledEngines.join(', ') || 'none'}.`;
+  const logMessage = `[scan-workflow] Starting AI mention testing. Engines: ${availableEngines.join(', ') || 'none'}. Missing API key: ${missingApiKeyEngines.join(', ') || 'none'}. Filtered by platform settings: ${platformFilteredEngines.join(', ') || 'none'}.`;
 
-  assert.ok(logMessage.includes('Available engines: chatgpt, claude, gemini, perplexity'));
-  assert.ok(logMessage.includes('Disabled (no API key): none'));
+  assert.ok(logMessage.includes('Engines: chatgpt, claude, gemini, perplexity'));
+  assert.ok(logMessage.includes('Missing API key: none'));
+  assert.ok(logMessage.includes('Filtered by platform settings: none'));
+});
+
+test('Fix 4: log message distinguishes missing keys from platform filtering', () => {
+  const allAvailableEngines = ['chatgpt', 'perplexity', 'gemini', 'claude'];
+  const filteredEngines = ['chatgpt', 'gemini', 'claude'];
+  const allEngines = ['chatgpt', 'claude', 'gemini', 'perplexity'];
+  const missingApiKeyEngines = allEngines.filter((e) => !allAvailableEngines.includes(e));
+  const platformFilteredEngines = allAvailableEngines.filter((e) => !filteredEngines.includes(e));
+
+  const logMessage = `[scan-workflow] Starting AI mention testing. Engines: ${filteredEngines.join(', ') || 'none'}. Missing API key: ${missingApiKeyEngines.join(', ') || 'none'}. Filtered by platform settings: ${platformFilteredEngines.join(', ') || 'none'}.`;
+
+  assert.ok(logMessage.includes('Missing API key: none'));
+  assert.ok(logMessage.includes('Filtered by platform settings: perplexity'));
 });

@@ -57,6 +57,7 @@ function fillTemplate(template: string, brand: string, industry: string): string
 }
 
 export const mockMentionTester: MentionTesterService = {
+  supportsProviderPacing: false,
   async query(engine: AIEngine, prompt: MentionPrompt): Promise<EngineResponse> {
     await new Promise((r) => setTimeout(r, 100 + Math.random() * 200));
 

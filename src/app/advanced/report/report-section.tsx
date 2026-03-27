@@ -99,6 +99,16 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
   const scores = report.score.scores;
   const webHealth = report.score.webHealth;
   const mentions = report.mentionSummary;
+  const aiMentionsState = report.enrichments?.aiMentions;
+  const mentionsPending = aiMentionsState?.status === 'pending' || aiMentionsState?.status === 'running';
+  const mentionsDegraded = Boolean(aiMentionsState?.status === 'complete' && aiMentionsState?.metrics?.degraded);
+  const mentionsUnavailable = Boolean(
+    aiMentionsState?.status === 'failed' ||
+    aiMentionsState?.status === 'unavailable' ||
+    mentions &&
+    (mentions.results?.length ?? 0) === 0 &&
+    Object.values(mentions.engineStatus ?? {}).some((status) => status.status === 'error')
+  );
   const dimensions = report.score.dimensions ?? [];
   const fixes = report.score.fixes ?? report.fixes ?? [];
   const copyToLlm = report.copyToLlm ?? files?.copyToLlm ?? null;
@@ -160,8 +170,8 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
             },
             {
               label: 'AI Mentions',
-              score: mentions?.overallScore ?? null,
-              color: scoreColor(mentions?.overallScore ?? null),
+              score: mentionsPending || mentionsUnavailable ? null : (mentions?.overallScore ?? null),
+              color: scoreColor(mentionsPending || mentionsUnavailable ? null : (mentions?.overallScore ?? null)),
             },
           ]}
           actions={
@@ -254,11 +264,21 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
 
           return (
             <div id="section-ai-mentions" className="scroll-mt-4 rounded-xl transition-all duration-500">
+            {mentionsDegraded && (
+              <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-sm text-amber-200">
+                AI Mentions completed with fallback prompts or heuristic analysis because one or more providers slowed down or timed out during this run.
+              </div>
+            )}
+            {mentionsUnavailable && (
+              <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3 text-sm text-red-200">
+                AI Mentions did not complete cleanly for this scan, so this section is unavailable for reliable scoring.
+              </div>
+            )}
             <YwsBreakdownSection
               title="AI Mentions"
               tooltip="How often AI engines mention your brand when users ask relevant questions. Based on live queries to ChatGPT, Perplexity, Gemini, and Claude."
-              score={mentions.overallScore}
-              scoreColor={scoreColor(mentions.overallScore)}
+              score={mentionsPending || mentionsUnavailable ? null : mentions.overallScore}
+              scoreColor={scoreColor(mentionsPending || mentionsUnavailable ? null : mentions.overallScore)}
               passCount={mentionPass}
               failCount={mentionFail}
               unknownCount={engines.length - mentionPass - mentionFail}

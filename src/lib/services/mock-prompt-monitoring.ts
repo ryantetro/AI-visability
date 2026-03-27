@@ -38,7 +38,23 @@ export const mockPromptMonitoring: PromptMonitoringService = {
   },
 
   async savePromptResult(result) {
-    results.push({ id: randomUUID(), ...result });
+    results.push({
+      ...result,
+      id: randomUUID(),
+      mentionType: result.mentionType ?? (result.mentioned ? 'direct' : 'not_mentioned'),
+      positionContext: result.positionContext ?? null,
+      sentimentLabel: result.sentimentLabel ?? null,
+      sentimentStrength: result.sentimentStrength ?? null,
+      sentimentReasoning: result.sentimentReasoning ?? null,
+      keyQuote: result.keyQuote ?? null,
+      descriptionAccuracy: result.descriptionAccuracy ?? null,
+      analysisSource: result.analysisSource ?? 'heuristic',
+      competitorsJson: result.competitorsJson ?? null,
+      monitoringRunId: result.monitoringRunId ?? null,
+      runWeightedScore: result.runWeightedScore ?? null,
+      runScoreDelta: result.runScoreDelta ?? null,
+      notableScoreChange: result.notableScoreChange ?? false,
+    });
   },
 
   async listPromptResults(domain, limit = 100, userId?) {
@@ -67,7 +83,14 @@ export const mockPromptMonitoring: PromptMonitoringService = {
   },
 
   async saveCompetitorAppearance(appearance) {
-    competitorAppearances.push({ id: randomUUID(), ...appearance, detectedAt: new Date().toISOString() });
+    competitorAppearances.push({
+      ...appearance,
+      id: randomUUID(),
+      previousPosition: appearance.previousPosition ?? null,
+      movementDelta: appearance.movementDelta ?? null,
+      isNewCompetitor: appearance.isNewCompetitor ?? false,
+      detectedAt: new Date().toISOString(),
+    });
   },
 
   async listCompetitorSummaries(domain, days = 30): Promise<CompetitorSummary[]> {

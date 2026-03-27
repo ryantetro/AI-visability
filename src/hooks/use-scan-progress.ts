@@ -60,10 +60,33 @@ interface ScanData {
       completedAt?: number;
       error?: string;
     };
+    aiMentions?: {
+      status: 'pending' | 'running' | 'complete' | 'failed' | 'unavailable';
+      phase: 'queued' | 'prompt_generation' | 'engine_testing' | 'response_analysis' | 'finalizing' | null;
+      startedAt?: number;
+      completedAt?: number;
+      error?: string;
+      metrics?: {
+        plannedPrompts?: number;
+        executedPrompts?: number;
+        responsesCollected?: number;
+        enginesPlanned?: number;
+        enginesCompleted?: number;
+        degraded?: boolean;
+      };
+    };
   };
   progress: {
     status: string;
     checks: { label: string; status: string }[];
+    lanes?: Array<{
+      key: 'site_scan' | 'ai_mentions';
+      label: string;
+      status: 'pending' | 'running' | 'done' | 'error';
+      progressPct?: number;
+      currentStep?: string;
+      checks: { label: string; status: 'pending' | 'running' | 'done' | 'error' }[];
+    }>;
     currentStep?: string;
     error?: string;
   };
@@ -131,13 +154,14 @@ export function useScanProgress(scanId: string | null) {
     }
     setLoading(true);
     poll();
+    const aiMentionsRunning = data?.enrichments?.aiMentions?.status === 'running' || data?.enrichments?.aiMentions?.status === 'pending';
     const interval = setInterval(() => {
       const webHealthRunning = data?.enrichments?.webHealth?.status === 'running';
-      if ((data?.status === 'complete' && !webHealthRunning) || data?.status === 'failed') return;
+      if ((data?.status === 'complete' && !webHealthRunning && !aiMentionsRunning) || data?.status === 'failed') return;
       poll();
-    }, 1500);
+    }, data?.status === 'scoring' && aiMentionsRunning ? 2500 : 1500);
     return () => clearInterval(interval);
-  }, [scanId, poll, data?.status, data?.enrichments?.webHealth?.status]);
+  }, [scanId, poll, data?.status, data?.enrichments?.webHealth?.status, data?.enrichments?.aiMentions?.status]);
 
   return { data, loading, error, refetch: poll };
 }

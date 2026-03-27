@@ -17,6 +17,9 @@ const VENDOR_APP_DOMAINS = [
   'zooomyapps.com', 'luckyorange.com', 'nfcube.com',
 ];
 
+const STOREFRONT_UI_PATTERN = /\b(your cart|shopping cart|cart subtotal|view cart|mini cart|cart drawer|quick view|add to wishlist|my account|account login|sign in|log in|proceed to checkout|continue shopping|track order|product details|compare products|recently viewed|you may also like|customers also bought|related products|write a review|customer reviews|shipping & returns|shipping and returns|sort by|filter by|in stock|out of stock|sku|quantity)\b/i;
+const STOREFRONT_SINGLE_PHRASE_PATTERN = /^(your|my|our)\s+(cart|account|wishlist|checkout|order|bag)$/i;
+
 function unique(arr: string[]): string[] {
   return [...new Set(arr.filter(Boolean))];
 }
@@ -42,6 +45,11 @@ export function isJunk(s: string): boolean {
 
   // E-commerce UI patterns
   if (/\b(frequently bought together|add to wishlist|compare products|recently viewed|you may also like|customers also bought|related products|product details|write a review|customer reviews|shipping & returns|shipping and returns)\b/.test(t)) return true;
+  if (STOREFRONT_UI_PATTERN.test(t) || STOREFRONT_SINGLE_PHRASE_PATTERN.test(t)) return true;
+
+  // Storefront fragments and personalized UI copy
+  if (/^(your|my|our)\b/.test(t) && t.length < 40) return true;
+  if (/\b(welcome back|shop now|continue shopping|view details|add item|remove item)\b/.test(t)) return true;
 
   // Social/navigation CTAs
   if (/^(follow us|contact us|learn more|read more|see more|view all|show more|load more|back to top|share this|subscribe|newsletter)$/i.test(t)) return true;

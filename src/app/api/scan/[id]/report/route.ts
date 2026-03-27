@@ -6,9 +6,9 @@ import { ScoreResult } from '@/types/score';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
 import { getDomain, getFaviconUrl } from '@/lib/url-utils';
-import { normalizeMentionSummary } from '@/lib/ai-mentions/summary';
-import type { MentionSummary } from '@/types/ai-mentions';
 import type { CrawlData } from '@/types/crawler';
+import { estimateRemainingSeconds } from '@/lib/scan-eta';
+import { resolveScanState } from '@/lib/scan-state';
 
 interface PreviewHomepageData {
   assetUrls?: string[];
@@ -61,15 +61,28 @@ export async function GET(
     return NextResponse.json({ error: 'This report belongs to another account.' }, { status: 403 });
   }
 
+  const assetPreview = buildAssetPreview(scan);
+  const { progress, mentionSummary, enrichments } = resolveScanState(scan);
+
   if (scan.status !== 'complete') {
-    return NextResponse.json({ error: 'Scan not complete' }, { status: 400 });
+    return NextResponse.json({
+      error: 'Scan not complete',
+      pending: true,
+      status: scan.status,
+      progress,
+      enrichments,
+      assetPreview,
+      estimatedRemainingSec: estimateRemainingSeconds({
+        ...scan,
+        progress,
+        enrichments,
+      }),
+    }, { status: 202 });
   }
 
   const scoreResult = scan.scoreResult as ScoreResult;
   const copyToLlm = buildReportPromptBundle(scan.url, scoreResult);
   const score = serializeScoreResult(scoreResult);
-  const mentionSummary = normalizeMentionSummary(scan.mentionSummary as MentionSummary | null | undefined);
-  const assetPreview = buildAssetPreview(scan);
 
   // Derive hasPaid from plan-based access OR legacy scan.paid flag
   let hasPaid = !!scan.paid;
@@ -89,7 +102,7 @@ export async function GET(
     scores: score.scores,
     copyToLlm,
     share: buildSharePayload(scan.id),
-    enrichments: scan.enrichments,
+    enrichments,
     mentionSummary,
     assetPreview,
     hasPaid,

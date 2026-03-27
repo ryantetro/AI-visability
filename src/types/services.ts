@@ -68,10 +68,23 @@ export interface PromptResult {
   domain: string;
   engine: AIEngine;
   mentioned: boolean;
+  mentionType: 'direct' | 'indirect' | 'not_mentioned';
   position: number | null;
+  positionContext: 'listed_ranking' | 'prominent' | 'passing' | 'absent' | null;
   sentiment: string | null;
+  sentimentLabel: 'positive' | 'neutral' | 'negative' | 'mixed' | null;
+  sentimentStrength: number | null;
+  sentimentReasoning: string | null;
+  keyQuote: string | null;
   citationPresent: boolean;
   citationUrls: unknown[] | null;
+  descriptionAccuracy: 'accurate' | 'partial' | 'inaccurate' | null;
+  analysisSource: 'llm' | 'heuristic';
+  competitorsJson: Array<{ name: string; position: number | null }> | null;
+  monitoringRunId: string | null;
+  runWeightedScore: number | null;
+  runScoreDelta: number | null;
+  notableScoreChange: boolean;
   rawSnippet: string | null;
   testedAt: string;
 }
@@ -84,6 +97,9 @@ export interface CompetitorAppearance {
   engine: AIEngine;
   promptId: string | null;
   position: number | null;
+  previousPosition: number | null;
+  movementDelta: number | null;
+  isNewCompetitor: boolean;
   coMentioned: boolean;
   weekStart: string;
   detectedAt: string;

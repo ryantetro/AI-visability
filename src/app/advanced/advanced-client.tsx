@@ -452,6 +452,9 @@ function DomainWorkspace({
   if (loadingWorkspace) {
     return <div className="mt-6"><div className="mt-6"><CenteredWorkspaceState label="Loading this domain workspace..." /></div></div>;
   }
+  if (loadError === 'Scan not complete' && !report) {
+    return <div className="mt-6"><div className="mt-6"><CenteredWorkspaceState label="Finishing the latest scan and AI mentions..." /></div></div>;
+  }
   if (loadError && !report) {
     return <div className="mt-6"><div className="mt-6"><CenteredWorkspaceState label={loadError} tone="error" /></div></div>;
   }

@@ -45,8 +45,13 @@ const {
   looksLikeFragment,
 } = require('../src/lib/ai-mentions/content-extractor.ts');
 
-const { testAllEngines } = require('../src/lib/ai-mentions/engine-tester.ts');
-const { runMentionTests } = require('../src/lib/ai-mentions/index.ts');
+const { testAllEngines, runEngineTests } = require('../src/lib/ai-mentions/engine-tester.ts');
+const {
+  buildPromptReuseFingerprint,
+  createFailedMentionSummary,
+  runMentionTestJob,
+  runMentionTests,
+} = require('../src/lib/ai-mentions/index.ts');
 const { mockMentionTester } = require('../src/lib/services/mention-tester-mock.ts');
 const {
   realMentionTester,
@@ -360,6 +365,50 @@ function makeEngineResponse(engine, prompt, text) {
   return { engine, prompt, text, testedAt: Date.now() };
 }
 
+function makeMentionResult(overrides = {}) {
+  const mentioned = overrides.mentioned ?? true;
+  const mentionType = overrides.mentionType ?? (mentioned ? 'direct' : 'not_mentioned');
+  const competitors = overrides.competitors ?? [];
+  const competitorsWithPositions = overrides.competitorsWithPositions
+    ?? competitors.map((name) => ({ name, position: null }));
+  const sentimentLabel = overrides.sentimentLabel
+    ?? (overrides.sentiment === 'neutral' && overrides.sentimentStrength >= 7 ? 'mixed' : overrides.sentiment ?? null);
+  const sentiment = overrides.sentiment
+    ?? (sentimentLabel === 'mixed' ? 'neutral' : sentimentLabel);
+  const descriptionAccuracy = overrides.descriptionAccuracy
+    ?? (mentioned ? 'accurate' : null);
+
+  return {
+    engine: overrides.engine ?? 'chatgpt',
+    prompt: overrides.prompt ?? makePrompt(),
+    mentioned,
+    mentionType,
+    position: overrides.position ?? null,
+    positionContext: overrides.positionContext
+      ?? (mentionType === 'not_mentioned'
+        ? 'absent'
+        : overrides.position != null
+          ? 'listed_ranking'
+          : mentionType === 'indirect'
+            ? 'passing'
+            : 'prominent'),
+    sentiment,
+    sentimentLabel,
+    sentimentStrength: overrides.sentimentStrength ?? (mentioned ? 7 : 0),
+    sentimentReasoning: overrides.sentimentReasoning ?? null,
+    keyQuote: overrides.keyQuote ?? null,
+    citationPresent: overrides.citationPresent ?? false,
+    citationUrls: overrides.citationUrls ?? [],
+    descriptionAccurate: overrides.descriptionAccurate ?? (descriptionAccuracy === 'accurate'),
+    descriptionAccuracy,
+    competitors,
+    competitorsWithPositions,
+    rawSnippet: overrides.rawSnippet ?? '',
+    testedAt: overrides.testedAt ?? Date.now(),
+    analysisSource: overrides.analysisSource ?? 'heuristic',
+  };
+}
+
 // ─── fuzzyMatch ──────────────────────────────────────────────────────────────
 
 test('fuzzyMatch finds exact brand inclusion', () => {
@@ -414,6 +463,23 @@ test('analyzeResponse detects brand not mentioned', () => {
   assert.equal(result.mentioned, false);
   assert.equal(result.position, null);
   assert.equal(result.sentiment, null);
+});
+
+test('analyzeResponse can infer an indirect mention from own-domain citations', () => {
+  const prompt = makePrompt();
+  const response = {
+    engine: 'perplexity',
+    prompt,
+    text: 'The company is often cited for clear implementation guidance and helpful onboarding docs.',
+    testedAt: Date.now(),
+    citations: ['https://example.com/docs'],
+  };
+
+  const result = analyzeResponse(response, 'Example Co', 'example.com');
+
+  assert.equal(result.mentioned, true);
+  assert.equal(result.mentionType, 'indirect');
+  assert.equal(result.analysisSource, 'heuristic');
 });
 
 test('analyzeResponse detects negative sentiment', () => {
@@ -567,110 +633,81 @@ test('computeScore returns 0 for empty results', () => {
 });
 
 test('computeScore gives max score for perfect mention', () => {
-  const result = {
-    mentioned: true,
+  const result = makeMentionResult({
     position: 1,
     sentiment: 'positive',
+    sentimentLabel: 'positive',
+    sentimentStrength: 10,
     citationPresent: true,
     citationUrls: [{ url: 'https://example.com', domain: 'example.com', anchorText: null, isOwnDomain: true, isCompetitor: false }],
-    competitors: [],
-    engine: 'chatgpt',
-    prompt: makePrompt(),
-    descriptionAccurate: true,
     rawSnippet: 'Example Co is excellent',
-    testedAt: Date.now(),
-  };
+    keyQuote: 'Example Co is excellent.',
+  });
 
   const score = computeScore([result]);
   assert.equal(score, 100);
 });
 
 test('computeScore gives 0 for not-mentioned result', () => {
-  const result = {
+  const result = makeMentionResult({
     mentioned: false,
-    position: null,
+    mentionType: 'not_mentioned',
+    positionContext: 'absent',
     sentiment: null,
-    citationPresent: false,
-    citationUrls: [],
-    competitors: [],
-    engine: 'chatgpt',
-    prompt: makePrompt(),
+    sentimentLabel: null,
     descriptionAccurate: false,
+    descriptionAccuracy: null,
     rawSnippet: 'No mention here',
-    testedAt: Date.now(),
-  };
+  });
 
   assert.equal(computeScore([result]), 0);
 });
 
 test('computeScore averages across multiple results', () => {
-  const mentioned = {
-    mentioned: true,
+  const mentioned = makeMentionResult({
     position: 2,
     sentiment: 'positive',
-    citationPresent: false,
-    citationUrls: [],
-    competitors: [],
-    engine: 'chatgpt',
-    prompt: makePrompt(),
-    descriptionAccurate: true,
-    rawSnippet: '',
-    testedAt: Date.now(),
-  };
-  const notMentioned = {
+    sentimentLabel: 'positive',
+    sentimentStrength: 10,
+  });
+  const notMentioned = makeMentionResult({
     mentioned: false,
-    position: null,
+    mentionType: 'not_mentioned',
+    positionContext: 'absent',
     sentiment: null,
-    citationPresent: false,
-    citationUrls: [],
-    competitors: [],
-    engine: 'chatgpt',
+    sentimentLabel: null,
     prompt: makePrompt('p2'),
     descriptionAccurate: false,
-    rawSnippet: '',
-    testedAt: Date.now(),
-  };
+    descriptionAccuracy: null,
+  });
 
   const score = computeScore([mentioned, notMentioned]);
-  // mentioned: 60 (base) + 15 (top 3) + 15 (positive) = 90 / 2 results = 45
-  assert.equal(score, 45);
+  assert.equal(score, 39);
 });
 
 test('computeScore caps at 100', () => {
-  const results = Array.from({ length: 3 }, () => ({
-    mentioned: true,
+  const results = Array.from({ length: 3 }, () => makeMentionResult({
     position: 1,
     sentiment: 'positive',
+    sentimentLabel: 'positive',
+    sentimentStrength: 10,
     citationPresent: true,
-    citationUrls: [],
-    competitors: [],
-    engine: 'chatgpt',
-    prompt: makePrompt(),
-    descriptionAccurate: true,
-    rawSnippet: '',
-    testedAt: Date.now(),
+    citationUrls: [{ url: 'https://example.com', domain: 'example.com', anchorText: null, isOwnDomain: true, isCompetitor: false }],
   }));
 
   assert.equal(computeScore(results), 100);
 });
 
-test('computeScore awards 10 points for position 4-5', () => {
-  const result = {
-    mentioned: true,
+test('computeScore weights engines and response factors', () => {
+  const result = makeMentionResult({
+    engine: 'claude',
     position: 4,
     sentiment: 'neutral',
-    citationPresent: false,
-    citationUrls: [],
-    competitors: [],
-    engine: 'chatgpt',
-    prompt: makePrompt(),
-    descriptionAccurate: true,
-    rawSnippet: '',
-    testedAt: Date.now(),
-  };
+    sentimentLabel: 'neutral',
+    sentimentStrength: 10,
+  });
 
-  // 60 (base) + 10 (pos 4) + 5 (neutral) = 75
-  assert.equal(computeScore([result]), 75);
+  assert.equal(computeScore([result]), 58);
 });
 
 // ─── Prompt Generator ────────────────────────────────────────────────────────
@@ -803,6 +840,10 @@ test('generatePrompts grounds marine retail prompts in boating categories', () =
 
   assert.equal(profile.vertical, 'marine_watersports');
   assert.ok(prompts.some((prompt) => /marine parts|watersports|wakeboard|boating/i.test(prompt.text)));
+  assert.ok(
+    prompts.some((prompt) => /rank the top|top 5 .* in order/i.test(prompt.text)),
+    'Expected at least one explicit ranking prompt for marine retail',
+  );
   assert.ok(!prompts.every((prompt) => /logistics|supply chain|warehouse|freight/i.test(prompt.text)));
 });
 
@@ -1258,25 +1299,73 @@ test('runMentionTests produces non-zero score with mock tester', async () => {
   );
 });
 
+test('runMentionTestJob reuses cached prompts and keeps a stable compatibility fingerprint', async () => {
+  const crawl = createCrawlData();
+  const cachedPrompts = generatePrompts(crawl).slice(0, 5);
+
+  const execution = await runMentionTestJob(crawl, mockMentionTester, {
+    cachedPrompts,
+  });
+
+  assert.equal(execution.diagnostics.promptSource, 'cache');
+  assert.equal(execution.diagnostics.metrics.plannedPrompts, cachedPrompts.length);
+  assert.deepEqual(
+    execution.summary.promptsUsed.map((prompt) => prompt.id),
+    cachedPrompts.map((prompt) => prompt.id)
+  );
+  assert.equal(buildPromptReuseFingerprint(crawl), buildPromptReuseFingerprint(createCrawlData()));
+});
+
 // ─── computeShareOfVoice ────────────────────────────────────────────────────
 
 test('computeShareOfVoice calculates correct SOV', () => {
   const results = [
-    { engine: 'chatgpt', mentioned: true, competitors: ['Cognizo', 'MarketMuse'], prompt: makePrompt(), rawSnippet: '', position: 1, sentiment: 'positive', citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
-    { engine: 'chatgpt', mentioned: false, competitors: ['Cognizo'], prompt: makePrompt('p2'), rawSnippet: '', position: null, sentiment: null, citationPresent: false, citationUrls: [], descriptionAccurate: false, testedAt: Date.now() },
-    { engine: 'perplexity', mentioned: true, competitors: [], prompt: makePrompt(), rawSnippet: '', position: 1, sentiment: 'positive', citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
+    makeMentionResult({
+      engine: 'chatgpt',
+      competitors: ['Cognizo', 'MarketMuse'],
+      competitorsWithPositions: [
+        { name: 'Cognizo', position: 2 },
+        { name: 'MarketMuse', position: 3 },
+      ],
+      position: 1,
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+    }),
+    makeMentionResult({
+      engine: 'chatgpt',
+      mentioned: false,
+      mentionType: 'not_mentioned',
+      positionContext: 'absent',
+      competitors: ['Cognizo'],
+      competitorsWithPositions: [{ name: 'Cognizo', position: 1 }],
+      prompt: makePrompt('p2'),
+      sentiment: null,
+      sentimentLabel: null,
+      descriptionAccurate: false,
+      descriptionAccuracy: null,
+    }),
+    makeMentionResult({
+      engine: 'perplexity',
+      competitors: [],
+      competitorsWithPositions: [],
+      position: 1,
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+    }),
   ];
 
   const sov = computeShareOfVoice(results, 'Example Co');
 
   assert.equal(sov.brandMentions, 2);
   assert.equal(sov.totalMentions, 5); // 2 brand + 3 competitors
-  assert.equal(sov.shareOfVoicePct, 40); // 2/5 = 40%
+  assert.equal(sov.shareOfVoicePct, 61);
+  assert.equal(sov.brandProminence, 20);
+  assert.equal(sov.totalProminence, 42);
 
-  // chatgpt: 1 brand + 3 comps = 4 total, sovPct = 25%
+  // chatgpt: 10 prominence for brand vs 22 for competitors => 31%
   assert.equal(sov.byEngine.chatgpt.brandMentions, 1);
   assert.equal(sov.byEngine.chatgpt.totalMentions, 4);
-  assert.equal(sov.byEngine.chatgpt.sovPct, 25);
+  assert.equal(sov.byEngine.chatgpt.sovPct, 31);
 
   // perplexity: 1 brand + 0 comps = 1 total, sovPct = 100%
   assert.equal(sov.byEngine.perplexity.brandMentions, 1);
@@ -1293,9 +1382,33 @@ test('computeShareOfVoice returns 0 for empty results', () => {
 
 test('computeSentimentSummary extracts positives and negatives', () => {
   const results = [
-    { engine: 'chatgpt', mentioned: true, sentiment: 'positive', rawSnippet: 'Example Co is an excellent platform with innovative features.', competitors: [], prompt: makePrompt(), position: 1, citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
-    { engine: 'perplexity', mentioned: true, sentiment: 'negative', rawSnippet: 'Example Co is outdated and unreliable for modern needs.', competitors: [], prompt: makePrompt(), position: 1, citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
-    { engine: 'gemini', mentioned: true, sentiment: 'positive', rawSnippet: 'Example Co is a trusted leader in the space.', competitors: [], prompt: makePrompt(), position: 1, citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
+    makeMentionResult({
+      engine: 'chatgpt',
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+      sentimentStrength: 9,
+      rawSnippet: 'Example Co is an excellent platform with innovative features.',
+      keyQuote: 'Example Co is an excellent platform with innovative features.',
+      position: 1,
+    }),
+    makeMentionResult({
+      engine: 'perplexity',
+      sentiment: 'negative',
+      sentimentLabel: 'negative',
+      sentimentStrength: 6,
+      rawSnippet: 'Example Co is outdated and unreliable for modern needs.',
+      keyQuote: 'Example Co is outdated and unreliable for modern needs.',
+      position: 1,
+    }),
+    makeMentionResult({
+      engine: 'gemini',
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+      sentimentStrength: 8,
+      rawSnippet: 'Example Co is a trusted leader in the space.',
+      keyQuote: 'Example Co is a trusted leader in the space.',
+      position: 1,
+    }),
   ];
 
   const summary = computeSentimentSummary(results);
@@ -1304,49 +1417,43 @@ test('computeSentimentSummary extracts positives and negatives', () => {
   assert.ok(summary.positiveScore > 50);
   assert.ok(summary.positives.length > 0, 'Should extract positive bullets');
   assert.ok(summary.negatives.length > 0, 'Should extract negative bullets');
+  assert.equal(summary.sentimentBreakdown.chatgpt.sentiment, 'positive');
+  assert.equal(summary.keyPositiveQuotes[0], 'Example Co is an excellent platform with innovative features.');
 });
 
-test('computeSentimentSummary removes markdown-heavy fragments and falls back to polished prose', () => {
+test('computeSentimentSummary keeps real quotes only when available', () => {
   const results = [
-    {
+    makeMentionResult({
       engine: 'chatgpt',
-      mentioned: true,
       sentiment: 'positive',
+      sentimentLabel: 'positive',
+      sentimentStrength: 8,
+      keyQuote: 'Marine Products is known for quality watersports gear.',
       rawSnippet:
         'Some of the leading dealers of wakeboards and related products include: 1. Breach** - Known for quality watersports gear. ### For Powerboats, PWCs (Jet Skis), and Tow Sports Boats.',
-      competitors: [],
-      prompt: makePrompt(),
       position: 1,
-      citationPresent: false,
-      citationUrls: [],
-      descriptionAccurate: true,
-      testedAt: Date.now(),
-    },
+    }),
   ];
 
   const summary = computeSentimentSummary(results, 'marine-products.com');
 
   assert.equal(summary.positives.length, 1);
-  assert.match(summary.positives[0], /Marine Products is generally described positively/i);
+  assert.equal(summary.positives[0], 'Marine Products is known for quality watersports gear.');
   assert.doesNotMatch(summary.positives[0], /###|\*\*|1\./);
 });
 
 test('computeSentimentSummary keeps brand-specific complete sentences when available', () => {
   const results = [
-    {
+    makeMentionResult({
       engine: 'chatgpt',
-      mentioned: true,
       sentiment: 'positive',
+      sentimentLabel: 'positive',
+      sentimentStrength: 8,
+      keyQuote: 'Marine Products is a trusted dealer for wakeboards, boat parts, and watersports gear.',
       rawSnippet:
         'Marine Products is a trusted dealer for wakeboards, boat parts, and watersports gear. 1. Breach** - Known for quality watersports gear.',
-      competitors: [],
-      prompt: makePrompt(),
       position: 1,
-      citationPresent: false,
-      citationUrls: [],
-      descriptionAccurate: true,
-      testedAt: Date.now(),
-    },
+    }),
   ];
 
   const summary = computeSentimentSummary(results, 'marine-products.com');
@@ -1358,7 +1465,17 @@ test('computeSentimentSummary keeps brand-specific complete sentences when avail
 
 test('computeSentimentSummary handles no mentions', () => {
   const results = [
-    { engine: 'chatgpt', mentioned: false, sentiment: null, rawSnippet: 'No brand here.', competitors: [], prompt: makePrompt(), position: null, citationPresent: false, citationUrls: [], descriptionAccurate: false, testedAt: Date.now() },
+    makeMentionResult({
+      engine: 'chatgpt',
+      mentioned: false,
+      mentionType: 'not_mentioned',
+      positionContext: 'absent',
+      sentiment: null,
+      sentimentLabel: null,
+      rawSnippet: 'No brand here.',
+      descriptionAccurate: false,
+      descriptionAccuracy: null,
+    }),
   ];
 
   const summary = computeSentimentSummary(results);
@@ -1375,8 +1492,34 @@ test('computeTopicPerformance groups by topic correctly', () => {
   ];
 
   const results = [
-    { engine: 'chatgpt', mentioned: true, competitors: ['Comp1'], prompt: prompts[0], rawSnippet: '', position: 1, sentiment: 'positive', citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
-    { engine: 'chatgpt', mentioned: false, competitors: ['Comp1', 'Comp2'], prompt: prompts[1], rawSnippet: '', position: null, sentiment: null, citationPresent: false, citationUrls: [], descriptionAccurate: false, testedAt: Date.now() },
+    makeMentionResult({
+      engine: 'chatgpt',
+      competitors: ['Comp1'],
+      competitorsWithPositions: [{ name: 'Comp1', position: 2 }],
+      prompt: prompts[0],
+      rawSnippet: '',
+      position: 1,
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+    }),
+    makeMentionResult({
+      engine: 'chatgpt',
+      mentioned: false,
+      mentionType: 'not_mentioned',
+      positionContext: 'absent',
+      competitors: ['Comp1', 'Comp2'],
+      competitorsWithPositions: [
+        { name: 'Comp1', position: 1 },
+        { name: 'Comp2', position: 2 },
+      ],
+      prompt: prompts[1],
+      rawSnippet: '',
+      position: null,
+      sentiment: null,
+      sentimentLabel: null,
+      descriptionAccurate: false,
+      descriptionAccuracy: null,
+    }),
   ];
 
   const topics = computeTopicPerformance(results, prompts);
@@ -1402,9 +1545,39 @@ test('computeCompetitorLeaderboard ranks competitors correctly', () => {
   ];
 
   const results = [
-    { engine: 'chatgpt', mentioned: true, competitors: ['Cognizo', 'MarketMuse'], prompt: prompts[0], rawSnippet: '1. Cognizo\n2. MarketMuse', position: 1, sentiment: 'positive', citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
-    { engine: 'chatgpt', mentioned: true, competitors: ['Cognizo'], prompt: prompts[1], rawSnippet: '1. Cognizo', position: 1, sentiment: 'positive', citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
-    { engine: 'perplexity', mentioned: true, competitors: ['MarketMuse'], prompt: prompts[2], rawSnippet: '1. MarketMuse', position: 2, sentiment: 'neutral', citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
+    makeMentionResult({
+      engine: 'chatgpt',
+      competitors: ['Cognizo', 'MarketMuse'],
+      competitorsWithPositions: [
+        { name: 'Cognizo', position: 1 },
+        { name: 'MarketMuse', position: 2 },
+      ],
+      prompt: prompts[0],
+      rawSnippet: '1. Cognizo\n2. MarketMuse',
+      position: 1,
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+    }),
+    makeMentionResult({
+      engine: 'chatgpt',
+      competitors: ['Cognizo'],
+      competitorsWithPositions: [{ name: 'Cognizo', position: 1 }],
+      prompt: prompts[1],
+      rawSnippet: '1. Cognizo',
+      position: 1,
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+    }),
+    makeMentionResult({
+      engine: 'perplexity',
+      competitors: ['MarketMuse'],
+      competitorsWithPositions: [{ name: 'MarketMuse', position: 1 }],
+      prompt: prompts[2],
+      rawSnippet: '1. MarketMuse',
+      position: 2,
+      sentiment: 'neutral',
+      sentimentLabel: 'neutral',
+    }),
   ];
 
   const leaderboard = computeCompetitorLeaderboard(results, prompts);
@@ -1422,9 +1595,46 @@ test('computeCompetitorLeaderboard filters generic platforms and weak one-off me
   ];
 
   const results = [
-    { engine: 'chatgpt', mentioned: true, competitors: ['Blue Ocean Marine', 'Shopify'], prompt: prompts[0], rawSnippet: '1. Blue Ocean Marine\n2. Shopify', position: 1, sentiment: 'positive', citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
-    { engine: 'perplexity', mentioned: true, competitors: ['Blue Ocean Marine', 'Shopify'], prompt: prompts[1], rawSnippet: '1. Blue Ocean Marine\n2. Shopify', position: 1, sentiment: 'positive', citationPresent: false, citationUrls: [], descriptionAccurate: true, testedAt: Date.now() },
-    { engine: 'chatgpt', mentioned: false, competitors: ['Cloud'], prompt: prompts[2], rawSnippet: '1. Cloud', position: null, sentiment: null, citationPresent: false, citationUrls: [], descriptionAccurate: false, testedAt: Date.now() },
+    makeMentionResult({
+      engine: 'chatgpt',
+      competitors: ['Blue Ocean Marine', 'Shopify'],
+      competitorsWithPositions: [
+        { name: 'Blue Ocean Marine', position: 1 },
+        { name: 'Shopify', position: 2 },
+      ],
+      prompt: prompts[0],
+      rawSnippet: '1. Blue Ocean Marine\n2. Shopify',
+      position: 1,
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+    }),
+    makeMentionResult({
+      engine: 'perplexity',
+      competitors: ['Blue Ocean Marine', 'Shopify'],
+      competitorsWithPositions: [
+        { name: 'Blue Ocean Marine', position: 1 },
+        { name: 'Shopify', position: 2 },
+      ],
+      prompt: prompts[1],
+      rawSnippet: '1. Blue Ocean Marine\n2. Shopify',
+      position: 1,
+      sentiment: 'positive',
+      sentimentLabel: 'positive',
+    }),
+    makeMentionResult({
+      engine: 'chatgpt',
+      mentioned: false,
+      mentionType: 'not_mentioned',
+      positionContext: 'absent',
+      competitors: ['Cloud'],
+      competitorsWithPositions: [{ name: 'Cloud', position: 1 }],
+      prompt: prompts[2],
+      rawSnippet: '1. Cloud',
+      sentiment: null,
+      sentimentLabel: null,
+      descriptionAccurate: false,
+      descriptionAccuracy: null,
+    }),
   ];
 
   const leaderboard = computeCompetitorLeaderboard(results, prompts);
@@ -1453,8 +1663,18 @@ test('runMentionTests returns new enhanced fields in MentionSummary', async () =
   assert.ok(summary.sentimentSummary, 'sentimentSummary should be present');
   assert.ok(['positive', 'neutral', 'negative'].includes(summary.sentimentSummary.overallSentiment));
   assert.ok(typeof summary.sentimentSummary.positiveScore === 'number');
+  assert.ok(typeof summary.sentimentSummary.averageStrength === 'number');
+  assert.ok(summary.sentimentSummary.sentimentBreakdown.chatgpt);
   assert.ok(Array.isArray(summary.sentimentSummary.positives));
   assert.ok(Array.isArray(summary.sentimentSummary.negatives));
+  assert.ok(Array.isArray(summary.sentimentSummary.keyPositiveQuotes));
+  assert.ok(Array.isArray(summary.sentimentSummary.keyNegativeQuotes));
+
+  for (const result of summary.results) {
+    assert.ok(['direct', 'indirect', 'not_mentioned'].includes(result.mentionType));
+    assert.ok(['llm', 'heuristic'].includes(result.analysisSource));
+    assert.ok(Array.isArray(result.competitorsWithPositions));
+  }
 
   assert.ok(Array.isArray(summary.topicPerformance), 'topicPerformance should be an array');
   assert.ok(summary.topicPerformance.length > 0, 'topicPerformance should have entries');
@@ -1474,6 +1694,50 @@ test('runMentionTests returns new enhanced fields in MentionSummary', async () =
   }
 
   assert.ok(Array.isArray(summary.inferredCompetitors), 'inferredCompetitors should be an array');
+});
+
+test('createFailedMentionSummary returns a renderable fallback summary', () => {
+  const summary = createFailedMentionSummary(createCrawlData(), ['chatgpt', 'gemini'], 'AI mention testing timed out.');
+
+  assert.equal(summary.overallScore, 0);
+  assert.equal(summary.results.length, 0);
+  assert.ok(summary.promptsUsed.length >= 15);
+  assert.equal(summary.engineStatus.chatgpt.status, 'error');
+  assert.equal(summary.engineStatus.gemini.status, 'error');
+  assert.equal(summary.engineStatus.claude.status, 'not_configured');
+  assert.equal(summary.visibilityPct, 0);
+  assert.equal(summary.shareOfVoice.shareOfVoicePct, 0);
+});
+
+test('runEngineTests records per-prompt failures for a rate-limited engine when provider pacing is disabled', async () => {
+  const prompts = generatePrompts(createCrawlData()).slice(0, 4);
+  let claudeCalls = 0;
+
+  const tester = {
+    availableEngines: () => ['chatgpt', 'claude'],
+    query: async (engine, prompt) => {
+      if (engine === 'claude') {
+        claudeCalls += 1;
+        const error = new Error('Anthropic API error: 429 rate limit exceeded');
+        error.engine = engine;
+        error.prompt = prompt;
+        throw error;
+      }
+
+      return {
+        engine,
+        prompt,
+        text: `${prompt.brand} is a trusted option.`,
+        testedAt: Date.now(),
+      };
+    },
+  };
+
+  const run = await runEngineTests(tester, prompts);
+
+  assert.equal(run.responses.length, prompts.length);
+  assert.equal(claudeCalls, prompts.length);
+  assert.equal(run.failures.filter((failure) => failure.engine === 'claude').length, prompts.length);
 });
 
 test('runMentionTests infers competitor candidates from the scanned site', async () => {
@@ -1505,32 +1769,35 @@ test('discoverCompetitors rejects wrong-industry, vendor, and UI-text candidates
   const profile = buildBusinessProfile(crawl);
   const prompts = generatePrompts(crawl, profile);
   const results = [
-    {
+    makeMentionResult({
       engine: 'chatgpt',
-      mentioned: true,
       competitors: ['C.H. Robinson', 'Mission and Vision', 'Rebuyengine', 'SLC Boats'],
+      competitorsWithPositions: [
+        { name: 'SLC Boats', position: 1 },
+        { name: 'C.H. Robinson', position: 2 },
+        { name: 'Mission and Vision', position: 3 },
+        { name: 'Rebuyengine', position: null },
+      ],
       prompt: { ...prompts[0], id: 'p1', text: 'Best marine parts stores in Salt Lake City', category: 'comparison', source: 'competitor' },
       rawSnippet: '1. SLC Boats\n2. C.H. Robinson\n3. Mission and Vision',
       position: 1,
       sentiment: 'positive',
-      citationPresent: false,
-      citationUrls: [],
-      descriptionAccurate: true,
-      testedAt: Date.now(),
-    },
-    {
+      sentimentLabel: 'positive',
+    }),
+    makeMentionResult({
       engine: 'perplexity',
-      mentioned: true,
       competitors: ['SLC Boats', 'DHL Supply Chain', 'Customer Satisfaction'],
+      competitorsWithPositions: [
+        { name: 'SLC Boats', position: 1 },
+        { name: 'DHL Supply Chain', position: 2 },
+        { name: 'Customer Satisfaction', position: null },
+      ],
       prompt: { ...prompts[1], id: 'p2', text: 'What are the top wakeboard and watersports retailers near Salt Lake City?', category: 'comparison', source: 'competitor' },
       rawSnippet: '1. SLC Boats\n2. DHL Supply Chain',
       position: 1,
       sentiment: 'positive',
-      citationPresent: false,
-      citationUrls: [],
-      descriptionAccurate: true,
-      testedAt: Date.now(),
-    },
+      sentimentLabel: 'positive',
+    }),
   ];
 
   const discovery = discoverCompetitors(crawl, prompts, results, profile);
@@ -2069,6 +2336,9 @@ test('isJunk rejects e-commerce UI patterns', () => {
   assert.equal(isJunk('Compare Products'), true);
   assert.equal(isJunk('Related Products'), true);
   assert.equal(isJunk('Customers Also Bought'), true);
+  assert.equal(isJunk('Your Cart'), true);
+  assert.equal(isJunk('Proceed to Checkout'), true);
+  assert.equal(isJunk('My Account'), true);
 });
 
 // 2. isJunk rejects social/nav CTAs
@@ -2158,6 +2428,16 @@ test('isValidPromptText rejects prompts with embedded periods', () => {
   assert.equal(isValidPromptText('Best tailored for noah flegel. made for everyone tool'), false);
 });
 
+test('isValidPromptText rejects storefront UI prompt fragments', () => {
+  assert.equal(isValidPromptText('Where should I buy your cart?'), false);
+  assert.equal(isValidPromptText('Best your cart'), false);
+  assert.equal(isValidPromptText('What is the best view cart tool?'), false);
+});
+
+test('isValidPromptText still allows normal short-verb direct questions', () => {
+  assert.equal(isValidPromptText('What does Example Co do?'), true);
+});
+
 // 11. generatePrompts produces clean prompts for e-commerce site
 test('generatePrompts produces clean prompts for e-commerce site', () => {
   const crawl = createEcommerceCrawlData();
@@ -2180,6 +2460,8 @@ test('generatePrompts produces clean prompts for e-commerce site', () => {
       `Prompt should not contain exclamation mark: "${p.text}"`);
     assert.ok(!/\d+[/"']/.test(p.text),
       `Prompt should not contain measurements: "${p.text}"`);
+    assert.ok(!p.text.toLowerCase().includes('is one of the leading'),
+      `Prompt should not contain raw marketing sentence fragments: "${p.text}"`);
   }
 });
 
