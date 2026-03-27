@@ -15,6 +15,7 @@ const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_BATCH_SIZE = 8;
 const DEFAULT_TIMEOUT_MS = 6000;
 const DEFAULT_TOTAL_BUDGET_MS = 30000;
+const ANALYSIS_BUDGET_GUARD_MS = 250;
 const ANALYZER_JSON_SCHEMA = {
   name: 'mention_response_analysis',
   strict: true,
@@ -392,11 +393,23 @@ async function analyzeSingleResponseWithRetry(
   response: EngineResponse,
   context: AnalyzerContext,
   timeoutMs: number,
+  deadlineAt?: number,
 ): Promise<LLMAnalysisPayload> {
   try {
     return await callOpenAI(response, context, timeoutMs);
   } catch (error) {
     if (!shouldRetry(error)) throw error;
+    if (deadlineAt != null) {
+      const remainingBudgetMs = deadlineAt - Date.now();
+      if (remainingBudgetMs <= ANALYSIS_BUDGET_GUARD_MS) {
+        throw error;
+      }
+      return callOpenAI(
+        response,
+        context,
+        Math.min(timeoutMs, remainingBudgetMs - ANALYSIS_BUDGET_GUARD_MS),
+      );
+    }
     return callOpenAI(response, context, timeoutMs);
   }
 }
@@ -453,42 +466,64 @@ export async function analyzeResponsesWithLLM(
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const totalBudgetMs = options?.totalBudgetMs ?? DEFAULT_TOTAL_BUDGET_MS;
   const startedAt = Date.now();
+  const deadlineAt = startedAt + totalBudgetMs;
   const results = new Array<MentionResult>(responses.length);
   let llmDisabled = false;
+  const concurrency = Math.max(
+    1,
+    Math.min(
+      batchSize,
+      responses.length >= 48 ? 4 : responses.length >= 24 ? 6 : batchSize,
+    ),
+  );
+  let nextIndex = 0;
+  let consecutiveRetryableFailures = 0;
+  let budgetExhausted = false;
 
-  for (let i = 0; i < responses.length; i += batchSize) {
-    if (llmDisabled || Date.now() - startedAt >= totalBudgetMs) {
-      for (let j = i; j < responses.length; j++) {
-        results[j] = analyzeResponse(responses[j], context.brand, domain);
+  async function analyzeResponseAtIndex(index: number) {
+    const response = responses[index];
+    const remainingBudgetMs = deadlineAt - Date.now();
+
+    if (llmDisabled || remainingBudgetMs <= ANALYSIS_BUDGET_GUARD_MS) {
+      if (!llmDisabled && !budgetExhausted && remainingBudgetMs <= ANALYSIS_BUDGET_GUARD_MS) {
+        budgetExhausted = true;
+        console.warn('[mention-tests] LLM response analysis budget exhausted; using heuristic fallback for remaining responses.');
       }
-      break;
+      results[index] = analyzeResponse(response, context.brand, domain);
+      return;
     }
 
-    const batch = responses.slice(i, i + batchSize);
-    const settled = await Promise.allSettled(
-      batch.map((response) => analyzeSingleResponseWithRetry(response, context, timeoutMs))
-    );
+    const effectiveTimeoutMs = Math.min(timeoutMs, remainingBudgetMs - ANALYSIS_BUDGET_GUARD_MS);
 
-    for (let offset = 0; offset < batch.length; offset++) {
-      const response = batch[offset];
-      const targetIndex = i + offset;
-      const item = settled[offset];
-
-      if (item.status === 'fulfilled') {
-        results[targetIndex] = mapToMentionResult(response, context, item.value, 'llm');
+    try {
+      const payload = await analyzeSingleResponseWithRetry(response, context, effectiveTimeoutMs, deadlineAt);
+      results[index] = mapToMentionResult(response, context, payload, 'llm');
+      consecutiveRetryableFailures = 0;
+    } catch (error) {
+      console.warn('[mention-tests] LLM response analysis failed, using heuristic fallback:', error);
+      results[index] = analyzeResponse(response, context.brand, domain);
+      if (shouldRetry(error)) {
+        consecutiveRetryableFailures += 1;
+        if (consecutiveRetryableFailures >= concurrency) {
+          llmDisabled = true;
+          console.warn('[mention-tests] Disabling LLM response analysis for remaining responses after repeated timeout/rate-limit failures.');
+        }
       } else {
-        console.warn('[mention-tests] LLM response analysis failed, using heuristic fallback:', item.reason);
-        results[targetIndex] = analyzeResponse(response, context.brand, domain);
+        consecutiveRetryableFailures = 0;
       }
-    }
-
-    const rejectedCount = settled.filter((item) => item.status === 'rejected').length;
-    const retryableFailures = settled.filter((item) => item.status === 'rejected' && shouldRetry(item.reason)).length;
-    if (batch.length > 0 && rejectedCount === batch.length && retryableFailures === batch.length) {
-      llmDisabled = true;
-      console.warn('[mention-tests] Disabling LLM response analysis for remaining responses after repeated timeout/rate-limit failures.');
     }
   }
+
+  async function worker() {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= responses.length) return;
+      await analyzeResponseAtIndex(index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
 
   return results.map((result, index) =>
     result ?? analyzeResponse(responses[index], context.brand, domain)

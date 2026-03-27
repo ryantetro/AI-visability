@@ -228,3 +228,65 @@ test('analyzeResponsesWithLLM disables remaining LLM batches after repeated retr
     global.fetch = origFetch;
   }
 });
+
+test('analyzeResponsesWithLLM stops starting new LLM requests when the total budget is exhausted', async () => {
+  const origKey = process.env.OPENAI_API_KEY;
+  const origFetch = global.fetch;
+  let fetchCalls = 0;
+
+  try {
+    process.env.OPENAI_API_KEY = 'test-key-fake';
+    global.fetch = async (_url, init) => new Promise((resolve, reject) => {
+      fetchCalls += 1;
+      const timer = setTimeout(() => {
+        resolve({
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                content: JSON.stringify({
+                  mentioned: true,
+                  mentionType: 'direct',
+                  position: 1,
+                  positionContext: 'listed_ranking',
+                  sentiment: 'positive',
+                  sentimentStrength: 8,
+                  sentimentReasoning: 'The answer ranks the brand first.',
+                  keyQuote: 'Example Co is the top option.',
+                  descriptionAccuracy: 'accurate',
+                  competitors: [],
+                  citationFound: true,
+                }),
+              },
+            }],
+          }),
+        });
+      }, 40);
+
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+      };
+
+      if (init?.signal?.aborted) return onAbort();
+      init?.signal?.addEventListener('abort', onAbort, { once: true });
+    });
+
+    const results = await analyzeResponsesWithLLM(
+      [
+        makeResponse({ prompt: makePrompt('prompt-1') }),
+        makeResponse({ prompt: makePrompt('prompt-2') }),
+        makeResponse({ prompt: makePrompt('prompt-3') }),
+      ],
+      { brand: 'Example Co', domain: 'example.com', businessProfile: makeBusinessProfile() },
+      { batchSize: 1, timeoutMs: 100, totalBudgetMs: 320 }
+    );
+
+    assert.equal(results[0].analysisSource, 'llm');
+    assert.ok(results.slice(1).every((result) => result.analysisSource === 'heuristic'));
+    assert.equal(fetchCalls, 2);
+  } finally {
+    process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
+});

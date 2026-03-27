@@ -47,6 +47,20 @@ interface LLMPromptResult {
 }
 
 function industryPatterns(profile: BusinessProfile): string[] {
+  const combined = [
+    profile.industry,
+    ...profile.categoryPhrases,
+    ...profile.productCategories,
+    ...profile.serviceSignals,
+    ...profile.similarityKeywords,
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  const educationLike = profile.industry === 'Education'
+    || profile.industry === 'Non-Profit'
+    || /\b(student|students|educator|educators|teacher|teachers|stem|workshop|workshops|internship|internships|mentorship|career exploration|career readiness)\b/.test(combined);
+
   if (profile.vertical === 'marine_watersports') {
     return [
       'buyers ask where to buy parts, gear, and watersports equipment near them',
@@ -82,6 +96,13 @@ function industryPatterns(profile: BusinessProfile): string[] {
       'buyer-intent prompts focus on performance improvement and execution efficiency',
     ];
   }
+  if (educationLike) {
+    return [
+      'buyers ask about STEM workshops, mentorship, internships, and career exploration opportunities',
+      'searches compare programs by student impact, hands-on learning, mentorship access, and confidence building',
+      'ranking prompts should sound like a parent, educator, student, or program buyer evaluating the best options',
+    ];
+  }
   if (profile.vertical === 'local_service') {
     return [
       'buyers ask who serves their area, who is trusted locally, and who can solve a specific problem quickly',
@@ -97,6 +118,20 @@ function industryPatterns(profile: BusinessProfile): string[] {
 }
 
 function fewShotExamples(profile: BusinessProfile): string[] {
+  const combined = [
+    profile.industry,
+    ...profile.categoryPhrases,
+    ...profile.productCategories,
+    ...profile.serviceSignals,
+    ...profile.similarityKeywords,
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  const educationLike = profile.industry === 'Education'
+    || profile.industry === 'Non-Profit'
+    || /\b(student|students|educator|educators|teacher|teachers|stem|workshop|workshops|internship|internships|mentorship|career exploration|career readiness)\b/.test(combined);
+
   if (profile.vertical === 'marine_watersports') {
     return [
       'best marine parts store in salt lake city',
@@ -116,6 +151,13 @@ function fewShotExamples(profile: BusinessProfile): string[] {
       'best payment platform for subscriptions and recurring billing',
       'stripe alternatives for online marketplaces',
       'what billing tools help reduce failed payment churn',
+    ];
+  }
+  if (educationLike) {
+    return [
+      'rank the top stem career exploration programs for students',
+      'best workshops and mentorship programs for girls interested in technology',
+      'what programs help students explore tech careers and internships',
     ];
   }
   return [

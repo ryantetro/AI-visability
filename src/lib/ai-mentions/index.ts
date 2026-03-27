@@ -33,6 +33,7 @@ import {
 import { discoverCompetitors } from './competitor-discovery';
 
 const EXECUTION_PROMPT_LIMIT = 15;
+const PROMPT_REUSE_VERSION = 2;
 const PROMPT_GENERATION_TIMEOUT_MS = 12000;
 const ENGINE_TEST_TIMEOUT_MS = 180000;
 const RESPONSE_ANALYSIS_TIMEOUT_MS = 12000;
@@ -107,6 +108,7 @@ export function buildPromptReuseFingerprint(crawlData: CrawlData): string {
   const businessProfile = buildBusinessProfile(crawlData);
 
   return JSON.stringify({
+    version: PROMPT_REUSE_VERSION,
     normalizedUrl: normalizeFingerprintValue(crawlData.normalizedUrl ?? crawlData.url),
     brand: normalizeFingerprintValue(businessProfile.brand),
     vertical: businessProfile.vertical,

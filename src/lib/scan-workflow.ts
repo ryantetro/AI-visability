@@ -10,7 +10,7 @@ import {
   createFailedMentionSummary,
   runMentionTestJob,
 } from '@/lib/ai-mentions';
-import { isValidPromptText } from '@/lib/ai-mentions/prompt-generator';
+import { buildBusinessProfile, isValidPromptText } from '@/lib/ai-mentions/prompt-generator';
 import { AI_ENGINES } from '@/lib/ai-engines';
 import { CrawlData } from '@/types/crawler';
 import { DatabaseService } from '@/types/services';
@@ -69,6 +69,17 @@ const AI_MENTIONS_LANE_INDEX = {
 } as const;
 
 const AI_MENTION_TIMEOUT_MS = 240_000;
+const AI_MENTION_PROMPT_GENERATION_TIMEOUT_MS = 12_000;
+const AI_MENTION_RESPONSE_ANALYSIS_TIMEOUT_MS = 12_000;
+const AI_MENTION_RESPONSE_ANALYSIS_TOTAL_BUDGET_MS = 60_000;
+const AI_MENTION_FINALIZATION_BUFFER_MS = 15_000;
+const AI_MENTION_ENGINE_TEST_TIMEOUT_MS = Math.max(
+  90_000,
+  AI_MENTION_TIMEOUT_MS
+    - AI_MENTION_PROMPT_GENERATION_TIMEOUT_MS
+    - AI_MENTION_RESPONSE_ANALYSIS_TOTAL_BUDGET_MS
+    - AI_MENTION_FINALIZATION_BUFFER_MS,
+);
 const FILE_GENERATION_TIMEOUT_MS = 30_000;
 const PROMPT_REUSE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -155,6 +166,41 @@ function isTerminalAiStatus(status: AiMentionsJobState['status'] | undefined) {
   return status === 'complete' || status === 'failed' || status === 'unavailable';
 }
 
+const EDUCATION_PROMPT_SIGNAL_PATTERN = /\b(stem|student|students|educator|educators|teacher|teachers|mentorship|mentor|internship|internships|career exploration|career readiness|young women|girls in tech|women in tech)\b/i;
+const EDUCATION_BAD_REUSE_PATTERN = /\b(construction|contractor|contractors|hvac|plumbing|roofing|estimating)\b|how can i actual\b|interactive workshops options for buyers|interactive workshops providers|interactive workshops tools solve the biggest buyer problems/i;
+
+function isEducationLikePromptProfile(crawlData: CrawlData) {
+  const profile = buildBusinessProfile(crawlData);
+  const combined = [
+    profile.industry,
+    profile.vertical,
+    ...profile.categoryPhrases,
+    ...profile.productCategories,
+    ...profile.serviceSignals,
+    ...profile.similarityKeywords,
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return profile.industry === 'Education'
+    || profile.industry === 'Non-Profit'
+    || /\b(stem|student|students|educator|educators|teacher|teachers|workshop|workshops|internship|internships|mentorship|career exploration|career readiness|women in stem|women in tech|girls in stem|girls in tech)\b/.test(combined);
+}
+
+function isReusablePromptSetValid(crawlData: CrawlData, prompts: MentionPrompt[]) {
+  if (!isEducationLikePromptProfile(crawlData)) {
+    return true;
+  }
+
+  const promptTexts = prompts.map((prompt) => prompt.text);
+  if (promptTexts.some((text) => EDUCATION_BAD_REUSE_PATTERN.test(text))) {
+    return false;
+  }
+
+  const anchoredPromptCount = promptTexts.filter((text) => EDUCATION_PROMPT_SIGNAL_PATTERN.test(text)).length;
+  return anchoredPromptCount >= 3;
+}
+
 function resolveReusablePrompts(scan: ScanJob, latestScan: ScanJob | null, crawlData: CrawlData): MentionPrompt[] | null {
   if (!latestScan || latestScan.id === scan.id) return null;
   const latestCompletedAt = latestScan.completedAt ?? latestScan.createdAt;
@@ -170,6 +216,11 @@ function resolveReusablePrompts(scan: ScanJob, latestScan: ScanJob | null, crawl
 
   const reusablePrompts = summary.promptsUsed.filter((prompt) => isValidPromptText(prompt.text));
   if (reusablePrompts.length < 10) {
+    return null;
+  }
+
+  if (!isReusablePromptSetValid(crawlData, reusablePrompts)) {
+    console.warn('[scan-workflow] Ignoring cached prompts because they do not match current prompt-quality heuristics.');
     return null;
   }
 
@@ -562,6 +613,10 @@ export async function runScan(scanId: string, db = getDatabase()) {
         const mentionExecution = await withTimeout(
           runMentionTestJob(crawlData, filteredTester, {
             cachedPrompts,
+            promptGenerationTimeoutMs: AI_MENTION_PROMPT_GENERATION_TIMEOUT_MS,
+            engineTestTimeoutMs: AI_MENTION_ENGINE_TEST_TIMEOUT_MS,
+            responseAnalysisTimeoutMs: AI_MENTION_RESPONSE_ANALYSIS_TIMEOUT_MS,
+            responseAnalysisTotalBudgetMs: AI_MENTION_RESPONSE_ANALYSIS_TOTAL_BUDGET_MS,
             onProgress: async (update) => {
               await updateStoredScan((scan) => {
                 const nextMetrics = mergeAiMetrics(scan.enrichments?.aiMentions?.metrics, update.metrics);

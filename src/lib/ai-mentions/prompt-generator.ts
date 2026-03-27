@@ -20,6 +20,13 @@ const KEYWORD_STOPWORDS = new Set([
   'products', 'product', 'services', 'service', 'company', 'companies', 'business', 'businesses',
   'online', 'today', 'leading', 'available', 'tools', 'tool', 'solutions', 'solution', 'gear',
 ]);
+const EDUCATION_SIGNAL_KEYWORDS = [
+  'education', 'course', 'training', 'tutorial', 'lms', 'e-learning',
+  'student', 'students', 'teacher', 'teachers', 'educator', 'educators', 'classroom',
+  'curriculum', 'workshop', 'workshops', 'stem', 'internship', 'internships',
+  'career exploration', 'career readiness', 'mentorship', 'mentor', 'women in stem',
+  'women in tech', 'girls in tech', 'girls in stem',
+];
 const PROMPT_STOREFRONT_UI_PATTERN = /\b(your cart|shopping cart|cart subtotal|view cart|my account|account login|sign in|log in|proceed to checkout|continue shopping|track order|product details|compare products|recently viewed|you may also like|customers also bought|related products|write a review|customer reviews|shipping & returns|shipping and returns|sort by|filter by|in stock|out of stock|sku|quantity)\b/i;
 const PROMPT_STOREFRONT_FRAGMENT_PATTERN = /\b(best|top|buy|compare|where should i buy|what is the best)\s+(your|my|our)\b/i;
 
@@ -114,7 +121,9 @@ function inferIndustry(crawl: CrawlData): string {
     ['Sports Technology', ['coaching', 'postgame', 'athlete', 'sports analytics', 'player evaluation', 'game film', 'scouting']],
     ['Fitness & Wellness', ['fitness', 'gym', 'workout', 'wellness', 'yoga', 'personal training']],
     ['Legal Technology', ['legal', 'law firm', 'attorney', 'lawyer', 'litigation', 'compliance']],
-    ['Construction', ['construction', 'contractor', 'building', 'renovation', 'plumbing', 'hvac']],
+    ['AI & Machine Learning', ['artificial intelligence', 'machine learning', 'deep learning', 'ai platform', 'llm', 'ai-powered', 'generative ai', 'natural language processing']],
+    ['Education', EDUCATION_SIGNAL_KEYWORDS],
+    ['Construction', ['construction', 'contractor', 'contractors', 'jobsite', 'job site', 'subcontractor', 'subcontractors', 'renovation', 'remodel', 'remodeling', 'plumbing', 'hvac', 'roofing', 'estimating']],
     ['Automotive', ['automotive', 'car dealer', 'vehicle', 'auto repair', 'fleet management']],
     ['Travel & Hospitality', ['travel', 'hotel', 'booking', 'tourism', 'hospitality', 'resort']],
     ['HR & Recruiting', ['human resources', 'hr software', 'recruiting', 'hiring', 'talent acquisition']],
@@ -126,13 +135,11 @@ function inferIndustry(crawl: CrawlData): string {
     ['Insurance', ['insurance', 'insurtech', 'underwriting', 'claims']],
     ['Media & Entertainment', ['media', 'streaming', 'podcast', 'entertainment', 'broadcasting']],
     ['Manufacturing', ['manufacturing', 'factory', 'production line', 'quality control']],
-    ['AI & Machine Learning', ['artificial intelligence', 'machine learning', 'deep learning', 'ai platform', 'llm', 'ai-powered', 'generative ai', 'natural language processing']],
     ['SaaS', ['saas', 'software as a service', 'cloud platform', 'subscription', 'subscription software']],
     ['E-commerce', ['shop', 'store', 'e-commerce', 'ecommerce', 'buy now', 'cart', 'shopify', 'online store']],
     ['Marketing', ['marketing', 'seo', 'advertising', 'content marketing', 'digital marketing', 'social media marketing', 'email marketing']],
     ['Healthcare', ['health', 'medical', 'patient', 'clinical', 'healthcare', 'telehealth', 'ehr']],
     ['Finance', ['finance', 'banking', 'investment', 'fintech', 'payment', 'accounting', 'bookkeeping']],
-    ['Education', ['education', 'learning', 'course', 'training', 'tutorial', 'lms', 'e-learning']],
     ['Real Estate', ['real estate', 'property', 'realty', 'housing', 'mortgage', 'listings']],
     ['Restaurant & Food Service', ['restaurant', 'dining', 'food', 'menu', 'chef', 'catering', 'food delivery']],
   ];
@@ -268,6 +275,67 @@ function compactListPhrase(value: string): string {
   return `${parts[0]}, ${parts[1]}, and ${parts[2]}`;
 }
 
+function hasEducationPromptSignals(profile: BusinessProfile): boolean {
+  if (profile.industry === 'Education') return true;
+
+  const combined = [
+    profile.industry,
+    profile.vertical,
+    ...profile.categoryPhrases,
+    ...profile.productCategories,
+    ...profile.serviceSignals,
+    ...profile.similarityKeywords,
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return EDUCATION_SIGNAL_KEYWORDS.some((keyword) => combined.includes(keyword));
+}
+
+function normalizeDynamicPromptFragment(value: string): string {
+  return value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.!?]+$/g, '')
+    .replace(/^(?:to\s+)/i, '')
+    .replace(/^(?:the|a|an)\s+/i, '')
+    .trim();
+}
+
+function buildProblemPromptText(problem: string): string | null {
+  const normalized = normalizeDynamicPromptFragment(problem)
+    .replace(/^actual\s+/i, '')
+    .trim();
+
+  if (normalized.length < 6) return null;
+
+  if (/^\w+ing\b/i.test(normalized)) {
+    return `What helps organizations avoid ${normalized.toLowerCase()}?`;
+  }
+
+  if (/^(?:problem|problems|issue|issues|challenge|challenges|pain point|pain points)\b/i.test(normalized)) {
+    return `What helps solve ${normalized.toLowerCase()}?`;
+  }
+
+  return `What helps with ${normalized.toLowerCase()}?`;
+}
+
+function buildWorkflowPromptText(capability: string, family: ReturnType<typeof detectPromptFamily>, industry: string): string | null {
+  const normalized = normalizeDynamicPromptFragment(capability);
+  if (normalized.length < 6) return null;
+
+  const subject = family === 'education' ? 'organizations' : 'teams';
+  if (/^(?:automate|generate|track|analyze|create|export|share|schedule|monitor|optimize|streamline|customize|collaborate|build|launch|offer|prepare|inspire|connect|manage|find|mentor|coach)\b/i.test(normalized)) {
+    return `What helps ${subject} ${normalized.toLowerCase()}?`;
+  }
+
+  if (family === 'education') {
+    return `What is the best way for organizations to ${normalized.toLowerCase()}?`;
+  }
+
+  return `What is the best way to ${normalized.toLowerCase()} in ${industry.toLowerCase()}?`;
+}
+
 function normalizeUspPromptFragment(usp: string, brand: string): string | null {
   const normalizedBrand = brand.trim().toLowerCase();
   const cleaned = usp
@@ -366,9 +434,10 @@ interface PromptBase {
   source: string;
 }
 
-function detectPromptFamily(profile: BusinessProfile): 'saas' | 'ecommerce' | 'healthcare' | 'finance' | 'marketing' | 'local_service' | 'marine' | 'general' {
+function detectPromptFamily(profile: BusinessProfile): 'saas' | 'ecommerce' | 'healthcare' | 'finance' | 'marketing' | 'local_service' | 'marine' | 'education' | 'general' {
   if (profile.vertical === 'marine_watersports') return 'marine';
   if (profile.vertical === 'local_service') return 'local_service';
+  if (hasEducationPromptSignals(profile) || profile.industry === 'Non-Profit') return 'education';
   if (profile.vertical === 'saas' || profile.industry === 'SaaS') return 'saas';
   if (profile.vertical === 'ecommerce_platform' || profile.industry === 'E-commerce') return 'ecommerce';
   if (profile.industry === 'Healthcare') return 'healthcare';
@@ -414,6 +483,12 @@ function buildVerticalSpecificPrompts(profile: BusinessProfile, year: number): P
         { text: `Best marketing platforms for content, SEO, and campaign reporting`, category: 'buyer-intent', source: 'backfill' },
         { text: `Compare marketing tools for attribution and performance reporting`, category: 'comparison', source: 'backfill' },
         { text: `What marketing software helps teams publish content faster?`, category: 'problem-solution', source: 'backfill' },
+      ];
+    case 'education':
+      return [
+        { text: `Best STEM career exploration programs for students in ${year}`, category: 'buyer-intent', source: 'backfill' },
+        { text: `Compare workshops, mentorship, and internship programs for young women in tech`, category: 'comparison', source: 'backfill' },
+        { text: `What programs help students explore technology careers and build confidence in STEM?`, category: 'problem-solution', source: 'backfill' },
       ];
     case 'local_service':
       return [
@@ -535,6 +610,19 @@ function buildRankingPrompts(profile: BusinessProfile): PromptBase[] {
           source: 'ranking',
         },
       ];
+    case 'education':
+      return [
+        {
+          text: `Rank the top STEM career exploration programs for students`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+        {
+          text: `List the top 5 workshops and internship programs for young women in order`,
+          category: 'comparison',
+          source: 'ranking',
+        },
+      ];
     default:
       return [
         {
@@ -578,6 +666,7 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
   const profile = extractSiteContent(crawl);
   const year = new Date().getFullYear();
   const isMarineRetail = resolvedProfile.vertical === 'marine_watersports';
+  const promptFamily = detectPromptFamily(resolvedProfile);
   const verticalSpecific = buildVerticalSpecificPrompts(resolvedProfile, year);
   const rankingPrompts = buildRankingPrompts(resolvedProfile);
 
@@ -663,8 +752,10 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
   // Problem-solution prompts (0-2)
   const problemPrompts: PromptBase[] = [];
   for (const problem of profile.problemStatements.slice(0, 2)) {
+    const promptText = buildProblemPromptText(problem);
+    if (!promptText) continue;
     problemPrompts.push({
-      text: `How can I ${problem.toLowerCase()}?`,
+      text: promptText,
       category: 'problem-solution',
       source: 'problem',
     });
@@ -683,8 +774,10 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
   // Workflow prompts (0-2)
   const workflowPrompts: PromptBase[] = [];
   for (const cap of profile.actionCapabilities.slice(0, 2)) {
+    const promptText = buildWorkflowPromptText(cap, promptFamily, industry);
+    if (!promptText) continue;
     workflowPrompts.push({
-      text: `What is the best way to ${cap.toLowerCase()} for ${industry.toLowerCase()}?`,
+      text: promptText,
       category: 'workflow',
       source: 'workflow',
     });
@@ -776,6 +869,8 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
     {
       text: resolvedProfile.vertical === 'marine_watersports'
         ? `What are the best marine parts and watersports retailers${location ? ` in ${location}` : ''}?`
+        : promptFamily === 'education'
+          ? `What are the best STEM career exploration programs${location ? ` in ${location}` : ''}?`
         : `What are the best ${industry} companies${location ? ` in ${location}` : ''}?`,
       category: 'category',
       source: 'fallback',
@@ -813,27 +908,41 @@ export function generatePrompts(crawl: CrawlData, businessProfile?: BusinessProf
   // Backfill if below MIN_PROMPTS with intent-driven templates
   const ind = industry.toLowerCase();
   const categoryPhrase = resolvedProfile.categoryPhrases[0]?.toLowerCase() ?? ind;
-  const genericBackfill: PromptBase[] = [
-    resolvedProfile.vertical === 'marine_watersports'
-      ? { text: `Who do boat owners trust for ${categoryPhrase}${location ? ` in ${location}` : ''}?`, category: 'recommendation', source: 'backfill' }
-      : { text: `What ${ind} software do professionals recommend in ${year}?`, category: 'recommendation', source: 'backfill' },
-    resolvedProfile.vertical === 'marine_watersports'
-      ? { text: `Compare the top boating and watersports retailers${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' }
-      : { text: `How to choose the right ${ind} platform for my business`, category: 'recommendation', source: 'backfill' },
-    resolvedProfile.vertical === 'marine_watersports'
-      ? { text: `Where should I buy marine parts and wakeboards${location ? ` near ${location}` : ''}?`, category: 'buyer-intent', source: 'backfill' }
-      : { text: `What problems does ${ind} software typically solve?`, category: 'recommendation', source: 'backfill' },
-    resolvedProfile.vertical === 'marine_watersports'
-      ? { text: `Rank the top marine and watersports retailers${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' }
-      : { text: `Rank the top ${categoryPhrase} tools${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' },
-    { text: `Compare the leading ${resolvedProfile.vertical === 'marine_watersports' ? 'marine retail' : ind} solutions`, category: 'comparison', source: 'backfill' },
-    { text: `What should I look for when evaluating ${resolvedProfile.vertical === 'marine_watersports' ? 'marine and watersports dealers' : `${ind} tools`}?`, category: 'recommendation', source: 'backfill' },
-    { text: `Which ${resolvedProfile.vertical === 'marine_watersports' ? 'boating retailers' : `${ind} platforms`} are growing fastest right now?`, category: 'category', source: 'backfill' },
-    { text: `What are the newest ${resolvedProfile.vertical === 'marine_watersports' ? 'marine gear retailers' : `${ind} tools`} for ${year}?`, category: 'category', source: 'backfill' },
-    { text: `Best ${resolvedProfile.vertical === 'marine_watersports' ? 'watersports shops' : `${ind} tools`} for small and mid-size teams`, category: 'recommendation', source: 'backfill' },
-    { text: `What ${resolvedProfile.vertical === 'marine_watersports' ? 'boating retailers' : `${ind} automation tools`} save the most time?`, category: 'recommendation', source: 'backfill' },
-    { text: `How is AI changing the ${resolvedProfile.vertical === 'marine_watersports' ? 'marine retail' : ind} industry?`, category: 'category', source: 'backfill' },
-  ];
+  const genericBackfill: PromptBase[] = promptFamily === 'education'
+    ? [
+      { text: `What programs do students and educators recommend for STEM career exploration in ${year}?`, category: 'recommendation', source: 'backfill' },
+      { text: `How do I choose the right STEM workshop or internship program for students?`, category: 'recommendation', source: 'backfill' },
+      { text: `What programs help students discover real technology career paths?`, category: 'recommendation', source: 'backfill' },
+      { text: `Rank the top STEM workshops and mentorship programs for students`, category: 'comparison', source: 'backfill' },
+      { text: `Compare the leading STEM education and career-readiness programs`, category: 'comparison', source: 'backfill' },
+      { text: `What should families and educators look for in a STEM career exploration program?`, category: 'recommendation', source: 'backfill' },
+      { text: `Which STEM programs are growing fastest for student career exploration?`, category: 'category', source: 'backfill' },
+      { text: `What are the newest STEM mentorship and internship programs for students in ${year}?`, category: 'category', source: 'backfill' },
+      { text: `Best programs for students who want hands-on STEM workshops and mentorship`, category: 'recommendation', source: 'backfill' },
+      { text: `What programs help young women build confidence and community in STEM?`, category: 'recommendation', source: 'backfill' },
+      { text: `How is AI changing STEM education and career exploration programs?`, category: 'category', source: 'backfill' },
+    ]
+    : [
+      resolvedProfile.vertical === 'marine_watersports'
+        ? { text: `Who do boat owners trust for ${categoryPhrase}${location ? ` in ${location}` : ''}?`, category: 'recommendation', source: 'backfill' }
+        : { text: `What ${ind} software do professionals recommend in ${year}?`, category: 'recommendation', source: 'backfill' },
+      resolvedProfile.vertical === 'marine_watersports'
+        ? { text: `Compare the top boating and watersports retailers${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' }
+        : { text: `How to choose the right ${ind} platform for my business`, category: 'recommendation', source: 'backfill' },
+      resolvedProfile.vertical === 'marine_watersports'
+        ? { text: `Where should I buy marine parts and wakeboards${location ? ` near ${location}` : ''}?`, category: 'buyer-intent', source: 'backfill' }
+        : { text: `What problems does ${ind} software typically solve?`, category: 'recommendation', source: 'backfill' },
+      resolvedProfile.vertical === 'marine_watersports'
+        ? { text: `Rank the top marine and watersports retailers${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' }
+        : { text: `Rank the top ${categoryPhrase} tools${location ? ` in ${location}` : ''}`, category: 'comparison', source: 'backfill' },
+      { text: `Compare the leading ${resolvedProfile.vertical === 'marine_watersports' ? 'marine retail' : ind} solutions`, category: 'comparison', source: 'backfill' },
+      { text: `What should I look for when evaluating ${resolvedProfile.vertical === 'marine_watersports' ? 'marine and watersports dealers' : `${ind} tools`}?`, category: 'recommendation', source: 'backfill' },
+      { text: `Which ${resolvedProfile.vertical === 'marine_watersports' ? 'boating retailers' : `${ind} platforms`} are growing fastest right now?`, category: 'category', source: 'backfill' },
+      { text: `What are the newest ${resolvedProfile.vertical === 'marine_watersports' ? 'marine gear retailers' : `${ind} tools`} for ${year}?`, category: 'category', source: 'backfill' },
+      { text: `Best ${resolvedProfile.vertical === 'marine_watersports' ? 'watersports shops' : `${ind} tools`} for small and mid-size teams`, category: 'recommendation', source: 'backfill' },
+      { text: `What ${resolvedProfile.vertical === 'marine_watersports' ? 'boating retailers' : `${ind} automation tools`} save the most time?`, category: 'recommendation', source: 'backfill' },
+      { text: `How is AI changing the ${resolvedProfile.vertical === 'marine_watersports' ? 'marine retail' : ind} industry?`, category: 'category', source: 'backfill' },
+    ];
 
   const selectedCounts = new Map<MentionPrompt['category'], number>();
   for (const prompt of selected) {

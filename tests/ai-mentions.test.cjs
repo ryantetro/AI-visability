@@ -286,6 +286,66 @@ function createRichCrawlData() {
   };
 }
 
+function createSheTechCrawlData() {
+  const homepage = {
+    ...createCrawlData().homepage,
+    url: 'https://shetechexplorer.com/',
+    title: 'SheTech Explorer | Inspire and Prepare the Next Generation of Women in STEM',
+    h1s: ['Inspire and Prepare the Next Generation of Women in STEM'],
+    headings: [
+      { level: 1, text: 'Inspire and Prepare the Next Generation of Women in STEM' },
+      { level: 2, text: 'Interactive workshops for students and educators' },
+      { level: 2, text: 'Mentorship, internships, and career exploration' },
+      { level: 2, text: 'Building confidence through hands-on STEM experiences' },
+    ],
+    metaDescription: 'SheTech Explorer helps students explore STEM careers through interactive workshops, mentorship, internships, and hands-on learning experiences.',
+    metaKeywords: ['stem workshops', 'career exploration', 'internships', 'women in stem'],
+    ogTags: { 'og:site_name': 'SheTech Explorer' },
+    textContent: 'SheTech Explorer inspires and prepares the next generation of women in STEM. Our program helps students explore technology careers through interactive workshops, mentorship, internships, and hands-on experiences. Built for students, educators, and community partners who want better STEM career readiness.',
+    classification: 'homepage',
+    externalLinks: ['https://womentechcouncil.org/programs'],
+  };
+
+  const programsPage = {
+    ...createCrawlData().homepage,
+    url: 'https://shetechexplorer.com/programs',
+    title: 'Programs | SheTech Explorer',
+    headings: [
+      { level: 1, text: 'Programs' },
+      { level: 2, text: 'STEM workshops' },
+      { level: 2, text: 'Internship pathways' },
+      { level: 3, text: 'Career exploration events' },
+      { level: 3, text: 'Mentorship experiences' },
+    ],
+    textContent: 'Students use SheTech Explorer programs to discover real tech career paths, meet mentors, and prepare for internships. Educators and community leaders use the platform to plan interactive workshops and create opportunities for young women in STEM.',
+    classification: 'service',
+    schemaObjects: [
+      { type: 'Product', raw: { name: 'STEM workshops' } },
+      { type: 'Product', raw: { name: 'Internship pathways' } },
+    ],
+  };
+
+  const faqPage = {
+    ...createCrawlData().homepage,
+    url: 'https://shetechexplorer.com/faq',
+    title: 'FAQ | SheTech Explorer',
+    headings: [
+      { level: 1, text: 'FAQ' },
+      { level: 2, text: 'How do students join SheTech Explorer workshops?' },
+      { level: 2, text: 'What internship and mentorship opportunities are available?' },
+    ],
+    textContent: 'Frequently asked questions about workshops, mentorship, career exploration, and STEM internships for students.',
+    classification: 'faq',
+  };
+
+  return createCrawlData({
+    url: 'https://shetechexplorer.com/',
+    normalizedUrl: 'https://shetechexplorer.com',
+    homepage,
+    pages: [homepage, programsPage, faqPage],
+  });
+}
+
 function createMarineRetailCrawlData() {
   const homepage = {
     url: 'https://marine-products.com/',
@@ -1959,6 +2019,12 @@ test('inferIndustry detects Construction', () => {
   assert.equal(inferIndustry(crawl), 'Construction');
 });
 
+test('inferIndustry prefers Education for STEM workshop sites that mention building the next generation', () => {
+  const crawl = createSheTechCrawlData();
+
+  assert.equal(inferIndustry(crawl), 'Education');
+});
+
 test('inferIndustry analyzes sub-pages beyond homepage', () => {
   const homepage = {
     ...createCrawlData().homepage,
@@ -1991,6 +2057,20 @@ test('generatePrompts produces prompts with new categories for rich data', () =>
   // Should have use-case and/or workflow prompts from the enriched data
   assert.ok(sources.has('use-case') || sources.has('workflow') || sources.has('problem') || sources.has('buyer'),
     `Expected new prompt sources, got: ${[...sources].join(', ')}`);
+});
+
+test('generatePrompts keeps STEM education sites out of construction prompt templates', () => {
+  const crawl = createSheTechCrawlData();
+  const prompts = generatePrompts(crawl);
+  const promptTexts = prompts.map((prompt) => prompt.text);
+
+  assert.ok(promptTexts.length >= 15, `Expected at least 15 prompts, got ${promptTexts.length}`);
+  assert.ok(promptTexts.some((text) => /rank the top stem career exploration programs/i.test(text)),
+    `Expected education ranking prompt, got: ${promptTexts.join(' | ')}`);
+  assert.ok(promptTexts.some((text) => /workshops, mentorship, and internship programs/i.test(text) || /students explore technology careers/i.test(text)),
+    `Expected STEM education prompts, got: ${promptTexts.join(' | ')}`);
+  assert.ok(!promptTexts.some((text) => /construction|contractor|hvac|plumbing/i.test(text)),
+    `Did not expect construction prompts, got: ${promptTexts.join(' | ')}`);
 });
 
 test('mockMentionTester handles new categories without crashing', async () => {
