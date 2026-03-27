@@ -87,7 +87,10 @@ positionContext: 'listed_ranking' | 'prominent' | 'passing' | 'absent' | null;
 analysisSource: 'llm' | 'heuristic';
 ```
 
-Existing fields (`mentioned`, `position`, `sentiment`, `citationPresent`, `competitors`, `rawSnippet`) are populated from the LLM output for backward compatibility. The `mentioned` field is true for both `direct` and `indirect` mention types.
+Existing fields (`mentioned`, `position`, `sentiment`, `citationPresent`, `competitors`, `rawSnippet`) are populated from the LLM output for backward compatibility:
+- `mentioned` = true for both `direct` and `indirect` mention types
+- `sentiment` maps from the LLM output: `'mixed'` maps to `'neutral'` for the existing field (the new `sentimentStrength` captures nuance). The existing union `'positive' | 'neutral' | 'negative' | null` is unchanged.
+- `descriptionAccurate` (existing boolean) = `descriptionAccuracy === 'accurate'` for backward compat
 
 **`SentimentSummary` interface additions:**
 
@@ -285,6 +288,7 @@ Step 4 is the new core addition. Steps 5-10 use the richer data from the LLM ana
 | `src/lib/ai-mentions/competitor-discovery.ts` | Use `competitorsWithPositions` from LLM analysis for richer position data |
 | `src/types/ai-mentions.ts` | Extend `MentionResult`, `SentimentSummary`, `ShareOfVoiceData` with new fields |
 | `src/app/api/cron/monitor/route.ts` | Use LLM analyzer for monitoring, store enhanced fields, score change detection, competitor movement tracking |
+| `src/lib/services/supabase-prompt-monitoring.ts` | Extend `savePromptResult` input type and query to store enhanced fields (mention_type, sentiment_strength, etc.) |
 | `supabase/migrations/` | Add columns to `prompt_results` |
 
 ## Database Changes
