@@ -61,9 +61,24 @@ export function scoreCrawlData(data: CrawlData, webHealth?: WebHealthSummary): S
 
   const bandInfo = getBandInfo(aiVisibility);
   const webHealthPercentage = webHealth?.status === 'complete' ? webHealth.percentage : null;
-  const overall = webHealthPercentage === null
-    ? null
-    : Math.round(aiVisibility * 0.6 + webHealthPercentage * 0.4);
+
+  // Pillar-level weighted overall (without mentions - not available at scan time)
+  const perfPillar = webHealth?.pillars?.find(p => p.key === 'performance');
+  const trustPillar = webHealth?.pillars?.find(p => p.key === 'security');
+  const perfScore = perfPillar?.percentage ?? null;
+  const trustScore = trustPillar?.percentage ?? null;
+
+  let overall: number | null;
+  if (perfScore !== null && trustScore !== null) {
+    // AI Visibility (1.0) + Performance (0.5) + Trust (0.5) = weight sum 2.0
+    overall = Math.round((aiVisibility * 1.0 + perfScore * 0.5 + trustScore * 0.5) / 2.0);
+  } else if (webHealthPercentage !== null) {
+    // Fallback: use aggregate web health at half weight
+    overall = Math.round((aiVisibility * 1.0 + webHealthPercentage * 0.5) / 1.5);
+  } else {
+    overall = null;
+  }
+
   const overallBandInfo = getBandInfo(overall ?? aiVisibility);
 
   const webChecks = webHealth?.pillars.flatMap((pillar) => pillar.checks) || [];

@@ -147,8 +147,8 @@ export function EngineHeatmap({ data }: { data: CompetitorComparisonData }) {
                     >
                       {cell.rate == null ? '--' : `${cell.rate}%`}
                     </span>
-                    <span className="mt-0.5 text-[9px] text-zinc-500 tabular-nums">
-                      {cell.rate == null ? cell.state : `${cell.mentioned}/${cell.total}`}
+                    <span className="mt-0.5 text-[9px] text-zinc-500">
+                      {cell.rate == null ? cell.state : 'Mention rate'}
                     </span>
                   </motion.div>
                 );

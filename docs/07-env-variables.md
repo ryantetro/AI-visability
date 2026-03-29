@@ -15,6 +15,17 @@
 | `NEXT_PUBLIC_APP_URL` | Public app URL (e.g., `https://app.yourwebsitescore.com`) |
 | `MONITORING_SECRET` | Secret for cron job and internal API authentication |
 
+### Cron / monitoring tuning (optional)
+
+Used by `GET /api/cron/monitor`. Helps avoid Vercel **504** when Phase 0 rescans or Phase 2 prompt checks run too long in one invocation.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CRON_MAX_RESCANS_PER_RUN` | `1` | Full site rescans per cron (0–5). Each rescan can take many minutes. |
+| `CRON_MAX_PROMPT_ENGINE_CALLS` | `80` | Cap on AI engine queries in prompt monitoring per invocation (max 400). |
+
+See [12-monitoring-alerts.md](./12-monitoring-alerts.md).
+
 ## AI Engine Keys (Optional -- enables live AI visibility testing)
 
 | Variable | Description |

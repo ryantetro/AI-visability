@@ -299,7 +299,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
                           ? 'Not configured on this run'
                           : status?.status === 'error'
                             ? `Testing error${status.errorMessage ? ` · ${status.errorMessage}` : ''}`
-                            : `${mentioned}/${total} prompts mentioned${sentiment ? ` · ${sentiment}` : ''}`;
+                            : `${total > 0 ? Math.round((mentioned / total) * 100) : 0}% mention rate${sentiment ? ` · ${sentiment}` : ''}`;
                     const verdict: 'pass' | 'fail' | 'unknown' =
                       status?.status !== 'complete'
                         ? 'unknown'
@@ -329,9 +329,12 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
                   checks: mentions.promptsUsed.map((prompt) => {
                     const promptResults = results.filter((r) => r.prompt.id === prompt.id);
                     const mentionedCount = promptResults.filter((r) => r.mentioned).length;
+                    const enginePct = promptResults.length > 0
+                      ? Math.round((mentionedCount / promptResults.length) * 100)
+                      : 0;
                     return {
                       label: `"${prompt.text}"`,
-                      detail: `Mentioned by ${mentionedCount}/${promptResults.length} engines`,
+                      detail: `${enginePct}% of AI engines surfaced a mention`,
                       verdict: (mentionedCount > promptResults.length / 2 ? 'pass' : 'fail') as 'pass' | 'fail',
                     };
                   }),
@@ -341,7 +344,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
                       label: 'Top Competitors',
                       checks: mentions.competitorsMentioned.slice(0, 5).map((c) => ({
                         label: c.name,
-                        detail: `Mentioned ${c.count} times across AI engines`,
+                        detail: 'Frequently co-mentioned when AI compares options',
                         verdict: 'unknown' as const,
                       })),
                     }]
@@ -605,12 +608,10 @@ function TakeActionSection({
   if (mentions) {
     const mentionScore = mentions.overallScore;
     if (mentionScore < 50) {
-      const engineCount = Object.values(mentions.engineBreakdown).filter((e) => e.mentioned > 0).length;
-      const totalEngines = Object.keys(mentions.engineBreakdown).length;
       steps.push({
         icon: <Search className="h-5 w-5" />,
         title: 'Increase your AI mentions',
-        description: `You're only visible on ${engineCount}/${totalEngines} AI engines. Add structured data, improve your content authority, and ensure your brand name appears in relevant industry contexts to get mentioned more.`,
+        description: 'AI engines are only surfacing your brand inconsistently in our tests. Add structured data, improve your content authority, and ensure your brand name appears in relevant industry contexts to get mentioned more.',
         priority: mentionScore < 25 ? 'high' : 'medium',
         scrollTarget: 'section-ai-mentions',
       });

@@ -1746,7 +1746,7 @@ export function AnalysisPageContent() {
                                 ? 'Not configured on this run'
                                 : status?.status === 'error'
                                   ? `Testing error${status.errorMessage ? ` · ${status.errorMessage}` : ''}`
-                                  : `${mentioned}/${total} prompts mentioned · ${eb?.sentiment ?? 'not-found'}`,
+                                  : `${total > 0 ? Math.round((mentioned / total) * 100) : 0}% mention rate · ${eb?.sentiment ?? 'not-found'}`,
                             verdict: status?.status !== 'complete'
                               ? 'unknown' as const
                               : mentioned > 0 ? 'pass' as const : 'fail' as const,
@@ -1759,9 +1759,12 @@ export function AnalysisPageContent() {
                         checks: mentionData.promptsUsed.map((prompt) => {
                           const promptResults = mentionData.results.filter((r) => r.prompt.id === prompt.id);
                           const mentionedCount = promptResults.filter((r) => r.mentioned).length;
+                          const enginePct = promptResults.length > 0
+                            ? Math.round((mentionedCount / promptResults.length) * 100)
+                            : 0;
                           return {
                             label: `"${prompt.text}"`,
-                            detail: `Mentioned by ${mentionedCount}/${promptResults.length} engines`,
+                            detail: `${enginePct}% of AI engines surfaced a mention`,
                             verdict: mentionedCount > promptResults.length / 2 ? 'pass' as const : 'fail' as const,
                           };
                         }),

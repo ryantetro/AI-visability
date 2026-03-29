@@ -854,9 +854,8 @@ function EngineBreakdownSection({ ms }: { ms: MentionSummary }) {
               {/* Percentage */}
               <p className="mt-1 text-2xl font-bold tabular-nums text-white">{entry.mentionRate}%</p>
 
-              {/* Mention count */}
-              <p className="mt-1 text-[11px] tabular-nums text-zinc-500">
-                {entry.mentioned} / {entry.total} mentions
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Live engine testing
               </p>
             </div>
           );

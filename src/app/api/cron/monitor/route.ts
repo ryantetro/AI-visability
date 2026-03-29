@@ -16,6 +16,9 @@ import { applyRegionContext, getSelectedRegions, DEFAULT_REGION_ID } from '@/lib
 import { buildBusinessProfile } from '@/lib/ai-mentions/prompt-generator';
 import type { CrawlData } from '@/types/crawler';
 
+/** Serverless wall-clock limit (seconds). Vercel Pro caps most routes at 300s — heavy cron work must stay under this. */
+export const maxDuration = 300;
+
 const VALID_CATEGORIES: MentionPrompt['category'][] = [
   'direct', 'category', 'comparison', 'recommendation',
   'workflow', 'use-case', 'problem-solution', 'buyer-intent',
@@ -26,7 +29,25 @@ function isValidCategory(cat: string): cat is MentionPrompt['category'] {
 }
 
 const RESCAN_STALENESS_MS = 24 * 60 * 60 * 1000; // 24 hours
-const MAX_RESCANS_PER_RUN = 5;
+
+/** Full site rescans run inline and can take several minutes each — default 1 per cron to avoid Vercel 504 timeouts. Override 0–5 via CRON_MAX_RESCANS_PER_RUN. */
+function getCronMaxRescansPerRun(): number {
+  const raw = process.env.CRON_MAX_RESCANS_PER_RUN;
+  if (raw === undefined || raw === '') return 1;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(5, Math.max(0, n));
+}
+
+/** Cap AI engine calls in Phase 2 per cron invocation (each prompt × engine). Increase via CRON_MAX_PROMPT_ENGINE_CALLS if your platform allows longer functions. */
+function getCronMaxPromptEngineCalls(): number {
+  const raw = process.env.CRON_MAX_PROMPT_ENGINE_CALLS;
+  const fallback = 80;
+  if (raw === undefined || raw === '') return fallback;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.min(400, n);
+}
 
 async function getUserIdByEmail(email: string): Promise<string | null> {
   try {
@@ -135,9 +156,10 @@ export async function GET(request: NextRequest) {
     try {
       const monitoredDomains = await listActiveMonitoringDomains();
       let rescanCount = 0;
+      const maxRescans = getCronMaxRescansPerRun();
 
       for (const record of monitoredDomains) {
-        if (rescanCount >= MAX_RESCANS_PER_RUN) break;
+        if (rescanCount >= maxRescans) break;
 
         try {
           const domain = getDomain(record.url);
@@ -288,11 +310,16 @@ export async function GET(request: NextRequest) {
     }>();
     let promptsChecked = 0;
     let promptErrors = 0;
+    const maxPromptEngineCalls = getCronMaxPromptEngineCalls();
+    let promptEngineCalls = 0;
+    let promptMonitoringBudgetExhausted = false;
 
     try {
       const activeDomains = await pm.listActiveDomainsWithPrompts();
 
-      for (const domain of activeDomains) {
+      domainLoop: for (const domain of activeDomains) {
+        if (promptMonitoringBudgetExhausted) break domainLoop;
+
         const prompts = await pm.listPrompts(domain);
         const active = prompts.filter((p) => p.active);
         if (active.length === 0) continue;
@@ -302,6 +329,8 @@ export async function GET(request: NextRequest) {
         const pendingResponses: Array<{ promptId: string; engine: AIEngine; response: { engine: AIEngine; prompt: MentionPrompt; text: string; testedAt: number; citations?: string[]; searchResults?: Array<{ url: string; title?: string | null }> } }> = [];
 
         for (const prompt of active) {
+          if (promptMonitoringBudgetExhausted) break;
+
           let promptEngines: AIEngine[] = allEngines;
           let primaryRegionId = DEFAULT_REGION_ID;
 
@@ -364,16 +393,26 @@ export async function GET(request: NextRequest) {
           };
 
           for (const engine of promptEngines) {
+            if (promptEngineCalls >= maxPromptEngineCalls) {
+              promptMonitoringBudgetExhausted = true;
+              break;
+            }
             try {
               const response = await tester.query(engine, mentionPrompt);
               pendingResponses.push({ promptId: prompt.id, engine, response });
+              promptEngineCalls += 1;
             } catch {
               promptErrors++;
             }
           }
+
+          if (promptMonitoringBudgetExhausted) break;
         }
 
-        if (pendingResponses.length === 0) continue;
+        if (pendingResponses.length === 0) {
+          if (promptMonitoringBudgetExhausted) break domainLoop;
+          continue;
+        }
 
         const analyzedResults = await analyzeResponsesWithLLM(
           pendingResponses.map((entry) => entry.response),
@@ -453,6 +492,7 @@ export async function GET(request: NextRequest) {
 
           promptsChecked++;
         }
+        if (promptMonitoringBudgetExhausted) break domainLoop;
       }
     } catch {
       // Prompt monitoring failure shouldn't break the entire cron
@@ -467,6 +507,9 @@ export async function GET(request: NextRequest) {
       promptMonitoring: {
         promptsChecked,
         promptErrors,
+        engineCallsThisRun: promptEngineCalls,
+        budgetExhausted: promptMonitoringBudgetExhausted,
+        engineCallBudget: maxPromptEngineCalls,
       },
       timestamp: new Date().toISOString(),
     });

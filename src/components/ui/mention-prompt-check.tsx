@@ -33,7 +33,9 @@ export function MentionPromptCheck({ prompt, results }: MentionPromptCheckProps)
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-medium text-white">&ldquo;{prompt.text}&rdquo;</p>
           <p className="mt-1 text-[11px] text-zinc-400">
-            Mentioned by {mentionedCount}/{totalEngines} engines
+            {totalEngines > 0
+              ? `${Math.round((mentionedCount / totalEngines) * 100)}% of AI engines surfaced a mention`
+              : 'No engine results'}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {results.map((r) => (

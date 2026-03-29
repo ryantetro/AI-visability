@@ -4,6 +4,7 @@ import { MentionSummary, AIEngine } from '@/types/ai-mentions';
 import type { ScanJob } from '@/types/scan';
 import { getDomain } from '@/lib/url-utils';
 import { normalizeMentionSummary } from '@/lib/ai-mentions/summary';
+import { getBandInfo } from '@/lib/scorer';
 
 export interface PublicEngineResult {
   engine: AIEngine;
@@ -49,6 +50,8 @@ export interface PublicScoreSummary {
   engines: PublicEngineResult[];
   topFixes: PublicTopFix[];
   pillars: PublicPillarScore[];
+  totalFixCount: number;
+  mentionRate: number | null;
 }
 
 export type PublicScoreScanLike = Pick<
@@ -100,22 +103,55 @@ export function buildPublicScoreSummaryFromScan(scan: PublicScoreScanLike | null
     percentage: p.percentage,
   }));
 
+  // Recompute overall with pillar-level weights including mentions
+  const perfPillar = pillars.find(p => p.key === 'performance');
+  const trustPillarData = pillars.find(p => p.key === 'security');
+  const perfScore = perfPillar?.percentage ?? null;
+  const trustScore = trustPillarData?.percentage ?? null;
+  const mScore = mentionSummary?.overallScore ?? null;
+
+  let weightedSum = scoreResult.scores.aiVisibility * 1.0;
+  let weightSum = 1.0;
+
+  if (perfScore !== null) {
+    weightedSum += perfScore * 0.5;
+    weightSum += 0.5;
+  }
+  if (trustScore !== null) {
+    weightedSum += trustScore * 0.5;
+    weightSum += 0.5;
+  }
+  if (mScore !== null) {
+    weightedSum += mScore * 1.0;
+    weightSum += 1.0;
+  }
+
+  const newOverall = Math.round(weightedSum / weightSum);
+  const newBandInfo = getBandInfo(newOverall);
+
+  // Compute mention rate from engine data
+  const totalMentioned = engines.reduce((sum, e) => sum + (e.status === 'complete' ? e.mentioned : 0), 0);
+  const totalPrompts = engines.reduce((sum, e) => sum + (e.status === 'complete' ? e.total : 0), 0);
+  const mentionRate = totalPrompts > 0 ? totalMentioned / totalPrompts : null;
+
   return {
     id: scan.id,
     url: scan.url,
     domain: getDomain(scan.url),
     completedAt: scan.completedAt,
-    percentage: scoreResult.scores.overall ?? scoreResult.percentage,
+    percentage: newOverall,
     aiVisibility: scoreResult.scores.aiVisibility,
     webHealth: scoreResult.scores.webHealth,
     mentionScore: mentionSummary?.overallScore ?? null,
     total: scoreResult.total,
     maxTotal: scoreResult.maxTotal,
-    band: scoreResult.overallBand,
-    bandInfo: scoreResult.overallBandInfo,
+    band: newBandInfo.band,
+    bandInfo: newBandInfo,
     engines,
     topFixes,
     pillars,
+    totalFixCount: (scoreResult.fixes ?? []).length,
+    mentionRate,
   };
 }
 

@@ -330,36 +330,38 @@ export function DashboardSection({
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
             AI Mentions
-            <InfoTooltip text="How many times AI engines mention your brand when asked relevant questions. We test across ChatGPT, Perplexity, Gemini, and Claude." className="ml-1 align-middle" />
+            <InfoTooltip text="How often AI engines surface your brand in our test queries across ChatGPT, Perplexity, Gemini, and Claude." className="ml-1 align-middle" />
           </p>
           {totalMentions === 0 && totalChecks === 0 ? (
             <div className="mt-2">
               <span className="text-4xl font-bold text-zinc-600">--</span>
               <p className="mt-1.5 text-[11px] font-medium text-zinc-500">{report?.mentionSummary ? 'No prompts configured yet' : 'Awaiting first scan'}</p>
             </div>
-          ) : (
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-4xl font-bold text-white">
-              {totalMentions.toLocaleString()}
-            </span>
-            {totalChecks > 0 && (
-              <span className="text-sm text-zinc-500">/ {totalChecks}</span>
-            )}
-          </div>
-          )}
-          {mentions?.overallScore != null && (
-            <div className="mt-2 flex items-center gap-1.5">
-              <span className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                mentions.overallScore >= 50
-                  ? 'bg-[#25c972]/10 text-[#25c972]'
-                  : 'bg-[#ff8a1e]/10 text-[#ff8a1e]'
-              )}>
-                {mentions.overallScore >= 50 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {Math.round(mentions.overallScore)}% mention rate
-              </span>
-            </div>
-          )}
+          ) : (() => {
+            const mentionPct = mentions?.overallScore != null
+              ? Math.round(mentions.overallScore)
+              : totalChecks > 0
+                ? Math.round((totalMentions / totalChecks) * 100)
+                : null;
+            return mentionPct != null ? (
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-white">{mentionPct}%</span>
+                <span className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                  mentionPct >= 50
+                    ? 'bg-[#25c972]/10 text-[#25c972]'
+                    : 'bg-[#ff8a1e]/10 text-[#ff8a1e]'
+                )}>
+                  {mentionPct >= 50 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  mention rate
+                </span>
+              </div>
+            ) : (
+              <div className="mt-2">
+                <span className="text-4xl font-bold text-white">--</span>
+              </div>
+            );
+          })()}
           {engineBreakdown && (
             <p className="mt-3 text-[10px] leading-4 text-zinc-500">{engineBreakdown}</p>
           )}
@@ -405,15 +407,14 @@ export function DashboardSection({
                       />
                     </div>
                   </div>
-                  <div className="mt-2.5 flex items-baseline gap-1.5">
-                    <span className="text-xl font-bold text-white">{pc.mentioned}</span>
-                    <span className="text-[11px] text-zinc-500">/ {pc.total}</span>
+                  <div className="mt-2.5 flex items-baseline justify-end">
                     <span className={cn(
-                      'ml-auto text-[11px] font-semibold',
+                      'text-xl font-bold tabular-nums',
                       pc.pct >= 60 ? 'text-[#25c972]' : pc.pct >= 30 ? 'text-[#ffbb00]' : 'text-[#ff5252]'
                     )}>
                       {pc.pct}%
                     </span>
+                    <span className="ml-2 text-[11px] text-zinc-500">visibility</span>
                   </div>
                 </div>
               );

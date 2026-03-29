@@ -34,8 +34,9 @@ export function EngineMentionCard({ engine, breakdown, status }: EngineMentionCa
     <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
       <h4 className="text-[13px] font-semibold text-white">{label}</h4>
       <p className="mt-1 text-[20px] font-bold tabular-nums text-white">
-        {breakdown.mentioned}{' '}
-        <span className="text-[13px] font-normal text-zinc-500">/ {breakdown.total}</span>
+        {Math.round(ratio * 100)}
+        <span className="text-[13px] font-normal text-zinc-500">%</span>
+        <span className="ml-1.5 text-[13px] font-normal text-zinc-500">mention rate</span>
       </p>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
         <div
