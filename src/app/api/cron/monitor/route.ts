@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { getDatabase, getAlertService, getMentionTester, getPromptMonitoring } from '@/lib/services/registry';
 import { computeScore } from '@/lib/ai-mentions/mention-analyzer';
@@ -30,7 +30,7 @@ function isValidCategory(cat: string): cat is MentionPrompt['category'] {
 
 const RESCAN_STALENESS_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-/** Full site rescans run inline and can take several minutes each — default 1 per cron to avoid Vercel 504 timeouts. Override 0–5 via CRON_MAX_RESCANS_PER_RUN. */
+/** Site rescans run in background via after(). Default 1 per cron run, override 0–5 via CRON_MAX_RESCANS_PER_RUN. */
 function getCronMaxRescansPerRun(): number {
   const raw = process.env.CRON_MAX_RESCANS_PER_RUN;
   if (raw === undefined || raw === '') return 1;
@@ -187,12 +187,12 @@ export async function GET(request: NextRequest) {
             },
             {
               db,
-              schedule: async (task) => { await task(); },
+              schedule: (task) => { after(task); },
             }
           );
 
           const scanId = (result.body as { id?: string }).id;
-          rescans.push({ domain, status: result.status === 200 ? 'rescanned' : 'failed', scanId });
+          rescans.push({ domain, status: result.status === 200 ? 'triggered' : 'failed', scanId });
           if (result.status === 200) rescanCount++;
         } catch {
           rescans.push({ domain: record.domain, status: 'error' });
