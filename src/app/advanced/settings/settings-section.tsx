@@ -28,7 +28,12 @@ import { REGIONS } from '@/lib/region-gating';
 import { useDomainContext } from '@/contexts/domain-context';
 import { buildLoginHref, getCurrentAppPath } from '@/lib/app-paths';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
-import type { LimitIssue, PlanChangePreviewResponse } from '@/lib/billing';
+import type {
+  BillingConnectionState,
+  BillingRecoveryAction,
+  LimitIssue,
+  PlanChangePreviewResponse,
+} from '@/lib/billing';
 
 interface SettingsSectionProps {
   domain: string;
@@ -103,6 +108,10 @@ function uniqueIssues(issues: LimitIssue[]) {
     seen.add(key);
     return true;
   });
+}
+
+function getBillingAutoRepairStorageKey(ownerId: string) {
+  return `aiso:billing-auto-repair:${ownerId}`;
 }
 
 /** Convert a 2-letter country code to its flag emoji */
@@ -198,6 +207,12 @@ export function SettingsSection({
   const [reactivateLoading, setReactivateLoading] = useState(false);
   const [stripePlanRedirectLoading, setStripePlanRedirectLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
+  const [billingRepairing, setBillingRepairing] = useState(false);
+  const [billingRecoveryOverride, setBillingRecoveryOverride] = useState<{
+    state: BillingConnectionState;
+    message: string | null;
+    action: BillingRecoveryAction;
+  } | null>(null);
   const [cancelPlanModalOpen, setCancelPlanModalOpen] = useState(false);
   const [changePlanModalOpen, setChangePlanModalOpen] = useState(false);
   const [changePlanLoading, setChangePlanLoading] = useState(false);
@@ -250,7 +265,6 @@ export function SettingsSection({
     maxRegions,
     maxSeats,
     teamId,
-    teamRole,
     planExpiresAt,
     planCancelAtPeriodEnd,
     refresh: refreshPlan,
@@ -274,6 +288,11 @@ export function SettingsSection({
   const hasMultiSeat = canAccess(tier, 'pro');
   const pendingChange = billingStatus.status?.pendingChange ?? null;
   const canManageBilling = billingStatus.status?.canManageBilling ?? tier !== 'free';
+  const billingConnectionState = billingRecoveryOverride?.state ?? billingStatus.status?.billingConnectionState ?? (tier === 'free' ? 'free' : 'healthy');
+  const billingManagementMode = billingStatus.status?.billingManagementMode ?? (tier === 'free' ? 'none' : 'stripe');
+  const billingRecoveryMessage = billingRecoveryOverride?.message ?? billingStatus.status?.recoveryMessage ?? null;
+  const billingRecoveryAction = billingRecoveryOverride?.action ?? billingStatus.status?.recoveryAction ?? null;
+  const canSelfServeBilling = billingStatus.status?.canSelfServeBilling ?? canManageBilling;
   const activeReadiness = billingStatus.status?.activeReadiness ?? null;
   const readiness = billingStatus.status?.readiness ?? null;
   const billingCurrentPlan = billingStatus.status?.currentPlan ?? plan;
@@ -434,41 +453,40 @@ export function SettingsSection({
   const { monitoredSites, handleUnlockComplete } = useDomainContext();
   const displayEmail = user?.email ?? email;
   const activePromptMetric = activeReadiness?.metrics.find((metric) => metric.category === 'prompts') ?? null;
+  const activeDomainMetric = activeReadiness?.metrics.find((metric) => metric.category === 'domains') ?? null;
   const billingOwnerEmail = billingStatus.status?.billingOwner.email ?? null;
   const pendingEffectiveTimestamp = parseIsoTimestamp(pendingChange?.effectiveAt ?? null);
   const pendingEffectiveLabel = formatShortDate(pendingEffectiveTimestamp);
   const pendingRemainingLabel = formatRemainingAccess(pendingEffectiveTimestamp);
   const changeTargetIsSamePlan = selectedTargetPlan === billingCurrentPlan;
   const stripeHostedPlanChange = Boolean(changePlanPreview?.change.canUseStripe);
-  const guidedFallbackPlanChange = Boolean(
-    changePlanPreview
-      && !changePlanPreview.change.canUseStripe
-      && (changePlanPreview.change.decision === 'stripe_upgrade' || changePlanPreview.change.decision === 'stripe_cycle_switch'),
-  );
   const selectedTargetTier = selectedTargetPlan ? planStringToTier(selectedTargetPlan) : null;
   const selectedTargetIsDowngrade = Boolean(
     selectedTargetTier
       && selectedTargetTier !== billingCurrentTier
       && canAccess(billingCurrentTier, selectedTargetTier),
   );
-  const canScheduleGuidedChange = Boolean(
-    selectedTargetPlan
-      && !changeTargetIsSamePlan
-      && (selectedTargetIsDowngrade || guidedFallbackPlanChange)
-      && !stripeHostedPlanChange,
-  );
   const seatPriorityMembers = teamData.members.filter((member) => member.role !== 'owner');
   const seatPriorityIssues = (pendingChange ? visibleBillingIssues : (canManageBilling ? activeIssues : viewerOverageIssues))
     .filter((issue) => issue.category === 'seats' || issue.category === 'pending_invites');
 
   const billingCycle = billingCurrentPlan.includes('annual') ? 'Annual' : billingCurrentPlan.includes('monthly') ? 'Monthly' : '';
-  const planExpiresAtTimestamp = parseIsoTimestamp(planExpiresAt);
+  const effectivePlanExpiresAt = billingStatus.status?.currentPeriodEnd ?? planExpiresAt;
+  const effectiveCancelAtPeriodEnd = billingStatus.status?.cancelAtPeriodEnd ?? planCancelAtPeriodEnd;
+  const planExpiresAtTimestamp = parseIsoTimestamp(effectivePlanExpiresAt);
   const accessEndsOnLabel = formatShortDate(planExpiresAtTimestamp);
   const remainingAccessLabel = formatRemainingAccess(planExpiresAtTimestamp);
-  const hasScheduledCancellation = tier !== 'free' && planCancelAtPeriodEnd;
+  const hasScheduledCancellation = billingCurrentTier !== 'free' && effectiveCancelAtPeriodEnd;
+  const showBillingRecoveryCard = billingRepairing || (billingConnectionState !== 'healthy' && billingConnectionState !== 'free');
+  const showCustomBillingCard = !billingRepairing
+    && billingManagementMode === 'custom'
+    && billingCurrentTier !== 'free'
+    && Boolean(billingRecoveryMessage);
+  const billingActionsBlocked = billingCurrentTier !== 'free' && (!canSelfServeBilling || billingRepairing || billingConnectionState === 'unrecoverable');
+  const trackedDomainsCurrent = activeDomainMetric?.current ?? monitoredSites.length;
   const trackedDomainsValue = isUnlimitedPlanLimit(maxDomains)
-    ? `${monitoredSites.length} / Unlimited`
-    : `${monitoredSites.length} / ${maxDomains}`;
+    ? `${trackedDomainsCurrent} / Unlimited`
+    : `${trackedDomainsCurrent} / ${maxDomains}`;
   const trackedPromptsValue = activePromptMetric
     ? `${activePromptMetric.current} / ${isUnlimitedPlanLimit(maxPrompts) ? 'Unlimited' : maxPrompts}`
     : isUnlimitedPlanLimit(maxPrompts)
@@ -483,6 +501,66 @@ export function SettingsSection({
   const snippet = trackingKey.siteKey
     ? buildBotTrackingSnippet(trackingRuntime, snippetAppUrl, trackingKey.siteKey)
     : '';
+
+  const handleReconnectBilling = useCallback(async (options: { silent?: boolean } = {}) => {
+    const silent = options.silent ?? false;
+
+    setBillingRepairing(true);
+    setBillingRecoveryOverride({
+      state: 'repairing',
+      message: 'We’re reconnecting your Stripe billing record now.',
+      action: null,
+    });
+    if (!silent) {
+      setBillingError(null);
+      setChangePlanError(null);
+      setChangePlanSuccess(null);
+    }
+
+    try {
+      const res = await fetch('/api/billing/reconcile', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to reconnect billing');
+      }
+
+      const [status] = await Promise.all([billingStatus.refresh(), refreshPlan(), teamData.refresh()]);
+      const nextConnectionState = status?.billingConnectionState ?? (data.billingConnectionState as BillingConnectionState | undefined);
+      const nextRecoveryMessage = typeof status?.recoveryMessage === 'string'
+        ? status.recoveryMessage
+        : (typeof data.recoveryMessage === 'string' ? data.recoveryMessage : null);
+      const nextRecoveryAction = (status?.recoveryAction
+        ?? (typeof data.recoveryAction === 'string' ? data.recoveryAction : null)) as BillingRecoveryAction;
+
+      if (nextConnectionState && nextConnectionState !== 'healthy' && nextConnectionState !== 'free') {
+        setBillingRecoveryOverride({
+          state: nextConnectionState,
+          message: nextRecoveryMessage ?? 'Billing changes are temporarily unavailable for this workspace.',
+          action: nextRecoveryAction,
+        });
+      } else {
+        setBillingRecoveryOverride(null);
+      }
+
+      if ((status?.billingConnectionState === 'healthy' || status?.billingConnectionState === 'free' || data.ok) && !silent) {
+        setChangePlanSuccess('Billing reconnected successfully.');
+      }
+
+      return Boolean(status?.billingConnectionState === 'healthy' || status?.billingConnectionState === 'free' || data.ok);
+    } catch (error) {
+      if (!silent) {
+        setBillingError(error instanceof Error ? error.message : 'We couldn’t reconnect billing right now.');
+      }
+      setBillingRecoveryOverride({
+        state: 'unrecoverable',
+        message: 'We couldn’t reconnect an active Stripe subscription for this workspace. Billing changes are temporarily unavailable until this record is reviewed.',
+        action: 'contact_support',
+      });
+      return false;
+    } finally {
+      setBillingRepairing(false);
+    }
+  }, [billingStatus, refreshPlan, teamData]);
 
   const handleOpenBillingPortal = async () => {
     setPortalLoading(true);
@@ -500,6 +578,14 @@ export function SettingsSection({
       }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (data.code === 'repair_required') {
+          setBillingRecoveryOverride({
+            state: (data.billingConnectionState ?? 'repairable') as BillingConnectionState,
+            message: typeof data.recoveryMessage === 'string' ? data.recoveryMessage : data.error || 'Billing needs attention before Stripe can open.',
+            action: (typeof data.recoveryAction === 'string' ? data.recoveryAction : null) as BillingRecoveryAction,
+          });
+          return;
+        }
         throw new Error(data.error || 'Failed to open billing portal');
       }
       const { url } = await res.json();
@@ -528,6 +614,14 @@ export function SettingsSection({
       const res = await fetch('/api/billing/reactivate', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (data.code === 'repair_required') {
+          setBillingRecoveryOverride({
+            state: (data.billingConnectionState ?? 'repairable') as BillingConnectionState,
+            message: typeof data.recoveryMessage === 'string' ? data.recoveryMessage : data.error || 'Billing needs attention before this plan can be reactivated.',
+            action: (typeof data.recoveryAction === 'string' ? data.recoveryAction : null) as BillingRecoveryAction,
+          });
+          return;
+        }
         throw new Error(data.error || 'Failed to reactivate this subscription');
       }
 
@@ -593,6 +687,14 @@ export function SettingsSection({
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (data.code === 'repair_required') {
+          setBillingRecoveryOverride({
+            state: (data.billingConnectionState ?? 'repairable') as BillingConnectionState,
+            message: typeof data.recoveryMessage === 'string' ? data.recoveryMessage : data.error || 'Billing needs attention before Stripe can open this plan change.',
+            action: (typeof data.recoveryAction === 'string' ? data.recoveryAction : null) as BillingRecoveryAction,
+          });
+          return;
+        }
         throw new Error(data.error || 'Failed to open Stripe for this plan change');
       }
       if (typeof data.url === 'string' && data.url) {
@@ -635,6 +737,16 @@ export function SettingsSection({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (data.code === 'repair_required') {
+          setBillingRecoveryOverride({
+            state: (data.billingConnectionState ?? 'repairable') as BillingConnectionState,
+            message: typeof data.recoveryMessage === 'string' ? data.recoveryMessage : data.error || 'Billing needs attention before previewing this plan change.',
+            action: (typeof data.recoveryAction === 'string' ? data.recoveryAction : null) as BillingRecoveryAction,
+          });
+          setChangePlanPreview(null);
+          setChangePlanError(null);
+          return;
+        }
         throw new Error(data.error || 'Failed to preview this plan change');
       }
       const snapshot = data as PlanChangePreviewResponse;
@@ -668,6 +780,15 @@ export function SettingsSection({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (data.code === 'repair_required') {
+          setBillingRecoveryOverride({
+            state: (data.billingConnectionState ?? 'repairable') as BillingConnectionState,
+            message: typeof data.recoveryMessage === 'string' ? data.recoveryMessage : data.error || 'Billing needs attention before scheduling this plan change.',
+            action: (typeof data.recoveryAction === 'string' ? data.recoveryAction : null) as BillingRecoveryAction,
+          });
+          setChangePlanError(null);
+          return;
+        }
         throw new Error(data.error || 'Failed to schedule this plan change');
       }
 
@@ -725,6 +846,28 @@ export function SettingsSection({
     if (appUrl || typeof window === 'undefined') return;
     setAppUrl(normalizeAppUrl(window.location.origin));
   }, [appUrl]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (billingConnectionState === 'healthy' || billingConnectionState === 'free') {
+      setBillingRecoveryOverride(null);
+      return;
+    }
+
+    if (!billingStatus.status || !canManageBilling || billingConnectionState !== 'repairable' || billingRepairing) {
+      return;
+    }
+
+    const ownerId = billingStatus.status.billingOwner.userId;
+    const storageKey = getBillingAutoRepairStorageKey(ownerId);
+    if (window.sessionStorage.getItem(storageKey) === 'attempted') {
+      return;
+    }
+
+    window.sessionStorage.setItem(storageKey, 'attempted');
+    void handleReconnectBilling({ silent: true });
+  }, [billingConnectionState, billingStatus.status, canManageBilling, billingRepairing, handleReconnectBilling]);
 
   // Modal open/close lifecycle — cleanup on close, auto-select on open
   const hasAutoSelectedRef = useRef(false);
@@ -1236,6 +1379,61 @@ export function SettingsSection({
           </div>
         )}
 
+        {showBillingRecoveryCard && (
+          <div className="mb-4 rounded-xl border border-amber-300/15 bg-amber-300/[0.06] px-4 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100/80">
+                  {billingRepairing
+                    ? 'Reconnecting billing'
+                    : billingConnectionState === 'unrecoverable'
+                      ? 'Billing record needs review'
+                      : 'Billing record needs reconnection'}
+                </p>
+                <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                  {billingRepairing
+                    ? 'We’re reconnecting your Stripe billing record now.'
+                    : billingRecoveryMessage ?? 'Billing changes are temporarily unavailable for this workspace.'}
+                </p>
+                <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                  {billingConnectionState === 'unrecoverable'
+                    ? `Plan changes and Stripe portal actions stay paused for ${billingOwnerEmail ?? 'this workspace'} until the record is reviewed.`
+                    : 'Plan changes and Stripe portal actions will unlock automatically as soon as the billing record is healthy again.'}
+                </p>
+              </div>
+              {billingRecoveryAction === 'retry' && (
+                <button
+                  type="button"
+                  onClick={() => void handleReconnectBilling()}
+                  disabled={billingRepairing}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200/20 bg-black/20 px-4 py-2 text-[12px] font-medium text-amber-100 transition-colors hover:border-amber-200/30 hover:text-white disabled:opacity-50"
+                >
+                  {billingRepairing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  {billingRepairing ? 'Reconnecting...' : 'Retry connection'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showCustomBillingCard && (
+          <div className="mb-4 rounded-xl border border-sky-300/15 bg-sky-300/[0.06] px-4 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100/80">
+                  Custom billing arrangement
+                </p>
+                <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                  {billingRecoveryMessage}
+                </p>
+                <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                  Stripe self-serve billing actions are disabled for this workspace. Reach out internally before changing the plan or billing method.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Card className="mt-4">
           <FieldRow label="Current plan" value={planConfig.name} />
           <FieldRow
@@ -1250,7 +1448,7 @@ export function SettingsSection({
                   ? `Your subscription has been canceled and will stay active until ${accessEndsOnLabel}.`
                   : 'Your subscription has been canceled and will stay active through the end of the current billing period.'
                 : tier === 'free'
-                  ? 'No active Stripe subscription.'
+                  ? 'No active subscription.'
                   : 'Your plan is active and set to renew automatically.'
             }
             value={
@@ -1463,19 +1661,19 @@ export function SettingsSection({
                       setChangePlanSuccess(null);
                       setChangePlanModalOpen(true);
                     }}
-                    disabled={changePlanLoading || stripePlanRedirectLoading}
+                    disabled={changePlanLoading || stripePlanRedirectLoading || billingActionsBlocked}
                     className={btnPrimary}
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
                     {pendingChange ? 'Update Scheduled Change' : 'Change Plan'}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={hasScheduledCancellation ? () => void handleReactivatePlan() : handleOpenBillingPortal}
-                  disabled={portalLoading || reactivateLoading}
-                  className={btnPrimary}
-                >
+                  <button
+                    type="button"
+                    onClick={hasScheduledCancellation ? () => void handleReactivatePlan() : handleOpenBillingPortal}
+                    disabled={portalLoading || reactivateLoading || billingActionsBlocked}
+                    className={btnPrimary}
+                  >
                   <CreditCard className="h-3.5 w-3.5" />
                   {hasScheduledCancellation
                     ? reactivateLoading
@@ -1489,7 +1687,7 @@ export function SettingsSection({
                   <button
                     type="button"
                     onClick={handleOpenBillingPortal}
-                    disabled={portalLoading || reactivateLoading}
+                    disabled={portalLoading || reactivateLoading || billingActionsBlocked}
                     className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
                   >
                     {portalLoading ? 'Opening Stripe...' : 'Billing & Invoices'}
@@ -1499,7 +1697,7 @@ export function SettingsSection({
                   <button
                     type="button"
                     onClick={() => void handleCancelScheduledPlanChange()}
-                    disabled={changePlanLoading}
+                    disabled={changePlanLoading || billingActionsBlocked}
                     className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
                   >
                     {changePlanLoading ? 'Canceling...' : 'Cancel Scheduled Change'}
@@ -1513,7 +1711,7 @@ export function SettingsSection({
                   <button
                     type="button"
                     onClick={() => setCancelPlanModalOpen(true)}
-                    disabled={portalLoading}
+                    disabled={portalLoading || billingActionsBlocked}
                     className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
                   >
                     Cancel Plan
@@ -1717,6 +1915,39 @@ export function SettingsSection({
                 );
               })()}
 
+              {selectedTargetPlan && !changeTargetIsSamePlan && tier !== 'free' && billingConnectionState !== 'healthy' && (
+                <div className="mt-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[12px] font-medium text-amber-100">
+                        {billingRepairing ? 'Reconnecting billing...' : 'Billing record needs attention'}
+                      </p>
+                      <p className="mt-1 text-[12px] leading-5 text-zinc-300">
+                        {billingRepairing
+                          ? 'We’re reconnecting your Stripe record now. This modal will unlock automatically if the repair succeeds.'
+                          : billingRecoveryMessage ?? 'Billing changes are temporarily unavailable for this workspace.'}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-5 text-zinc-500">
+                        {billingConnectionState === 'unrecoverable'
+                          ? 'Plan changes stay disabled until the Stripe record is reviewed.'
+                          : 'We’ll retry the Stripe lookup before allowing this plan change.'}
+                      </p>
+                    </div>
+                    {billingRecoveryAction === 'retry' && (
+                      <button
+                        type="button"
+                        onClick={() => void handleReconnectBilling()}
+                        disabled={billingRepairing}
+                        className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-amber-200/20 bg-black/20 px-3 py-2 text-[11px] font-medium text-amber-100 transition-colors hover:border-amber-200/30 hover:text-white disabled:opacity-50"
+                      >
+                        {billingRepairing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        {billingRepairing ? 'Reconnecting...' : 'Retry'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Readiness panel — shows when a plan is selected */}
               {selectedTargetPlan && !changeTargetIsSamePlan && (
                 <div className="mt-3">
@@ -1839,7 +2070,7 @@ export function SettingsSection({
                     <button
                       type="button"
                       onClick={() => void handleCancelScheduledPlanChange()}
-                      disabled={changePlanLoading || stripePlanRedirectLoading}
+                      disabled={changePlanLoading || stripePlanRedirectLoading || billingActionsBlocked}
                       className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
                     >
                       Cancel scheduled change
@@ -1850,7 +2081,7 @@ export function SettingsSection({
                   <button
                     type="button"
                     onClick={() => setChangePlanModalOpen(false)}
-                    disabled={changePlanLoading || stripePlanRedirectLoading}
+                    disabled={changePlanLoading || stripePlanRedirectLoading || billingRepairing}
                     className="rounded-lg px-4 py-2 text-[12px] font-medium text-zinc-400 transition-colors hover:text-white disabled:opacity-50"
                   >
                     Cancel
@@ -1861,8 +2092,8 @@ export function SettingsSection({
                       ? () => void handleContinuePlanChangeInStripe()
                       : () => void handleSchedulePlanChange()}
                     disabled={stripeHostedPlanChange
-                      ? stripePlanRedirectLoading || !selectedTargetPlan || changeTargetIsSamePlan
-                      : changePlanLoading || !selectedTargetPlan || changeTargetIsSamePlan}
+                      ? stripePlanRedirectLoading || previewLoading || !changePlanPreview || Boolean(changePlanError) || !selectedTargetPlan || changeTargetIsSamePlan || billingActionsBlocked
+                      : changePlanLoading || previewLoading || !changePlanPreview || Boolean(changePlanError) || !selectedTargetPlan || changeTargetIsSamePlan || billingActionsBlocked}
                     className="inline-flex items-center gap-2 rounded-lg bg-[#25c972] px-5 py-2 text-[12px] font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
                   >
                     {(changePlanLoading || stripePlanRedirectLoading) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}

@@ -11,7 +11,8 @@ import {
   canUseStripe,
   createChangePlanPortalSession,
   createSubscriptionCheckout,
-  syncStripeSubscriptionForUser,
+  requiresStripeBillingForPlan,
+  resolveBillingIdentityForUser,
 } from '@/lib/services/stripe-payment';
 
 export async function POST(request: NextRequest) {
@@ -69,16 +70,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let subscriptionId = context.billingProfile.stripe_subscription_id;
-    if (!subscriptionId && context.billingProfile.stripe_customer_id) {
-      const synced = await syncStripeSubscriptionForUser(
-        context.billingOwner.userId,
-        context.billingProfile.stripe_customer_id,
+    const needsExistingStripeSubscription = Boolean(
+      context.billingProfile.stripe_subscription_id
+      || requiresStripeBillingForPlan(context.access.plan, context.billingProfile.email),
+    );
+
+    if (context.access.plan !== 'free' && !needsExistingStripeSubscription) {
+      return NextResponse.json(
+        {
+          error: 'This workspace uses a custom billing arrangement outside Stripe.',
+          code: 'repair_required',
+          billingConnectionState: 'unrecoverable',
+          recoveryMessage: 'This workspace uses a custom billing arrangement outside Stripe.',
+          recoveryAction: 'contact_support',
+        },
+        { status: 409 },
       );
-      subscriptionId = synced?.subscriptionId ?? null;
     }
 
+    const billingResolution = needsExistingStripeSubscription
+      ? await resolveBillingIdentityForUser(context.billingOwner.userId, {
+          email: context.billingProfile.email,
+          plan: context.access.plan,
+          stripe_customer_id: context.billingProfile.stripe_customer_id,
+          stripe_subscription_id: context.billingProfile.stripe_subscription_id,
+        })
+      : null;
+    const subscriptionId = billingResolution?.subscription?.subscriptionId ?? null;
+
     if (!subscriptionId) {
+      if (context.access.plan !== 'free') {
+        return NextResponse.json(
+          {
+            error: billingResolution?.message ?? 'Billing needs attention before Stripe can open this plan change.',
+            code: 'repair_required',
+            billingConnectionState: billingResolution?.state ?? 'unrecoverable',
+            recoveryMessage: billingResolution?.message ?? null,
+            recoveryAction: billingResolution?.recoveryAction ?? 'contact_support',
+          },
+          { status: 409 },
+        );
+      }
+
       const checkoutSession = await createSubscriptionCheckout(
         context.billingOwner.userId,
         context.billingOwner.email ?? user.email,

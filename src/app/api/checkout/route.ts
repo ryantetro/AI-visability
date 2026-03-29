@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       const session = await createSubscriptionCheckout(user.id, user.email, selectedPlan, {
         returnPath,
         cancelPath,
+        scanId,
       });
       return NextResponse.json(session);
     } catch (err) {

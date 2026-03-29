@@ -7,7 +7,11 @@ import {
   isHybridChangePlanEnabled,
 } from '@/lib/billing';
 import { isPaymentPlanString } from '@/lib/pricing';
-import { canUseStripe } from '@/lib/services/stripe-payment';
+import {
+  canUseStripe,
+  requiresStripeBillingForPlan,
+  resolveBillingIdentityForUser,
+} from '@/lib/services/stripe-payment';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -31,6 +35,30 @@ export async function POST(request: NextRequest) {
     }
     if (context.access.plan === targetPlan) {
       return NextResponse.json({ error: 'This plan is already active.' }, { status: 400 });
+    }
+
+    if (requiresStripeBillingForPlan(context.access.plan, context.billingProfile.email) || context.billingProfile.stripe_subscription_id) {
+      const resolution = await resolveBillingIdentityForUser(
+        context.billingOwner.userId,
+        {
+          email: context.billingProfile.email,
+          plan: context.access.plan,
+          stripe_customer_id: context.billingProfile.stripe_customer_id,
+          stripe_subscription_id: context.billingProfile.stripe_subscription_id,
+        },
+      );
+      if (resolution.state !== 'healthy') {
+        return NextResponse.json(
+          {
+            error: resolution.message ?? 'Billing needs attention before this plan change can be previewed.',
+            code: 'repair_required',
+            billingConnectionState: resolution.state,
+            recoveryMessage: resolution.message,
+            recoveryAction: resolution.recoveryAction,
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const effectiveAt = context.access.planExpiresAt;

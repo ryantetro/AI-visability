@@ -8,7 +8,11 @@ import {
 } from '@/lib/billing';
 import { isPaymentPlanString, planStringToTier, TIER_LEVEL } from '@/lib/pricing';
 import { getSupabaseClient } from '@/lib/supabase';
-import { canUseStripe, scheduleSubscriptionPlanChange, syncStripeSubscriptionForUser } from '@/lib/services/stripe-payment';
+import {
+  canUseStripe,
+  resolveBillingIdentityForUser,
+  scheduleSubscriptionPlanChange,
+} from '@/lib/services/stripe-payment';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -34,17 +38,28 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
     }
-    let subscriptionId = context.billingProfile.stripe_subscription_id;
-    if (!subscriptionId && context.billingProfile.stripe_customer_id) {
-      const synced = await syncStripeSubscriptionForUser(
-        context.billingOwner.userId,
-        context.billingProfile.stripe_customer_id,
-      );
-      subscriptionId = synced?.subscriptionId ?? null;
-    }
+    const billingResolution = await resolveBillingIdentityForUser(
+      context.billingOwner.userId,
+      {
+        email: context.billingProfile.email,
+        plan: context.access.plan,
+        stripe_customer_id: context.billingProfile.stripe_customer_id,
+        stripe_subscription_id: context.billingProfile.stripe_subscription_id,
+      },
+    );
+    const subscriptionId = billingResolution.subscription?.subscriptionId ?? null;
 
-    if (!subscriptionId) {
-      return NextResponse.json({ error: 'No active Stripe subscription was found for this workspace.' }, { status: 400 });
+    if (billingResolution.state !== 'healthy' || !subscriptionId) {
+      return NextResponse.json(
+        {
+          error: billingResolution.message ?? 'Billing needs attention before this change can be scheduled.',
+          code: 'repair_required',
+          billingConnectionState: billingResolution.state,
+          recoveryMessage: billingResolution.message,
+          recoveryAction: billingResolution.recoveryAction,
+        },
+        { status: 409 },
+      );
     }
     if (context.access.plan === targetPlan) {
       return NextResponse.json({ error: 'This plan is already active.' }, { status: 400 });

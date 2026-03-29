@@ -21,7 +21,16 @@ import {
 } from '@/lib/team-management';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getOrCreateProfile, type UserProfile } from '@/lib/user-profile';
-import { canUseStripe, syncStripeSubscriptionForUser } from '@/lib/services/stripe-payment';
+import {
+  canUseStripe,
+  requiresStripeBillingForPlan,
+  resolveBillingIdentityForUser,
+  type BillingIdentityResolution,
+  type BillingConnectionState,
+  type BillingRecoveryAction,
+} from '@/lib/services/stripe-payment';
+
+export type { BillingConnectionState, BillingRecoveryAction } from '@/lib/services/stripe-payment';
 
 export type LimitCategory =
   | 'domains'
@@ -100,6 +109,11 @@ export interface BillingStatus {
   currentTier: PlanTier;
   currentPeriodEnd: string | null;
   canManageBilling: boolean;
+  billingConnectionState: BillingConnectionState;
+  billingManagementMode: 'stripe' | 'custom' | 'none';
+  canSelfServeBilling: boolean;
+  recoveryMessage: string | null;
+  recoveryAction: BillingRecoveryAction;
   billingOwner: BillingOwnerSummary;
   cancelAtPeriodEnd: boolean;
   pendingChange: PendingPlanChange | null;
@@ -199,6 +213,36 @@ interface PlanLimits {
   regions: number;
   seats: number;
   contentPages: number;
+}
+
+const BILLING_PROFILE_BASE_SELECT = `
+  id,
+  email,
+  plan,
+  scans_used,
+  free_scan_limit,
+  stripe_customer_id,
+  stripe_subscription_id,
+  stripe_subscription_schedule_id,
+  plan_expires_at,
+  plan_cancel_at_period_end,
+  pending_plan,
+  pending_plan_effective_at,
+  plan_updated_at,
+  created_at,
+  updated_at
+`;
+
+const BILLING_PROFILE_TRIM_SELECT = `
+  last_workspace_trim_at,
+  trim_banner_dismissed,
+  trim_failed
+`;
+
+function isMissingBillingSchemaError(error: { message?: string | null; code?: string | null } | null | undefined) {
+  const message = error?.message ?? '';
+  return message.includes('does not exist')
+    || message.includes('Could not find the table');
 }
 
 function normalizeLimit(limit: number): number | null {
@@ -360,40 +404,51 @@ function getMonthStartIso() {
 async function getBillingProfileById(userId: string, fallbackEmail?: string): Promise<BillingProfileRecord> {
   const supabase = getSupabaseClient();
 
-  const { data } = await supabase
+  let { data, error } = await supabase
     .from('user_profiles')
-    .select(`
-      id,
-      email,
-      plan,
-      scans_used,
-      free_scan_limit,
-      stripe_customer_id,
-      stripe_subscription_id,
-      stripe_subscription_schedule_id,
-      plan_expires_at,
-      plan_cancel_at_period_end,
-      pending_plan,
-      pending_plan_effective_at,
-      plan_updated_at,
-      created_at,
-      updated_at,
-      last_workspace_trim_at,
-      trim_banner_dismissed,
-      trim_failed
-    `)
+    .select(`${BILLING_PROFILE_BASE_SELECT},${BILLING_PROFILE_TRIM_SELECT}`)
     .eq('id', userId)
     .maybeSingle();
+
+  if (error && isMissingBillingSchemaError(error)) {
+    const fallback = await supabase
+      .from('user_profiles')
+      .select(BILLING_PROFILE_BASE_SELECT)
+      .eq('id', userId)
+      .maybeSingle();
+
+    data = fallback.data
+      ? {
+          ...fallback.data,
+          last_workspace_trim_at: null,
+          trim_banner_dismissed: false,
+          trim_failed: false,
+        }
+      : null;
+    error = fallback.error;
+  }
 
   if (data) {
     const profile = data as BillingProfileRecord;
 
-    if (profile.stripe_customer_id && !profile.stripe_subscription_id && canUseStripe()) {
-      const synced = await syncStripeSubscriptionForUser(userId, profile.stripe_customer_id);
-      if (synced) {
+    const shouldRecoverStripeState = canUseStripe() && (
+      (profile.stripe_customer_id && !profile.stripe_subscription_id)
+      || (!profile.stripe_customer_id && profile.stripe_subscription_id)
+    );
+
+    if (shouldRecoverStripeState) {
+      const resolution = await resolveBillingIdentityForUser(userId, {
+        email: profile.email,
+        plan: profile.plan,
+        stripe_customer_id: profile.stripe_customer_id,
+        stripe_subscription_id: profile.stripe_subscription_id,
+      }, { attemptRepair: true });
+      const synced = resolution.subscription;
+      if (resolution.state === 'healthy' && synced) {
         return {
           ...profile,
           plan: synced.plan ?? profile.plan,
+          stripe_customer_id: synced.customerId,
           stripe_subscription_id: synced.subscriptionId,
           stripe_subscription_schedule_id: synced.scheduleId,
           plan_expires_at: synced.currentPeriodEnd,
@@ -404,6 +459,10 @@ async function getBillingProfileById(userId: string, fallbackEmail?: string): Pr
     }
 
     return profile;
+  }
+
+  if (error && !fallbackEmail) {
+    throw new Error(error.message ?? 'Billing profile not found');
   }
 
   if (!fallbackEmail) {
@@ -1171,7 +1230,6 @@ export async function trimWorkspaceToFit(
 
     if (activeMembers && activeMembers.length > maxSeats) {
       // Owner is always protected — separate them out
-      const owner = activeMembers.find((m) => m.role === 'owner');
       const nonOwners = activeMembers.filter((m) => m.role !== 'owner');
       // Keep (maxSeats - 1) non-owners (1 slot reserved for owner)
       const keepCount = Math.max(0, maxSeats - 1);
@@ -1220,6 +1278,36 @@ export async function trimWorkspaceToFit(
 
 export async function getBillingStatus(userId: string, email: string): Promise<BillingStatus> {
   const context = await resolveBillingContext(userId, email);
+  const customBillingArrangement = Boolean(
+    !context.billingProfile.stripe_subscription_id
+    && !context.billingProfile.stripe_customer_id
+    && !requiresStripeBillingForPlan(context.access.plan, context.billingProfile.email),
+  );
+  const stripeManagedWorkspace = Boolean(
+    context.billingProfile.stripe_subscription_id
+    || context.billingProfile.stripe_customer_id
+    || requiresStripeBillingForPlan(context.access.plan, context.billingProfile.email),
+  );
+  const billingResolution: BillingIdentityResolution = canUseStripe() && stripeManagedWorkspace
+    ? await resolveBillingIdentityForUser(context.billingOwner.userId, {
+        email: context.billingProfile.email,
+        plan: context.access.plan,
+        stripe_customer_id: context.billingProfile.stripe_customer_id,
+        stripe_subscription_id: context.billingProfile.stripe_subscription_id,
+      })
+    : {
+        state: context.access.plan === 'free' ? 'free' : 'healthy',
+        subscription: null,
+        attemptedRepair: false,
+        repaired: false,
+        requiresStripeSubscription: false,
+        message: null,
+        recoveryAction: null,
+      };
+  const resolvedCurrentPlan = billingResolution.subscription?.plan ?? context.access.plan;
+  const resolvedCurrentTier = planStringToTier(resolvedCurrentPlan);
+  const resolvedCurrentPeriodEnd = billingResolution.subscription?.currentPeriodEnd ?? context.access.planExpiresAt;
+  const resolvedCancelAtPeriodEnd = billingResolution.subscription?.cancelAtPeriodEnd ?? context.access.planCancelAtPeriodEnd;
   const pendingPlan = context.billingProfile.pending_plan;
   const scheduledPlan = pendingPlan && isPaymentPlanString(pendingPlan) ? pendingPlan : null;
   const pendingChange = scheduledPlan
@@ -1227,28 +1315,42 @@ export async function getBillingStatus(userId: string, email: string): Promise<B
         targetPlan: scheduledPlan,
         targetTier: planStringToTier(scheduledPlan),
         targetLabel: getBillingPlanLabel(scheduledPlan),
-        effectiveAt: context.billingProfile.pending_plan_effective_at ?? context.access.planExpiresAt,
+        effectiveAt: context.billingProfile.pending_plan_effective_at ?? resolvedCurrentPeriodEnd,
         scheduleId: context.billingProfile.stripe_subscription_schedule_id ?? null,
         status: 'scheduled' as const,
       }
     : null;
 
   const [activeReadiness, readiness] = await Promise.all([
-    buildPlanUsageSnapshot(context, context.access.plan, context.access.planExpiresAt, { forceChecks: true }),
+    buildPlanUsageSnapshot(context, resolvedCurrentPlan, resolvedCurrentPeriodEnd, { forceChecks: true }),
     pendingChange
       ? buildPlanUsageSnapshot(context, pendingChange.targetPlan, pendingChange.effectiveAt)
-      : buildPlanUsageSnapshot(context, context.access.plan, context.access.planExpiresAt),
+      : buildPlanUsageSnapshot(context, resolvedCurrentPlan, resolvedCurrentPeriodEnd),
   ]);
 
   const overageIssues = activeReadiness.viewerIssues.filter((issue) => issue.severity === 'blocker');
 
   return {
-    currentPlan: context.access.plan,
-    currentTier: context.access.tier,
-    currentPeriodEnd: context.access.planExpiresAt,
+    currentPlan: resolvedCurrentPlan,
+    currentTier: resolvedCurrentTier,
+    currentPeriodEnd: resolvedCurrentPeriodEnd,
     canManageBilling: context.canManageBilling,
+    billingConnectionState: billingResolution.state,
+    billingManagementMode: customBillingArrangement
+      ? 'custom'
+      : stripeManagedWorkspace
+        ? 'stripe'
+        : 'none',
+    canSelfServeBilling: context.canManageBilling && (
+      (billingResolution.state === 'healthy' && stripeManagedWorkspace)
+      || billingResolution.state === 'free'
+    ),
+    recoveryMessage: customBillingArrangement
+      ? 'This workspace uses a custom billing arrangement outside Stripe.'
+      : billingResolution.message,
+    recoveryAction: customBillingArrangement ? 'contact_support' : billingResolution.recoveryAction,
     billingOwner: context.billingOwner,
-    cancelAtPeriodEnd: context.access.planCancelAtPeriodEnd,
+    cancelAtPeriodEnd: resolvedCancelAtPeriodEnd,
     pendingChange,
     overageMode: overageIssues.length > 0 ? 'cleanup_required' : 'none',
     overageIssues,

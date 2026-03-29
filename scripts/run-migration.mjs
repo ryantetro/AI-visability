@@ -11,12 +11,13 @@
  */
 
 import { readFileSync, readdirSync } from 'fs';
-import { resolve, join } from 'path';
+import { resolve, join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 // ---------------------------------------------------------------------------
 // 1. Load env vars from .env.local
 // ---------------------------------------------------------------------------
-const root = resolve(import.meta.dirname, '..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const envPath = join(root, '.env.local');
 
 let envContent;

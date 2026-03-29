@@ -9,6 +9,7 @@ function SuccessContent() {
   const [resolvedScanId, setResolvedScanId] = useState(searchParams.get('scanId'));
   const [verifying, setVerifying] = useState(Boolean(searchParams.get('session_id')));
   const [verifyError, setVerifyError] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
@@ -16,6 +17,7 @@ function SuccessContent() {
 
     if (!sessionId || existingScanId) {
       setResolvedScanId(existingScanId);
+      setPaymentConfirmed(Boolean(existingScanId));
       setVerifying(false);
       return;
     }
@@ -35,9 +37,14 @@ function SuccessContent() {
 
         const payload = await res.json();
         if (!active) return;
-        if (payload.paid && payload.scanId) {
-          setResolvedScanId(payload.scanId);
+        if (payload.paid) {
+          setPaymentConfirmed(true);
+          if (payload.scanId) {
+            setResolvedScanId(payload.scanId);
+          }
+          return;
         }
+        setVerifyError(true);
       } catch {
         if (active) setVerifyError(true);
       } finally {
@@ -69,9 +76,13 @@ function SuccessContent() {
         <p className="app-body app-measure max-w-md" style={{ color: 'var(--text-tertiary)' }}>
           {verifying
             ? 'Confirming your checkout session and unlocking your advanced implementation tools.'
-            : resolvedScanId
+            : verifyError
+              ? 'We could not confirm a completed payment for this session yet. If you finished checkout, give Stripe a moment and try again.'
+            : paymentConfirmed && resolvedScanId
               ? 'Your AI visibility fix files are ready. Follow the guided install steps to boost your score.'
-              : 'Your plan has been upgraded. Head to your dashboard to access all features.'}
+            : paymentConfirmed
+                ? 'Your plan has been upgraded. Head to your dashboard to access all features.'
+                : 'Your checkout session is still pending. Return to billing when you are ready to finish it.'}
         </p>
         {!verifying && (
           <>
@@ -79,18 +90,14 @@ function SuccessContent() {
               href={resolvedScanId ? `/dashboard?report=${resolvedScanId}` : '/dashboard'}
               className="aiso-button aiso-button-primary px-6 py-3 text-sm"
             >
-              {resolvedScanId ? 'Open Advanced Tools' : 'Go to Dashboard'}
+              {verifyError ? 'Return to Dashboard' : resolvedScanId ? 'Open Advanced Tools' : paymentConfirmed ? 'Go to Dashboard' : 'Back to Dashboard'}
             </Link>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-              Plan upgrades apply within 30 seconds. If your new features aren't visible yet, refresh the page.
-            </p>
+            {paymentConfirmed ? (
+              <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                Plan upgrades apply within 30 seconds. If your new features aren&apos;t visible yet, refresh the page.
+              </p>
+            ) : null}
           </>
-        )}
-        {verifyError && (
-          <p className="text-sm mt-2" style={{ color: 'var(--color-error-500, #ef4444)' }}>
-            We couldn't confirm your session automatically.{' '}
-            <Link href="/dashboard" className="underline">Go to dashboard</Link> — your payment was received and your plan will update shortly.
-          </p>
         )}
       </div>
     </div>

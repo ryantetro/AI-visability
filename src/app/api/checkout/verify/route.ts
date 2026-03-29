@@ -3,6 +3,7 @@ import { getPayment, getDatabase } from '@/lib/services/registry';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { upgradeUserPlan } from '@/lib/user-profile';
 import { getSupabaseClient } from '@/lib/supabase';
+import { canUseStripe } from '@/lib/services/stripe-payment';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -38,10 +39,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Keep the webhook as the source of truth, but also apply the upgrade here so the
-    // returning user sees the new plan immediately and webhook delays do not block access.
     try {
-      await upgradeUserPlan(user.id, plan);
+      const usingStripe = canUseStripe();
+      if (!usingStripe) {
+        await upgradeUserPlan(user.id, plan);
+      }
 
       const updatePayload: Record<string, string | boolean | null> = {
         plan_updated_at: new Date().toISOString(),
@@ -69,10 +71,12 @@ export async function POST(request: NextRequest) {
         updatePayload.pending_plan_effective_at = null;
       }
 
-      await getSupabaseClient()
-        .from('user_profiles')
-        .update(updatePayload)
-        .eq('id', user.id);
+      if (Object.keys(updatePayload).length > 0) {
+        await getSupabaseClient()
+          .from('user_profiles')
+          .update(updatePayload)
+          .eq('id', user.id);
+      }
     } catch {
       // Non-blocking: scan unlock still succeeds even if plan upgrade fails
     }

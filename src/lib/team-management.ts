@@ -1,6 +1,12 @@
 import { getSupabaseClient } from '@/lib/supabase';
 import crypto from 'crypto';
 
+function isMissingTeamStatusSchemaError(error: { message?: string | null } | null | undefined) {
+  const message = error?.message ?? '';
+  return message.includes('team_members.status')
+    && message.includes('does not exist');
+}
+
 /* ── Types ──────────────────────────────────────────────────────── */
 
 export interface Team {
@@ -88,13 +94,24 @@ export async function createTeam(
 export async function getTeamForUser(userId: string): Promise<TeamForUser | null> {
   const supabase = getSupabaseClient();
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('team_members')
     .select('role, team_id, teams(*)')
     .eq('user_id', userId)
     .eq('status', 'active')
     .limit(1)
     .single();
+
+  if (error && isMissingTeamStatusSchemaError(error)) {
+    const fallback = await supabase
+      .from('team_members')
+      .select('role, team_id, teams(*)')
+      .eq('user_id', userId)
+      .limit(1)
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !data) return null;
 
@@ -110,13 +127,24 @@ export async function getTeamForUser(userId: string): Promise<TeamForUser | null
 export async function getTeamMembers(teamId: string): Promise<TeamMember[]> {
   const supabase = getSupabaseClient();
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('team_members')
     .select('id, team_id, user_id, role, status, plan_access_rank, joined_at, user_profiles(email)')
     .eq('team_id', teamId)
     .eq('status', 'active')
     .order('plan_access_rank', { ascending: true, nullsFirst: false })
     .order('joined_at', { ascending: true });
+
+  if (error && isMissingTeamStatusSchemaError(error)) {
+    const fallback = await supabase
+      .from('team_members')
+      .select('id, team_id, user_id, role, plan_access_rank, joined_at, user_profiles(email)')
+      .eq('team_id', teamId)
+      .order('plan_access_rank', { ascending: true, nullsFirst: false })
+      .order('joined_at', { ascending: true });
+    data = fallback.data?.map((row) => ({ ...row, status: 'active' })) ?? null;
+    error = fallback.error;
+  }
 
   if (error || !data) return [];
 

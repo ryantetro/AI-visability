@@ -1,8 +1,9 @@
 import Stripe from 'stripe';
 import { CheckoutSession, PaymentPlan, PaymentService } from '@/types/services';
-import { getPlanPriceCents, getPlanDisplayName, type PaymentPlanString } from '@/lib/pricing';
+import { getPlanPriceCents, getPlanDisplayName, isPaymentPlanString, type PaymentPlanString } from '@/lib/pricing';
 import { getSupabaseClient } from '@/lib/supabase';
 import { sanitizeAppRelativePath } from '@/lib/app-paths';
+import { getAccountAccessOverride } from '@/lib/account-access-overrides';
 
 let _stripe: Stripe | null = null;
 const STRIPE_SESSION_PLACEHOLDER = '{CHECKOUT_SESSION_ID}';
@@ -16,6 +17,7 @@ const CHANGE_PLAN_PORTAL_METADATA = {
 interface RedirectOptions {
   returnPath?: string;
   cancelPath?: string;
+  scanId?: string;
 }
 
 interface PortalSessionOptions {
@@ -24,13 +26,32 @@ interface PortalSessionOptions {
   flowData?: Stripe.BillingPortal.SessionCreateParams.FlowData;
 }
 
-interface StripeSubscriptionState {
+export interface StripeSubscriptionState {
   subscriptionId: string;
   customerId: string;
   plan: PaymentPlanString | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   scheduleId: string | null;
+}
+
+export type BillingConnectionState =
+  | 'healthy'
+  | 'repairing'
+  | 'repairable'
+  | 'unrecoverable'
+  | 'free';
+
+export type BillingRecoveryAction = 'retry' | 'contact_support' | null;
+
+export interface BillingIdentityResolution {
+  state: BillingConnectionState;
+  subscription: StripeSubscriptionState | null;
+  attemptedRepair: boolean;
+  repaired: boolean;
+  requiresStripeSubscription: boolean;
+  message: string | null;
+  recoveryAction: BillingRecoveryAction;
 }
 
 function getStripe(): Stripe {
@@ -113,6 +134,20 @@ function getExplicitChangePlanPortalConfigurationId() {
   return configId ? configId : null;
 }
 
+function normalizeNullableString(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeEmail(email: string | null | undefined) {
+  const normalized = email?.trim().toLowerCase();
+  return normalized ? normalized : null;
+}
+
+function escapeStripeSearchValue(value: string) {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 function isStripeResourceMissing(error: unknown) {
   const code = error && typeof error === 'object' && 'code' in error
     ? String((error as { code?: string }).code)
@@ -129,6 +164,18 @@ function isManageableSubscriptionStatus(status: Stripe.Subscription.Status) {
     || status === 'trialing'
     || status === 'past_due'
     || status === 'unpaid';
+}
+
+function isProvisionableSubscriptionStatus(status: Stripe.Subscription.Status) {
+  return status === 'active' || status === 'trialing';
+}
+
+export function isStripeCheckoutProvisioned(
+  paymentStatus: Stripe.Checkout.Session.PaymentStatus | null,
+  subscriptionStatus?: Stripe.Subscription.Status | null,
+) {
+  return paymentStatus === 'paid'
+    || (subscriptionStatus ? isProvisionableSubscriptionStatus(subscriptionStatus) : false);
 }
 
 function getSubscriptionStatusPriority(status: Stripe.Subscription.Status) {
@@ -172,6 +219,74 @@ function toStripeSubscriptionState(subscription: Stripe.Subscription): StripeSub
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     scheduleId: getSubscriptionScheduleId(subscription),
   };
+}
+
+async function persistStripeSubscriptionForUser(
+  userId: string,
+  subscription: StripeSubscriptionState,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  const updatePayload: Record<string, string | boolean | null> = {
+    stripe_customer_id: subscription.customerId,
+    stripe_subscription_id: subscription.subscriptionId,
+    stripe_subscription_schedule_id: subscription.scheduleId,
+    plan_expires_at: subscription.currentPeriodEnd,
+    plan_cancel_at_period_end: subscription.cancelAtPeriodEnd,
+    plan_updated_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (subscription.plan) {
+    updatePayload.plan = subscription.plan;
+  }
+
+  await supabase
+    .from('user_profiles')
+    .update(updatePayload)
+    .eq('id', userId);
+}
+
+async function persistStripeCustomerIdForUser(userId: string, customerId: string): Promise<void> {
+  await getSupabaseClient()
+    .from('user_profiles')
+    .update({
+      stripe_customer_id: customerId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+}
+
+async function clearInvalidStripeSubscriptionLinkForUser(userId: string): Promise<void> {
+  await getSupabaseClient()
+    .from('user_profiles')
+    .update({
+      stripe_subscription_id: null,
+      stripe_subscription_schedule_id: null,
+      plan_expires_at: null,
+      plan_cancel_at_period_end: false,
+      plan_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+}
+
+async function retrieveManageableStripeSubscriptionById(subscriptionId: string): Promise<StripeSubscriptionState | null> {
+  const stripe = getStripe();
+
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['schedule'],
+    });
+    if (!isManageableSubscriptionStatus(subscription.status)) {
+      return null;
+    }
+    return toStripeSubscriptionState(subscription);
+  } catch (error) {
+    if (isStripeResourceMissing(error)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function retrieveScheduleIfManageable(scheduleId: string) {
@@ -230,28 +345,183 @@ export async function syncStripeSubscriptionForUser(
   if (!subscription) {
     return null;
   }
+  await persistStripeSubscriptionForUser(userId, subscription);
+  return subscription;
+}
 
-  const supabase = getSupabaseClient();
-  const updatePayload: Record<string, string | boolean | null> = {
-    stripe_customer_id: subscription.customerId,
-    stripe_subscription_id: subscription.subscriptionId,
-    stripe_subscription_schedule_id: subscription.scheduleId,
-    plan_expires_at: subscription.currentPeriodEnd,
-    plan_cancel_at_period_end: subscription.cancelAtPeriodEnd,
-    plan_updated_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+async function searchStripeCustomerByMetadataUserId(userId: string): Promise<string | null> {
+  const stripe = getStripe();
+  const query = `metadata['userId']:'${escapeStripeSearchValue(userId)}'`;
+  const results = await stripe.customers.search({
+    query,
+    limit: 10,
+  });
 
-  if (subscription.plan) {
-    updatePayload.plan = subscription.plan;
+  const customer = results.data.find((entry) => !entry.deleted);
+  return customer?.id ?? null;
+}
+
+async function searchStripeCustomerByEmail(email: string): Promise<string | null> {
+  const stripe = getStripe();
+  const results = await stripe.customers.list({
+    email,
+    limit: 10,
+  });
+
+  const customer = results.data.find((entry) => !entry.deleted);
+  return customer?.id ?? null;
+}
+
+function buildBillingRecoveryMessage(
+  state: BillingConnectionState,
+  requiresStripeSubscription: boolean,
+) {
+  if (!requiresStripeSubscription) {
+    return null;
   }
 
-  await supabase
-    .from('user_profiles')
-    .update(updatePayload)
-    .eq('id', userId);
+  if (state === 'repairable') {
+    return 'We can reconnect this workspace to its Stripe billing record before making plan changes.';
+  }
 
-  return subscription;
+  if (state === 'unrecoverable') {
+    return 'We couldn’t reconnect an active Stripe subscription for this workspace. Billing changes are temporarily unavailable until this record is reviewed.';
+  }
+
+  return null;
+}
+
+export function requiresStripeBillingForPlan(plan: string, email?: string | null) {
+  const override = getAccountAccessOverride(email);
+  if (override?.plan === plan) {
+    return false;
+  }
+  return isPaymentPlanString(plan);
+}
+
+export async function resolveBillingIdentityForUser(
+  userId: string,
+  billingProfile: {
+    email?: string | null;
+    plan?: string | null;
+    stripe_customer_id?: string | null;
+    stripe_subscription_id?: string | null;
+  },
+  options: {
+    attemptRepair?: boolean;
+  } = {},
+): Promise<BillingIdentityResolution> {
+  const directSubscriptionId = normalizeNullableString(billingProfile.stripe_subscription_id);
+  const customerId = normalizeNullableString(billingProfile.stripe_customer_id);
+  const currentPlan = normalizeNullableString(billingProfile.plan) ?? 'free';
+  const normalizedEmail = normalizeEmail(billingProfile.email);
+  const attemptRepair = options.attemptRepair ?? false;
+  const requiresStripeSubscription = Boolean(
+    directSubscriptionId
+    || requiresStripeBillingForPlan(currentPlan, billingProfile.email),
+  );
+
+  if (directSubscriptionId) {
+    const directSubscription = await retrieveManageableStripeSubscriptionById(directSubscriptionId);
+    if (directSubscription) {
+      await persistStripeSubscriptionForUser(userId, directSubscription);
+      return {
+        state: 'healthy',
+        subscription: directSubscription,
+        attemptedRepair: attemptRepair,
+        repaired: false,
+        requiresStripeSubscription,
+        message: null,
+        recoveryAction: null,
+      };
+    }
+
+    await clearInvalidStripeSubscriptionLinkForUser(userId);
+  }
+
+  if (customerId) {
+    const synced = await syncStripeSubscriptionForUser(userId, customerId);
+    if (synced) {
+      return {
+        state: 'healthy',
+        subscription: synced,
+        attemptedRepair: attemptRepair,
+        repaired: false,
+        requiresStripeSubscription,
+        message: null,
+        recoveryAction: null,
+      };
+    }
+  }
+
+  if (!requiresStripeSubscription) {
+    return {
+      state: 'free',
+      subscription: null,
+      attemptedRepair: attemptRepair,
+      repaired: false,
+      requiresStripeSubscription: false,
+      message: null,
+      recoveryAction: null,
+    };
+  }
+
+  if (!attemptRepair) {
+    return {
+      state: 'repairable',
+      subscription: null,
+      attemptedRepair: false,
+      repaired: false,
+      requiresStripeSubscription,
+      message: buildBillingRecoveryMessage('repairable', requiresStripeSubscription),
+      recoveryAction: 'retry',
+    };
+  }
+
+  const discoveredCustomerId = await searchStripeCustomerByMetadataUserId(userId)
+    || (normalizedEmail ? await searchStripeCustomerByEmail(normalizedEmail) : null);
+
+  if (discoveredCustomerId) {
+    const synced = await syncStripeSubscriptionForUser(userId, discoveredCustomerId);
+    if (synced) {
+      return {
+        state: 'healthy',
+        subscription: synced,
+        attemptedRepair: true,
+        repaired: discoveredCustomerId !== customerId || synced.subscriptionId !== directSubscriptionId,
+        requiresStripeSubscription,
+        message: null,
+        recoveryAction: null,
+      };
+    }
+
+    if (discoveredCustomerId !== customerId) {
+      await persistStripeCustomerIdForUser(userId, discoveredCustomerId);
+    }
+  }
+
+  return {
+    state: 'unrecoverable',
+    subscription: null,
+    attemptedRepair: true,
+    repaired: false,
+    requiresStripeSubscription,
+    message: buildBillingRecoveryMessage('unrecoverable', requiresStripeSubscription),
+    recoveryAction: 'contact_support',
+  };
+}
+
+export async function resolveActiveStripeSubscriptionForUser(
+  userId: string,
+  billingProfile: {
+    email?: string | null;
+    plan?: string | null;
+    stripe_customer_id?: string | null;
+    stripe_subscription_id?: string | null;
+  },
+): Promise<StripeSubscriptionState | null> {
+  const resolution = await resolveBillingIdentityForUser(userId, billingProfile, { attemptRepair: false });
+  return resolution.state === 'healthy' ? resolution.subscription : null;
 }
 
 export async function scheduleSubscriptionPlanChange(
@@ -498,6 +768,13 @@ export async function getOrCreateStripeCustomer(userId: string, email: string): 
     return profile.stripe_customer_id;
   }
 
+  const existingCustomerId = await searchStripeCustomerByMetadataUserId(userId)
+    || await searchStripeCustomerByEmail(normalizeEmail(email) ?? email);
+  if (existingCustomerId) {
+    await persistStripeCustomerIdForUser(userId, existingCustomerId);
+    return existingCustomerId;
+  }
+
   // Create new Stripe customer
   const stripe = getStripe();
   const customer = await stripe.customers.create({
@@ -550,13 +827,23 @@ export async function createSubscriptionCheckout(
       session_id: STRIPE_SESSION_PLACEHOLDER,
     }),
     cancel_url: buildAppRedirectUrl(cancelPath),
-    metadata: { userId, plan },
-    subscription_data: { metadata: { userId, plan } },
+    metadata: {
+      userId,
+      plan,
+      ...(options.scanId ? { scanId: options.scanId } : {}),
+    },
+    subscription_data: {
+      metadata: {
+        userId,
+        plan,
+        ...(options.scanId ? { scanId: options.scanId } : {}),
+      },
+    },
   });
 
   return {
     id: session.id,
-    scanId: `upgrade_${userId}`,
+    scanId: options.scanId || `upgrade_${userId}`,
     amount: session.amount_total ?? getPlanPriceCents(plan),
     currency: 'usd',
     url: session.url || '',
@@ -711,9 +998,13 @@ export const stripePayment: PaymentService = {
     const customerId = typeof session.customer === 'string'
       ? session.customer
       : session.customer?.id ?? subscriptionState?.customerId ?? null;
+    const subscriptionProvisioned = isStripeCheckoutProvisioned(
+      session.payment_status,
+      expandedSubscription?.status,
+    );
 
     return {
-      paid: session.payment_status === 'paid' || session.status === 'complete',
+      paid: subscriptionProvisioned,
       scanId: (session.metadata?.scanId) || '',
       plan: session.metadata?.plan ?? subscriptionState?.plan ?? undefined,
       userId: session.metadata?.userId,

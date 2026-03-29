@@ -220,9 +220,18 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
           </span>
           <div className="mt-0.5 flex items-center gap-1.5">
             {site.lastTouchedAt && (() => {
-              const ageDays = Math.floor((Date.now() - site.lastTouchedAt) / 86400000);
-              const ageHours = Math.floor((Date.now() - site.lastTouchedAt) / 3600000);
-              const label = ageHours < 24 ? `${ageHours}h ago` : `${ageDays}d ago`;
+              const ageMs = Date.now() - site.lastTouchedAt;
+              const ageMinutes = Math.floor(ageMs / 60000);
+              const ageHours = Math.floor(ageMs / 3600000);
+              const ageDays = Math.floor(ageMs / 86400000);
+              const label =
+                ageMinutes < 1
+                  ? 'Just now'
+                  : ageHours < 1
+                    ? `${ageMinutes}m ago`
+                    : ageDays < 1
+                      ? `${ageHours}h ago`
+                      : `${ageDays}d ago`;
               const dotColor = ageDays < 1 ? 'bg-[#25c972]' : ageDays <= 7 ? 'bg-[#ffbb00]' : 'bg-[#ff5252]';
               return (
                 <span className="flex items-center gap-1 text-[10px] text-zinc-600">
