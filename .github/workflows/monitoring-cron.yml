@@ -7,6 +7,9 @@ jobs:
   rescan:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      HAS_MONITORING_SECRET: ${{ secrets.MONITORING_SECRET != '' }}
+      HAS_APP_URL: ${{ secrets.APP_URL != '' || secrets.NEXT_PUBLIC_APP_URL != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,14 +18,14 @@ jobs:
       - run: npm ci
       # Requires repo secrets (Settings → Secrets and variables → Actions). If unset, we skip with a warning so the workflow stays green.
       - name: Run monitoring cron
-        if: ${{ secrets.MONITORING_SECRET != '' && (secrets.APP_URL != '' || secrets.NEXT_PUBLIC_APP_URL != '') }}
+        if: env.HAS_MONITORING_SECRET == 'true' && env.HAS_APP_URL == 'true'
         run: node scripts/run-monitoring.mjs
         env:
           APP_URL: ${{ secrets.APP_URL || secrets.NEXT_PUBLIC_APP_URL }}
           MONITORING_SECRET: ${{ secrets.MONITORING_SECRET }}
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
       - name: Monitoring skipped (configure secrets)
-        if: ${{ secrets.MONITORING_SECRET == '' || (secrets.APP_URL == '' && secrets.NEXT_PUBLIC_APP_URL == '') }}
+        if: env.HAS_MONITORING_SECRET != 'true' || env.HAS_APP_URL != 'true'
         run: |
           echo "::warning::Scheduled monitoring was skipped. Add GitHub Actions secrets MONITORING_SECRET and APP_URL (or NEXT_PUBLIC_APP_URL)."
           echo "Values must match production (same MONITORING_SECRET and public app URL as on Vercel). See docs/12-monitoring-alerts.md"
