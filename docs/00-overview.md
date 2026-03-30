@@ -29,6 +29,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [23-score-page-overhaul.md](./23-score-page-overhaul.md) | Score page overhaul — reweighted formula, clear labels, marketing CTAs | `src/lib/public-score.ts`, `src/lib/scorer/index.ts`, `src/app/score/[id]/page.tsx` |
 | [24-prompt-library-suggest.md](./24-prompt-library-suggest.md) | Prompt Library — AI/heuristic suggested prompts from latest scan | `src/app/api/prompts/suggest/route.ts`, `src/app/advanced/panels/prompt-library-panel.tsx` |
 | [25-favicon-opengraph.md](./25-favicon-opengraph.md) | Default favicon, Apple icon, and Open Graph image | `src/app/icon.svg`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx` |
+| [26-landing-marketing-sections.md](./26-landing-marketing-sections.md) | Home landing marketing bands + Framer Motion | `src/components/marketing/`, `src/app/page.tsx` |
 
 ## Architecture Principles
 

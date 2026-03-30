@@ -152,6 +152,12 @@ export async function GET(request: NextRequest) {
   try {
     // ── Phase 0: Automated re-scans for score trending ──────────
     const rescans: Array<{ domain: string; status: string; scanId?: string }> = [];
+    const queuedRescans: Array<{
+      domain: string;
+      record: { url: string; email: string };
+      userId: string;
+      summaryIndex: number;
+    }> = [];
 
     try {
       const monitoredDomains = await listActiveMonitoringDomains();
@@ -177,23 +183,17 @@ export async function GET(request: NextRequest) {
             continue;
           }
 
-          const result = await startScan(
-            {
+          const summaryIndex = rescans.push({ domain, status: 'queued' }) - 1;
+          queuedRescans.push({
+            domain,
+            record: {
               url: record.url,
-              force: true,
-              ip: 'cron',
-              userEmail: record.email,
-              userId,
+              email: record.email,
             },
-            {
-              db,
-              schedule: (task) => { after(task); },
-            }
-          );
-
-          const scanId = (result.body as { id?: string }).id;
-          rescans.push({ domain, status: result.status === 200 ? 'triggered' : 'failed', scanId });
-          if (result.status === 200) rescanCount++;
+            userId,
+            summaryIndex,
+          });
+          rescanCount++;
         } catch {
           rescans.push({ domain: record.domain, status: 'error' });
         }
@@ -497,6 +497,33 @@ export async function GET(request: NextRequest) {
     } catch {
       // Prompt monitoring failure shouldn't break the entire cron
       promptErrors++;
+    }
+
+    for (const queued of queuedRescans) {
+      try {
+        const result = await startScan(
+          {
+            url: queued.record.url,
+            force: true,
+            ip: 'cron',
+            userEmail: queued.record.email,
+            userId: queued.userId,
+          },
+          {
+            db,
+            schedule: (task) => { after(task); },
+          }
+        );
+
+        const scanId = (result.body as { id?: string }).id;
+        rescans[queued.summaryIndex] = {
+          domain: queued.domain,
+          status: result.status === 200 ? 'triggered' : 'failed',
+          scanId,
+        };
+      } catch {
+        rescans[queued.summaryIndex] = { domain: queued.domain, status: 'error' };
+      }
     }
 
     return NextResponse.json({

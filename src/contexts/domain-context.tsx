@@ -213,9 +213,19 @@ export function DomainContextProvider({
   useEffect(() => {
     let active = true;
     async function loadRecentScans() {
+      let shouldUseStorageFallback = false;
       try {
         const res = await fetch('/api/user/scans');
-        if (!res.ok) throw new Error('Failed');
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            if (active) {
+              setRecentScans([]);
+            }
+            return;
+          }
+          shouldUseStorageFallback = true;
+          throw new Error('Failed');
+        }
         const data = await res.json();
         const scans = data.scans as RecentScanData[];
         if (!active) return;
@@ -237,6 +247,9 @@ export function DomainContextProvider({
             .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))
         );
       } catch {
+        if (!shouldUseStorageFallback) {
+          return;
+        }
         // Fallback to localStorage method
         const fromStorage = getRecentScanEntries().map((entry) => entry.id);
         const ids = [...new Set([...fromStorage, initialReportId].filter(Boolean))];

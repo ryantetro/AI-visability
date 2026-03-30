@@ -7,10 +7,18 @@ import { UrlInput } from '@/components/ui/url-input';
 import { useAuth } from '@/hooks/use-auth';
 import { AnimatedStat } from '@/components/ui/animated-stat';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/radix-accordion';
-import { AIBeamVisual } from '@/components/ui/ai-beam-visual';
 import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from '@/components/ui/ai-icons';
 import { PricingSection } from '@/components/pricing/pricing-section';
 import { HeroRotatingAiHeadline } from '@/components/ui/hero-rotating-ai-headline';
+import { ShiftSection } from '@/components/marketing/shift-section';
+import { CapabilityPillars } from '@/components/marketing/capability-pillars';
+import { HowItWorksSection } from '@/components/marketing/how-it-works-section';
+import { AiEnginesSection } from '@/components/marketing/ai-engines-section';
+import { DimensionsSection } from '@/components/marketing/dimensions-section';
+import { ReportPreviewBand } from '@/components/marketing/report-preview-band';
+import { SampleScoreCta } from '@/components/marketing/sample-score-cta';
+import { AgenciesCtaBand } from '@/components/marketing/agencies-cta-band';
+import { FadeIn } from '@/components/marketing/motion';
 
 export default function Home() {
   const router = useRouter();
@@ -127,89 +135,12 @@ export default function Home() {
       </section>
 
       <div className="relative overflow-hidden" style={{ backgroundColor: 'var(--surface-page)' }}>
-
-      {/* How it works */}
-      <section id="how-it-works" className="relative px-4 py-24">
-        <div className="mx-auto max-w-3xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            Three steps to AI visibility
-          </h2>
-          <p className="mx-auto mt-3 max-w-md text-center" style={{ color: 'var(--text-tertiary)' }}>
-            Sign in once, then scan and reopen your reports whenever you need them.
-          </p>
-          <div className="mt-14 grid gap-8 sm:grid-cols-3 stagger-children">
-            {[
-              { step: '1', title: 'Enter your URL', desc: 'We crawl your site the same way AI bots do — checking 19 factors across content, structure, and AI crawler access.' },
-              { step: '2', title: 'See your score', desc: 'Get a 0–100 score with a clear breakdown of what AI engines can (and can\u2019t) find, plus a prioritized fix list.' },
-              { step: '3', title: 'Fix everything', desc: 'Download ready-to-install files customized for your site — plus copy-paste prompts for ChatGPT or Claude to guide you step by step.' },
-            ].map((item) => (
-              <div key={item.step} className="text-center">
-                <div
-                  className="mx-auto flex h-12 w-12 items-center justify-center text-sm font-semibold"
-                  style={{
-                    backgroundColor: 'rgba(255,255,255,0.03)',
-                    color: 'var(--color-primary-400)',
-                    borderRadius: 'var(--radius-lg)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                  }}
-                >
-                  {item.step}
-                </div>
-                <h3 className="mt-4 font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* AI Search Engines Interstitial */}
-      <section className="relative px-4 py-8 pb-24 text-center">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            We scan everywhere your customers are searching
-          </h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm" style={{ color: 'var(--text-tertiary)' }}>
-            Our engine queries the top AI platforms in real-time to see exactly what they know about you.
-          </p>
-          <div className="mt-8">
-            <AIBeamVisual />
-          </div>
-        </div>
-      </section>
-
-      {/* 6 Dimensions */}
-      <section className="relative px-4 pb-24">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            What we check
-          </h2>
-          <p className="mx-auto mt-3 max-w-md text-center" style={{ color: 'var(--text-tertiary)' }}>
-            Six dimensions that determine how AI search engines see your business.
-          </p>
-          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
-            {[
-              { title: 'Crawler Access', desc: 'Can AI bots find your key files? We check robots.txt, sitemap, and llms.txt.', pts: '20 pts' },
-              { title: 'Structured Data', desc: 'Does your site tell AI who you are? We check for schema markup that describes your business.', pts: '20 pts' },
-              { title: 'Content Quality', desc: 'Can AI pull useful info from your pages? We check about pages, service descriptions, and freshness.', pts: '20 pts' },
-              { title: 'Your Expertise', desc: 'Do you publish consistently about what you offer? We check topic focus, linking, and depth.', pts: '20 pts' },
-              { title: 'Your Identity', desc: 'Are you recognizable across the web? We check brand consistency and authority signals.', pts: '10 pts' },
-              { title: 'AI Access', desc: 'Have you given AI engines explicit permission to crawl? We check bot access rules and AI-specific files.', pts: '10 pts' },
-            ].map((dim) => (
-              <div
-                key={dim.title}
-                className="aiso-card-soft p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{dim.title}</h3>
-                  <span className="aiso-kicker">{dim.pts}</span>
-                </div>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{dim.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ShiftSection />
+      <CapabilityPillars />
+      <HowItWorksSection />
+      <AiEnginesSection />
+      <DimensionsSection />
+      <ReportPreviewBand />
 
       <PricingSection
         id="pricing"
@@ -219,12 +150,17 @@ export default function Home() {
         showFaq={false}
       />
 
+      <SampleScoreCta />
+      <AgenciesCtaBand />
+
       {/* FAQ */}
       <section id="resources" className="relative px-4 py-24">
         <div className="mx-auto max-w-2xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+          <FadeIn>
+            <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Frequently asked questions
-          </h2>
+            </h2>
+          </FadeIn>
           <div className="mt-10">
             <Accordion type="single" collapsible className="w-full">
               {[
@@ -251,13 +187,15 @@ export default function Home() {
 
       {/* Bottom CTA */}
       <section className="relative px-4 py-24 text-center">
-        <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-          Most businesses aren&apos;t optimized for AI search yet
-        </h2>
-        <p className="mx-auto mt-3 max-w-md text-white/40">
-          See what ChatGPT knows about you — takes 30 seconds, completely free.
-        </p>
-        <UrlInput onSubmit={handleSubmit} loading={loading} variant="elevated" className="mx-auto mt-8" />
+        <FadeIn>
+          <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            Most businesses aren&apos;t optimized for AI search yet
+          </h2>
+          <p className="mx-auto mt-3 max-w-md text-white/40">
+            See what ChatGPT knows about you — takes 30 seconds, completely free.
+          </p>
+          <UrlInput onSubmit={handleSubmit} loading={loading} variant="elevated" className="mx-auto mt-8" />
+        </FadeIn>
       </section>
       </div>
     </div>

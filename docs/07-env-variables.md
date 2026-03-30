@@ -15,6 +15,12 @@
 | `NEXT_PUBLIC_APP_URL` | Public app URL (e.g., `https://app.yourwebsitescore.com`) |
 | `MONITORING_SECRET` | Secret for cron job and internal API authentication |
 
+### Marketing (optional)
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SAMPLE_SCORE_ID` | Completed scan id for the homepage “sample report” CTA (`/score/{id}`). Leave unset to show only the free-audit button in that band. |
+
 ### Cron / monitoring tuning (optional)
 
 Used by `GET /api/cron/monitor`. Helps avoid Vercel **504** when Phase 0 rescans or Phase 2 prompt checks run too long in one invocation.

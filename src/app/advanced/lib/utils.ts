@@ -3,6 +3,8 @@ import { FILE_META, DEFAULT_META, WORKSTREAMS } from './constants';
 import type { FileMeta, GeneratedFile, RecentScanData, WorkstreamMeta } from './types';
 import { getDomain } from '@/lib/url-utils';
 
+const STALE_IN_PROGRESS_SCAN_MS = 20 * 60 * 1000;
+
 export function getFileMeta(filename: string): FileMeta {
   return FILE_META[filename] ?? DEFAULT_META;
 }
@@ -109,11 +111,19 @@ export function matchFixToFile(fix: PrioritizedFix, files: GeneratedFile[]) {
 }
 
 export function getLatestScanByDomain(scans: RecentScanData[], domain: string) {
-  return (
-    scans
-      .filter((scan) => getDomain(scan.url) === domain)
-      .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null
-  );
+  const matching = scans
+    .filter((scan) => getDomain(scan.url) === domain)
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  if (matching.length === 0) return null;
+
+  const preferred = matching.find((scan) => {
+    const isInProgress = scan.status !== 'complete' && scan.status !== 'failed';
+    if (!isInProgress) return true;
+    return Date.now() - scan.createdAt <= STALE_IN_PROGRESS_SCAN_MS;
+  });
+
+  return preferred ?? matching[0] ?? null;
 }
 
 export function getLatestPaidScanByDomain(scans: RecentScanData[], domain: string) {
