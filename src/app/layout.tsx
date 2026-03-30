@@ -26,6 +26,20 @@ export const metadata: Metadata = {
   title: 'airadr — AI Search Optimization',
   description:
     'Check how visible your website is to AI search engines. Get a free AI visibility score and fix files to boost your presence in ChatGPT, Perplexity, and Claude.',
+  openGraph: {
+    title: 'airadr — AI Search Optimization',
+    description:
+      'Check how visible your website is to AI search engines. Get a free AI visibility score and fix files for ChatGPT, Perplexity, and Claude.',
+    siteName: 'airadr',
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'airadr — AI Search Optimization',
+    description:
+      'Check how visible your website is to AI search engines. Get a free AI visibility score and fix files for ChatGPT, Perplexity, and Claude.',
+  },
 };
 
 export default function RootLayout({
