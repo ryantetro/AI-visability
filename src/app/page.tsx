@@ -10,6 +10,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 import { AIBeamVisual } from '@/components/ui/ai-beam-visual';
 import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from '@/components/ui/ai-icons';
 import { PricingSection } from '@/components/pricing/pricing-section';
+import { HeroRotatingAiHeadline } from '@/components/ui/hero-rotating-ai-headline';
 
 export default function Home() {
   const router = useRouter();
@@ -71,14 +72,10 @@ export default function Home() {
             </span>
           </div>
 
-          <h1
-            className="text-4xl font-bold leading-[1.08] tracking-tight animate-hero-fade sm:text-5xl lg:text-6xl text-text-primary"
+          <HeroRotatingAiHeadline
+            className="animate-hero-fade sm:text-5xl lg:text-6xl"
             style={{ animationDelay: '80ms' }}
-          >
-            Can ChatGPT and Perplexity
-            <br />
-            <span className="bg-gradient-to-r from-[var(--color-primary-300)] to-[var(--color-primary-500)] bg-clip-text text-transparent">find your business?</span>
-          </h1>
+          />
 
           <p className="mx-auto mt-5 max-w-lg text-[17px] leading-relaxed animate-hero-fade text-white/45" style={{ animationDelay: '160ms' }}>
             Your customers are asking AI for recommendations.
