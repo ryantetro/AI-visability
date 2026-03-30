@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { AnimatedStat } from '@/components/ui/animated-stat';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/radix-accordion';
 import { AIBeamVisual } from '@/components/ui/ai-beam-visual';
-import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
+import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from '@/components/ui/ai-icons';
 import { PricingSection } from '@/components/pricing/pricing-section';
 
 export default function Home() {
@@ -99,6 +99,7 @@ export default function Home() {
                   { Icon: PerplexityIcon, color: 'text-[#62dbef]' },
                   { Icon: GeminiIcon, color: 'text-[#7ba9ff]' },
                   { Icon: ClaudeIcon, color: 'text-[#f1a07b]' },
+                  { Icon: GrokIcon, color: 'text-[#f5f5f5]' },
                 ] as const).map(({ Icon, color }, i) => (
                   <span key={i} className={`flex items-center justify-center ${color}`}>
                     <Icon className="size-4.5" />

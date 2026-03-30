@@ -68,12 +68,13 @@ export function buildPublicScoreSummaryFromScan(scan: PublicScoreScanLike | null
   const mentionSummary = normalizeMentionSummary(scan.mentionSummary as MentionSummary | undefined);
 
   // Build engine breakdown for public display
-  const engineOrder: AIEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude'];
+  const engineOrder: AIEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude', 'grok'];
   const engineLabels: Record<AIEngine, string> = {
     chatgpt: 'ChatGPT',
     perplexity: 'Perplexity',
     gemini: 'Gemini',
     claude: 'Claude',
+    grok: 'Grok',
   };
   const engines: PublicEngineResult[] = engineOrder.map((engine) => {
     const eb = mentionSummary?.engineBreakdown?.[engine];

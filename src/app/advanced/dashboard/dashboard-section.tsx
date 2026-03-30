@@ -17,7 +17,7 @@ import { DashboardPanel } from '@/components/app/dashboard-primitives';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { cn } from '@/lib/utils';
 import { getFaviconUrl } from '@/lib/url-utils';
-import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
+import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from '@/components/ui/ai-icons';
 import { scoreColor, barFillColor, formatRelativeTime, getScoreColor } from '../lib/utils';
 import { ENGINE_COLORS } from '../lib/constants';
 import { computeAverageRank, computeProminenceFallback, formatAverageRankDisplay } from '../lib/mention-utils';
@@ -47,13 +47,13 @@ interface DashboardSectionProps {
   reauditing?: boolean;
 }
 
-/* Official brand colors: ChatGPT #74aa9c, Perplexity #20B8CD, Gemini #4285F4, Claude #d97757 */
 const ENGINE_DISPLAY: Record<string, { label: string; color: string; Icon?: React.ComponentType<{ className?: string }> }> = {
   chatgpt: { label: 'ChatGPT', color: AI_ENGINE_META.chatgpt.color, Icon: ChatGPTIcon },
   perplexity: { label: 'Perplexity', color: AI_ENGINE_META.perplexity.color, Icon: PerplexityIcon },
   copilot: { label: 'Copilot', color: '#0ea5e9' },
   claude: { label: 'Claude', color: AI_ENGINE_META.claude.color, Icon: ClaudeIcon },
   gemini: { label: 'Gemini', color: AI_ENGINE_META.gemini.color, Icon: GeminiIcon },
+  grok: { label: 'Grok', color: AI_ENGINE_META.grok.color, Icon: GrokIcon },
 };
 
 function getEngineDisplay(engine: string) {

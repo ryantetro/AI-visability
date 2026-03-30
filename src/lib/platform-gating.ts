@@ -17,10 +17,10 @@ export const DEFAULT_PLATFORM_PRIORITY: AIPlatform[] = [
 
 /**
  * Map between our platform IDs and AIEngine IDs.
- * Currently the AI scan system only supports 4 engines (chatgpt, perplexity, gemini, claude).
- * copilot and grok are tracked for crawler/referral analytics but not yet for mention testing.
+ * The AI scan system supports 5 engines (chatgpt, perplexity, gemini, claude, grok).
+ * copilot is tracked for crawler/referral analytics but not yet for mention testing.
  */
-const SCANNABLE_PLATFORMS: Set<string> = new Set(['chatgpt', 'perplexity', 'gemini', 'claude']);
+const SCANNABLE_PLATFORMS: Set<string> = new Set(['chatgpt', 'perplexity', 'gemini', 'claude', 'grok']);
 
 /** Get the max platforms allowed for a tier */
 export function getMaxPlatforms(tier: PlanTier): number {

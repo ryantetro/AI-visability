@@ -126,6 +126,15 @@ Note: `/api/scan` prefix is in `PUBLIC_PREFIXES` in middleware (auth checked in 
 | GET | `/api/cron/monitor` | Secret | Cron job for monitoring checks |
 | GET | `/api/leaderboard` | None | Public leaderboard data |
 
+### Prompt monitoring
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/prompts` | Required | List prompts + results for `?domain=` |
+| POST | `/api/prompts` | Required | Create one monitored prompt |
+| PUT/DELETE | `/api/prompts/[id]` | Required | Update or delete a prompt |
+| POST | `/api/prompts/suggest` | Required | Suggest prompts from latest scan crawl (see [24-prompt-library-suggest.md](./24-prompt-library-suggest.md)) |
+
 ---
 
 ## Middleware Route Protection

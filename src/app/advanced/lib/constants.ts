@@ -134,23 +134,25 @@ export const BOT_CATEGORY_LABEL: Record<string, string> = {
 
 export { BOT_TO_PROVIDER };
 
-export const PROVIDER_DISPLAY_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude'] as const;
+export const PROVIDER_DISPLAY_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude', 'grok'] as const;
 
 export const PROVIDER_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
   perplexity: 'Perplexity',
   gemini: 'Gemini',
   claude: 'Claude',
+  grok: 'Grok',
   other: 'Other',
 };
 
-export const REFERRER_ENGINE_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude'] as const;
+export const REFERRER_ENGINE_ORDER = ['chatgpt', 'perplexity', 'gemini', 'claude', 'grok'] as const;
 
 export const REFERRER_ENGINE_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
   perplexity: 'Perplexity',
   gemini: 'Gemini',
   claude: 'Claude',
+  grok: 'Grok',
 };
 
 export const CHART_COLORS = { pass: '#25c972', fail: '#ff5252', unknown: '#ff8a1e' } as const;

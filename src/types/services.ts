@@ -152,7 +152,7 @@ export interface CrawlerVisitService {
   listVisitSummaries(domain: string, days?: number): Promise<CrawlerVisitSummary[]>;
 }
 
-export type SourceEngine = 'chatgpt' | 'perplexity' | 'gemini' | 'claude';
+export type SourceEngine = 'chatgpt' | 'perplexity' | 'gemini' | 'claude' | 'grok';
 
 export interface ReferralVisit {
   id: string;

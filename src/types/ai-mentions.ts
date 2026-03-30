@@ -1,4 +1,4 @@
-export type AIEngine = 'chatgpt' | 'perplexity' | 'gemini' | 'claude';
+export type AIEngine = 'chatgpt' | 'perplexity' | 'gemini' | 'claude' | 'grok';
 export type MentionType = 'direct' | 'indirect' | 'not_mentioned';
 export type MentionSentiment = 'positive' | 'neutral' | 'negative' | 'mixed';
 export type PositionContext = 'listed_ranking' | 'prominent' | 'passing' | 'absent';

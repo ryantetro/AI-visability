@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCrawlerVisits, getReferralVisits } from '@/lib/services/registry';
 import { getSupabaseClient } from '@/lib/supabase';
+import type { SourceEngine } from '@/types/services';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,7 @@ const HOUR_MS = 60 * 60 * 1000;
 const DOMAIN_LIMIT_PER_HOUR = 500;
 const TOUCH_INTERVAL_MS = HOUR_MS;
 const VALID_CATEGORIES = new Set(['indexing', 'citation', 'training', 'unknown']);
-const VALID_ENGINES = new Set(['chatgpt', 'perplexity', 'gemini', 'claude']);
+const VALID_ENGINES = new Set(['chatgpt', 'perplexity', 'gemini', 'claude', 'grok']);
 
 type RateWindow = {
   count: number;
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
     const referralVisits = getReferralVisits();
     await referralVisits.logVisit({
       domain,
-      sourceEngine: sourceEngine as 'chatgpt' | 'perplexity' | 'gemini' | 'claude',
+      sourceEngine: sourceEngine as SourceEngine,
       referrerUrl: referrerUrl || null,
       landingPage,
       userAgent: userAgent || null,

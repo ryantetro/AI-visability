@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { scoreColor } from '../lib/utils';
 import { getFaviconUrl } from '@/lib/url-utils';
-import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
+import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from '@/components/ui/ai-icons';
 import { AI_ENGINE_META } from '@/lib/ai-engines';
 import type { AIEngine } from '@/types/ai-mentions';
 
@@ -64,6 +64,7 @@ const ENGINE_ICON_MAP: Record<AIEngine, React.ComponentType<{ className?: string
   perplexity: PerplexityIcon,
   gemini: GeminiIcon,
   claude: ClaudeIcon,
+  grok: GrokIcon,
 };
 
 const ENGINE_ICON_COLORS = Object.fromEntries(

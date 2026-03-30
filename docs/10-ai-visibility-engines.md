@@ -1,11 +1,12 @@
 # AI Visibility Engines
 
-This document explains how AI visibility testing works for the four provider API keys currently supported by the app:
+This document explains how AI visibility testing works for the five provider API keys currently supported by the app:
 
 - `OPENAI_API_KEY` for `ChatGPT`
 - `GOOGLE_GENAI_API_KEY` for `Gemini`
 - `PERPLEXITY_API_KEY` for `Perplexity`
 - `ANTHROPIC_API_KEY` for `Claude`
+- `GROK_API_KEY` for `Grok`
 
 It reflects the current implementation in:
 
@@ -17,7 +18,7 @@ It reflects the current implementation in:
 
 ## Shared flow
 
-All four engines use the same AI visibility pipeline:
+All five engines use the same AI visibility pipeline:
 
 1. A scan crawls the website and builds `crawlData`.
 2. The app generates a set of AI-style prompts from the site content.
@@ -58,6 +59,7 @@ Current canonical engine ids:
 - `perplexity`
 - `gemini`
 - `claude`
+- `grok`
 
 ## ChatGPT
 
@@ -191,6 +193,37 @@ Relevant files:
 - [scripts/backfill-claude-ai-visibility.cjs](/Users/ryantetro/AI-visability/scripts/backfill-claude-ai-visibility.cjs)
 - [docs/09-anthropic-backfill.md](/Users/ryantetro/AI-visability/docs/09-anthropic-backfill.md)
 
+## Grok
+
+### Enablement
+
+- Env var: `GROK_API_KEY`
+- Optional model override: `GROK_MODEL`
+- User-facing label: `Grok`
+- Provider: `xAI`
+- Default model: `grok-4-1-fast-non-reasoning`
+
+### Request path
+
+Grok visibility testing is handled in [src/lib/services/mention-tester-real.ts](/Users/ryantetro/AI-visability/src/lib/services/mention-tester-real.ts) via:
+
+- endpoint: `https://api.x.ai/v1/chat/completions`
+- auth header: `Authorization: Bearer ${GROK_API_KEY}`
+
+### What it does
+
+When `GROK_API_KEY` is present, Grok participates in:
+
+- scan-time prompt testing
+- persisted `mentionSummary` results
+- prompt monitoring checks
+- competitor appearance storage
+- all engine-aware dashboard/report surfaces
+
+### Backfill behavior
+
+Grok was added after older mention data already existed. Older scans will show `not_backfilled` for Grok until a new scan is run.
+
 ## How engine availability is decided
 
 The app does not use a manual feature flag per provider.
@@ -201,6 +234,7 @@ Instead, engine availability is derived from the presence of the required env va
 - `GOOGLE_GENAI_API_KEY` enables `gemini`
 - `PERPLEXITY_API_KEY` enables `perplexity`
 - `ANTHROPIC_API_KEY` enables `claude`
+- `GROK_API_KEY` enables `grok`
 
 The runtime helper is `getConfiguredAIEngines()` in [src/lib/ai-engines.ts](/Users/ryantetro/AI-visability/src/lib/ai-engines.ts).
 
@@ -248,7 +282,7 @@ In [src/app/api/cron/monitor/route.ts](/Users/ryantetro/AI-visability/src/app/ap
 4. stores prompt results
 5. stores competitor appearances
 
-That means all four API keys affect both:
+That means all five API keys affect both:
 
 - scan-time AI visibility
 - ongoing prompt-monitoring visibility

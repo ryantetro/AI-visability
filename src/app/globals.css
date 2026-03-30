@@ -222,6 +222,27 @@ a:focus-visible,
   outline-offset: 2px;
 }
 
+/* Consistent clickable affordance for controls that act like buttons */
+button:not(:disabled),
+input[type='button']:not(:disabled),
+input[type='submit']:not(:disabled),
+input[type='reset']:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+  cursor: pointer;
+}
+
+button:disabled,
+input[type='button']:disabled,
+input[type='submit']:disabled,
+input[type='reset']:disabled,
+[role='button'][aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.aiso-button:not(:disabled) {
+  cursor: pointer;
+}
+
 h1,
 h2,
 h3,

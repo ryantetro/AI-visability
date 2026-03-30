@@ -1,6 +1,6 @@
 import type { AIEngine } from '@/types/ai-mentions';
 
-export const AI_ENGINES: AIEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude'];
+export const AI_ENGINES: AIEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude', 'grok'];
 
 export interface AIEngineMeta {
   id: AIEngine;
@@ -49,12 +49,22 @@ export const AI_ENGINE_META: Record<AIEngine, AIEngineMeta> = {
     defaultModel: 'claude-haiku-4-5-20251001',
     iconKey: 'claude',
   },
+  grok: {
+    id: 'grok',
+    label: 'Grok',
+    provider: 'xAI',
+    color: '#f5f5f5',
+    envKey: 'GROK_API_KEY',
+    defaultModel: 'grok-4-1-fast-non-reasoning',
+    iconKey: 'grok',
+  },
 };
 
 const MODEL_ENV_KEYS: Partial<Record<AIEngine, string>> = {
   perplexity: 'PERPLEXITY_MODEL',
   gemini: 'GEMINI_MODEL',
   claude: 'ANTHROPIC_MODEL',
+  grok: 'GROK_MODEL',
 };
 
 export function getAIEngineMeta(engine: AIEngine): AIEngineMeta {

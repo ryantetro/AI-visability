@@ -1,5 +1,5 @@
 export type AiCrawlerCategory = 'indexing' | 'citation' | 'training' | 'unknown';
-export type AiCrawlerProvider = 'chatgpt' | 'perplexity' | 'gemini' | 'claude' | 'other';
+export type AiCrawlerProvider = 'chatgpt' | 'perplexity' | 'gemini' | 'claude' | 'grok' | 'other';
 
 type AiCrawlerDefinition = {
   botName: string;
@@ -24,19 +24,21 @@ const AI_CRAWLER_DEFINITIONS: AiCrawlerDefinition[] = [
   { botName: 'GoogleOther', category: 'training', company: 'Google', provider: 'gemini', matchInUserAgent: 'GoogleOther' },
   { botName: 'Google-CloudVertexBot', category: 'training', company: 'Google', provider: 'gemini', matchInUserAgent: 'Google-CloudVertexBot' },
   { botName: 'Google-Extended', category: 'training', company: 'Google', provider: 'gemini' },
+  { botName: 'GrokBot', category: 'indexing', company: 'xAI', provider: 'grok', matchInUserAgent: 'GrokBot' },
 ];
 
 const DETECTABLE_AI_CRAWLERS = AI_CRAWLER_DEFINITIONS.filter(
   (crawler): crawler is AiCrawlerDefinition & { matchInUserAgent: string } => Boolean(crawler.matchInUserAgent)
 );
 
-export const AI_CRAWLER_PROVIDER_ORDER: AiCrawlerProvider[] = ['chatgpt', 'perplexity', 'gemini', 'claude', 'other'];
+export const AI_CRAWLER_PROVIDER_ORDER: AiCrawlerProvider[] = ['chatgpt', 'perplexity', 'gemini', 'claude', 'grok', 'other'];
 
 export const AI_CRAWLER_PROVIDER_LABELS: Record<AiCrawlerProvider, string> = {
   chatgpt: 'ChatGPT',
   perplexity: 'Perplexity',
   gemini: 'Gemini',
   claude: 'Claude',
+  grok: 'Grok',
   other: 'Other',
 };
 

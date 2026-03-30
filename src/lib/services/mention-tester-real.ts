@@ -236,11 +236,40 @@ async function queryPerplexity(prompt: string): Promise<QueryResult> {
   };
 }
 
+async function queryGrok(prompt: string): Promise<QueryResult> {
+  const key = process.env.GROK_API_KEY;
+  if (!key) throw new Error('GROK_API_KEY is not set');
+
+  const model = getAIEngineModel('grok');
+  const res = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1000,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Grok API error: ${res.status}${body ? ` ${body.slice(0, 240)}` : ''}`);
+  }
+  const data = await res.json();
+  return {
+    text: data.choices?.[0]?.message?.content ?? '',
+  };
+}
+
 const engineQueryMap: Record<AIEngine, (prompt: string) => Promise<QueryResult>> = {
   chatgpt: queryOpenAI,
   claude: queryAnthropic,
   gemini: queryGoogle,
   perplexity: queryPerplexity,
+  grok: queryGrok,
 };
 
 export const realMentionTester: MentionTesterService = {

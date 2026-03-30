@@ -5,10 +5,10 @@ import { CheckCircle2, ChevronDown, ChevronUp, Copy, HelpCircle, Info, Lock, XCi
 import { cn } from '@/lib/utils';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { CheckFixContent } from '@/lib/analysis-fix-content';
-import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from '@/components/ui/ai-icons';
+import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from '@/components/ui/ai-icons';
 import { AI_ENGINE_META } from '@/lib/ai-engines';
 
-export type EngineKey = 'chatgpt' | 'perplexity' | 'gemini' | 'claude';
+export type EngineKey = 'chatgpt' | 'perplexity' | 'gemini' | 'claude' | 'grok';
 
 export type VerdictQuality = 'strong' | 'normal' | 'low';
 
@@ -32,6 +32,7 @@ const ENGINE_ICONS: Record<EngineKey, React.ComponentType<{ className?: string }
   perplexity: PerplexityIcon,
   gemini: GeminiIcon,
   claude: ClaudeIcon,
+  grok: GrokIcon,
 };
 
 export interface SubSection {
@@ -189,6 +190,7 @@ const ENGINE_ICON_COLORS: Record<EngineKey, string> = {
   perplexity: AI_ENGINE_META.perplexity.color,
   gemini: AI_ENGINE_META.gemini.color,
   claude: AI_ENGINE_META.claude.color,
+  grok: AI_ENGINE_META.grok.color,
 };
 
 function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boolean }) {

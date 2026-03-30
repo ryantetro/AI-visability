@@ -4,7 +4,7 @@ import { getReferralVisits } from '@/lib/services/registry';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { SourceEngine } from '@/types/services';
 
-const ENGINE_ORDER: SourceEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude'];
+const ENGINE_ORDER: SourceEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude', 'grok'];
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);

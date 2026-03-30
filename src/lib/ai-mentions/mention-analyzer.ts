@@ -29,6 +29,7 @@ export const ENGINE_WEIGHTS: Record<AIEngine, number> = {
   perplexity: 1.1,
   gemini: 1.0,
   claude: 0.9,
+  grok: 1.0,
 };
 
 const POSITIVE_KEYWORDS = [

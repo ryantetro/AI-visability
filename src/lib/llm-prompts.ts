@@ -41,6 +41,8 @@ const BOT_TRACKING_SNIPPET_REFERRERS = `{
   'perplexity.ai': 'perplexity',
   'gemini.google.com': 'gemini',
   'claude.ai': 'claude',
+  'grok.com': 'grok',
+  'x.ai': 'grok',
 }`;
 
 const REPORT_PROMPT_SECTION_META: Record<ReportPromptSectionKey, {

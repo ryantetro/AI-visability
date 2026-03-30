@@ -34,6 +34,7 @@ See [12-monitoring-alerts.md](./12-monitoring-alerts.md).
 | `ANTHROPIC_API_KEY` | Enables Claude mention testing |
 | `GOOGLE_GENAI_API_KEY` | Enables Gemini mention testing |
 | `PERPLEXITY_API_KEY` | Enables Perplexity mention testing |
+| `GROK_API_KEY` | Enables Grok mention testing |
 
 ### AI Engine Models (Optional)
 
@@ -42,6 +43,7 @@ See [12-monitoring-alerts.md](./12-monitoring-alerts.md).
 | `ANTHROPIC_MODEL` | Claude model for mention testing | `claude-haiku-4-5-20251001` |
 | `GEMINI_MODEL` | Gemini model for mention testing | `gemini-2.5-flash` |
 | `PERPLEXITY_MODEL` | Perplexity Sonar model for mention testing | `sonar` |
+| `GROK_MODEL` | Grok model for mention testing | `grok-4-1-fast-non-reasoning` |
 
 ## AI visibility engines (Optional but recommended)
 
@@ -53,6 +55,8 @@ See [12-monitoring-alerts.md](./12-monitoring-alerts.md).
 | `GOOGLE_GENAI_API_KEY` | Enables Gemini mention testing |
 | `GEMINI_MODEL` | Optional Gemini model override. Defaults to `gemini-2.5-flash` |
 | `PERPLEXITY_API_KEY` | Enables Perplexity mention testing |
+| `GROK_API_KEY` | Enables Grok mention testing |
+| `GROK_MODEL` | Optional Grok model override. Defaults to `grok-4-1-fast-non-reasoning` |
 
 ## Stripe (Optional -- enables real billing)
 

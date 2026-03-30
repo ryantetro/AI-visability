@@ -4,7 +4,7 @@ import React, { forwardRef, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { AnimatedBeam } from "@/components/ui/animated-beam";
 import { Globe } from "lucide-react";
-import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon } from "@/components/ui/ai-icons";
+import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from "@/components/ui/ai-icons";
 
 
 
@@ -43,6 +43,7 @@ export function AIBeamVisual() {
     const perplexityRef = useRef<HTMLDivElement>(null);
     const geminiRef = useRef<HTMLDivElement>(null);
     const claudeRef = useRef<HTMLDivElement>(null);
+    const grokRef = useRef<HTMLDivElement>(null);
 
     return (
         <div
@@ -84,9 +85,11 @@ export function AIBeamVisual() {
                     </Circle>
                 </div>
 
-                {/* Invisible spacer — keeps the original 3-row vertical spacing */}
-                <div className="flex flex-row items-center justify-center opacity-0 pointer-events-none" aria-hidden>
-                    <div className="size-12" />
+                {/* Row 3 */}
+                <div className="flex flex-row items-center justify-center">
+                    <Circle ref={grokRef} label="Grok" className="text-[#f5f5f5]">
+                        <GrokIcon />
+                    </Circle>
                 </div>
 
             </div>
@@ -102,6 +105,8 @@ export function AIBeamVisual() {
                 duration={8} gradientStartColor="#10a37f" gradientStopColor="#8ab4f8" />
             <AnimatedBeam containerRef={containerRef} fromRef={websiteRef} toRef={claudeRef}
                 reverse duration={8} gradientStartColor="#10a37f" gradientStopColor="#d97757" />
+            <AnimatedBeam containerRef={containerRef} fromRef={websiteRef} toRef={grokRef}
+                curvature={50} duration={7} gradientStartColor="#10a37f" gradientStopColor="#f5f5f5" />
 
         </div>
     );

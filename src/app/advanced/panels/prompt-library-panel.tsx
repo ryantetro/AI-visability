@@ -29,6 +29,14 @@ export function PromptLibraryPanel({
   const [activeTab, setActiveTab] = useState<PromptCategory>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<{ text: string; category: string }[] | null>(null);
+  const [suggestSource, setSuggestSource] = useState<'llm' | 'heuristic' | null>(null);
+  const [addingSuggestedKey, setAddingSuggestedKey] = useState<string | null>(null);
+  const [addingAllSuggested, setAddingAllSuggested] = useState(false);
+
+  const normalizeSuggestionKey = (text: string) => text.trim().toLowerCase().replace(/\s+/g, ' ');
 
   const fetchData = async () => {
     try {
@@ -68,10 +76,98 @@ export function PromptLibraryPanel({
     try { await fetch(`/api/prompts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category }) }); await fetchData(); } catch { /* silently fail */ }
   };
 
+  const handleSuggestPrompts = async () => {
+    setSuggestLoading(true);
+    setSuggestError(null);
+    try {
+      const res = await fetch('/api/prompts/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSuggestError(typeof payload.error === 'string' ? payload.error : 'Could not suggest prompts.');
+        setSuggestions(null);
+        setSuggestSource(null);
+        return;
+      }
+      const list = Array.isArray(payload.suggestions) ? payload.suggestions : [];
+      setSuggestions(list);
+      const src = payload.source === 'llm' || payload.source === 'heuristic' ? payload.source : null;
+      setSuggestSource(list.length > 0 ? src : null);
+      if (list.length === 0) {
+        setSuggestError('No new prompts to add — try editing your scan or removing prompts you no longer need.');
+      }
+    } catch {
+      setSuggestError('Network error.');
+      setSuggestions(null);
+      setSuggestSource(null);
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  const handleAddSuggested = async (text: string, category: string) => {
+    const key = normalizeSuggestionKey(text);
+    setAddingSuggestedKey(key);
+    setSuggestError(null);
+    try {
+      const res = await fetch('/api/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, promptText: text.trim(), category }),
+      });
+      if (res.ok) {
+        setSuggestions((prev) => (prev ? prev.filter((s) => normalizeSuggestionKey(s.text) !== key) : null));
+        await fetchData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setSuggestError(typeof err.error === 'string' ? err.error : 'Failed to add prompt.');
+      }
+    } catch {
+      setSuggestError('Network error.');
+    } finally {
+      setAddingSuggestedKey(null);
+    }
+  };
+
+  const handleAddAllSuggested = async () => {
+    if (!suggestions?.length) return;
+    setAddingAllSuggested(true);
+    setSuggestError(null);
+    try {
+      for (const s of suggestions) {
+        const res = await fetch('/api/prompts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain, promptText: s.text, category: s.category }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          setSuggestError(typeof err.error === 'string' ? err.error : 'Failed to add a prompt.');
+          await fetchData();
+          setSuggestions([]);
+          setSuggestSource(null);
+          return;
+        }
+      }
+      setSuggestions([]);
+      setSuggestSource(null);
+      await fetchData();
+    } catch {
+      setSuggestError('Network error.');
+      await fetchData();
+    } finally {
+      setAddingAllSuggested(false);
+    }
+  };
+
   if (loading) return null;
 
   const prompts = data?.prompts ?? [];
   const results = data?.results ?? [];
+  const atPromptLimit = maxPrompts != null && maxPrompts > 0 && prompts.length >= maxPrompts;
   const filteredPrompts = activeTab === 'all' ? prompts : prompts.filter((p) => p.category === activeTab);
 
   const promptStats = filteredPrompts.map((p) => {
@@ -88,9 +184,14 @@ export function PromptLibraryPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <SectionTitle eyebrow="Prompt Library" title="Prompt Monitoring" description="Manage prompts to track how AI engines mention your brand over time." />
         <div className="flex items-center gap-2 mt-1">
-          <button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/10 px-3 py-2 text-[11px] font-semibold text-[#d8b4fe] transition-colors hover:bg-[#a855f7]/16">
+          <button
+            type="button"
+            onClick={handleSuggestPrompts}
+            disabled={suggestLoading || !domain}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/10 px-3 py-2 text-[11px] font-semibold text-[#d8b4fe] transition-colors hover:bg-[#a855f7]/16 disabled:opacity-45 disabled:pointer-events-none"
+          >
             <Sparkles className="h-3 w-3" />
-            Suggest prompts
+            {suggestLoading ? 'Suggesting…' : 'Suggest prompts'}
           </button>
           <ExportButton
             exportType="prompts"
@@ -138,6 +239,70 @@ export function PromptLibraryPanel({
             </div>
           );
         })()
+      )}
+
+      {suggestError && (
+        <p className={cn('mt-3 text-[11px]', suggestions && suggestions.length > 0 ? 'text-amber-400/90' : 'text-red-400')}>
+          {suggestError}
+        </p>
+      )}
+
+      {suggestions != null && suggestions.length > 0 && (
+        <div className="mt-4 rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/[0.06] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold text-[#e9d5ff]">Suggested prompts</p>
+              <p className="mt-1 text-[10px] text-zinc-500">
+                {suggestSource === 'llm'
+                  ? 'From your latest scan using AI.'
+                  : 'From your latest scan (rule-based). Add an OpenAI key for richer suggestions.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { setSuggestions(null); setSuggestSource(null); setSuggestError(null); }}
+                className="rounded-lg border border-white/12 px-3 py-1.5 text-[10px] font-medium text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                onClick={handleAddAllSuggested}
+                disabled={atPromptLimit || addingAllSuggested || addingSuggestedKey != null}
+                className="rounded-lg bg-[#d6d6d6] px-3 py-1.5 text-[10px] font-semibold text-black hover:bg-white disabled:opacity-45"
+              >
+                {addingAllSuggested ? 'Adding…' : `Add all (${suggestions.length})`}
+              </button>
+            </div>
+          </div>
+          {atPromptLimit && (
+            <p className="mt-2 text-[10px] text-amber-400/90">Prompt limit reached — delete a prompt or upgrade to add these.</p>
+          )}
+          <ul className="mt-3 max-h-[220px] space-y-2 overflow-y-auto">
+            {suggestions.map((s) => {
+              const rowKey = normalizeSuggestionKey(s.text);
+              const busy = addingSuggestedKey === rowKey || addingAllSuggested;
+              return (
+                <li
+                  key={rowKey}
+                  className="flex items-start gap-2 rounded-lg border border-white/8 bg-black/20 px-3 py-2"
+                >
+                  <p className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">{s.text}</p>
+                  <span className="shrink-0 text-[9px] uppercase tracking-wide text-zinc-500">{s.category}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddSuggested(s.text, s.category)}
+                    disabled={atPromptLimit || busy}
+                    className="shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-white/[0.06] disabled:opacity-40"
+                  >
+                    {busy ? '…' : 'Add'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       <div className="mt-5 flex gap-1 border-b border-white/8 pb-px">
