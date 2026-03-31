@@ -4,30 +4,7 @@ export const alt = 'airadr — AI Search Optimization';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-async function getSpaceGroteskBold(): Promise<ArrayBuffer | undefined> {
-  try {
-    const cssRes = await fetch(
-      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&display=swap',
-      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1)' } },
-    );
-    const css = await cssRes.text();
-    const urlMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
-    if (!urlMatch?.[1]) return undefined;
-    const fontRes = await fetch(urlMatch[1]);
-    if (!fontRes.ok) return undefined;
-    return fontRes.arrayBuffer();
-  } catch {
-    return undefined;
-  }
-}
-
 export default async function OpengraphImage() {
-  const boldData = await getSpaceGroteskBold();
-  const fonts = boldData
-    ? [{ name: 'Space Grotesk', data: boldData, style: 'normal' as const, weight: 700 as const }]
-    : undefined;
-  const fontFamily = fonts ? 'Space Grotesk' : 'system-ui, sans-serif';
-
   return new ImageResponse(
     (
       <div
@@ -37,6 +14,7 @@ export default async function OpengraphImage() {
           display: 'flex',
           flexDirection: 'row',
           background: 'linear-gradient(135deg, #050507 0%, #0a0c14 40%, #0d1020 70%, #0f1428 100%)',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
         }}
       >
         {/* Left content area */}
@@ -50,12 +28,12 @@ export default async function OpengraphImage() {
           }}
         >
           {/* Logo + brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div
               style={{
-                width: 52,
-                height: 52,
-                borderRadius: 26,
+                width: 48,
+                height: 48,
+                borderRadius: 24,
                 background: 'rgba(255,255,255,0.03)',
                 border: '1.5px solid rgba(255,255,255,0.1)',
                 display: 'flex',
@@ -63,15 +41,18 @@ export default async function OpengraphImage() {
                 justifyContent: 'center',
               }}
             >
-              <svg width="34" height="34" viewBox="0 0 32 32">
-                <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2.5" />
-                <path d="M16 3 A13 13 0 0 1 27.3 18.5" fill="none" stroke="#356df4" strokeWidth="2.5" strokeLinecap="round" />
-                <path d="M27.3 18.5 A13 13 0 0 1 4.7 18.5" fill="none" stroke="#25c972" strokeWidth="2.5" strokeLinecap="round" />
-                <path d="M4.7 18.5 A13 13 0 0 1 16 3" fill="none" stroke="#16b7ca" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
+              <div
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  border: '3px solid #356df4',
+                  display: 'flex',
+                }}
+              />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ fontFamily, fontSize: 26, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>
+              <span style={{ fontSize: 26, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>
                 airadr
               </span>
               <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.7)', letterSpacing: '0.1em' }}>
@@ -81,8 +62,8 @@ export default async function OpengraphImage() {
           </div>
 
           {/* Headline */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 600 }}>
-            <div style={{ fontFamily, fontSize: 48, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.035em', lineHeight: 1.12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 580 }}>
+            <div style={{ fontSize: 50, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.035em', lineHeight: 1.12 }}>
               Is AI recommending your business?
             </div>
             <div style={{ fontSize: 21, lineHeight: 1.5, color: 'rgba(203,213,225,0.8)' }}>
@@ -91,25 +72,34 @@ export default async function OpengraphImage() {
           </div>
 
           {/* Bottom stats */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontFamily, fontSize: 30, fontWeight: 700, color: '#356df4' }}>6</span>
+              <span style={{ fontSize: 30, fontWeight: 700, color: '#356df4' }}>6</span>
               <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)' }}>AI Engines</span>
             </div>
             <div style={{ width: 1, height: 36, background: 'rgba(255,255,255,0.08)', display: 'flex' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontFamily, fontSize: 30, fontWeight: 700, color: '#25c972' }}>30s</span>
+              <span style={{ fontSize: 30, fontWeight: 700, color: '#25c972' }}>30s</span>
               <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)' }}>Free Audit</span>
             </div>
             <div style={{ width: 1, height: 36, background: 'rgba(255,255,255,0.08)', display: 'flex' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontFamily, fontSize: 30, fontWeight: 700, color: '#16b7ca' }}>100+</span>
+              <span style={{ fontSize: 30, fontWeight: 700, color: '#16b7ca' }}>100+</span>
               <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)' }}>AEO Signals</span>
             </div>
             <div style={{ width: 1, height: 36, background: 'rgba(255,255,255,0.08)', display: 'flex' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(53,109,244,0.12)', border: '1px solid rgba(53,109,244,0.25)', borderRadius: 10, padding: '10px 20px' }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#fff', fontFamily }}>Get your free score</span>
-              <span style={{ fontSize: 16, color: '#356df4' }}>→</span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'rgba(53,109,244,0.12)',
+                border: '1px solid rgba(53,109,244,0.25)',
+                borderRadius: 10,
+                padding: '10px 20px',
+              }}
+            >
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>Get your free score</span>
             </div>
           </div>
         </div>
@@ -117,12 +107,12 @@ export default async function OpengraphImage() {
         {/* Right side: dashboard mockup */}
         <div
           style={{
-            width: 420,
+            width: 400,
             display: 'flex',
             flexDirection: 'column',
             gap: 14,
             padding: '52px 40px 52px 0',
-            opacity: 0.25,
+            opacity: 0.2,
           }}
         >
           {/* Score card */}
@@ -141,7 +131,7 @@ export default async function OpengraphImage() {
               AI VISIBILITY SCORE
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-              <span style={{ fontFamily, fontSize: 52, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>72</span>
+              <span style={{ fontSize: 52, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>72</span>
               <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.2)' }}>/100</span>
             </div>
             <div style={{ height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 3, display: 'flex' }}>
@@ -228,9 +218,6 @@ export default async function OpengraphImage() {
         </div>
       </div>
     ),
-    {
-      ...size,
-      fonts,
-    },
+    { ...size },
   );
 }
