@@ -22,7 +22,7 @@ const monoFont = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://www.ai-radr.com'),
   title: 'airadr — AI Search Optimization',
   description:
     'Check how visible your website is to AI search engines. Get a free AI visibility score and fix files to boost your presence in ChatGPT, Perplexity, and Claude.',
