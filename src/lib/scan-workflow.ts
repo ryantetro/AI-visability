@@ -319,7 +319,7 @@ export async function startScan(
     const id = randomUUID();
     const scan: ScanJob = {
       id,
-      url,
+      url: normalized,
       normalizedUrl: normalized,
       status: 'pending',
       progress: initialProgress(),
@@ -346,16 +346,33 @@ export async function startScan(
     }
 
     if (schedule) {
-      await schedule(async () => {
-        await runScan(id, db);
-      });
+      try {
+        await schedule(async () => {
+          await runScan(id, db);
+        });
+      } catch (error) {
+        console.error('[scan-workflow] failed to schedule scan; running fallback inline', {
+          scanId: id,
+          normalizedUrl: normalized,
+          userId,
+          userEmail,
+          error,
+        });
+        void runScan(id, db);
+      }
     }
 
     return {
       status: 200,
       body: { id, cached: false },
     };
-  } catch {
+  } catch (error) {
+    console.error('[scan-workflow] failed to start scan', {
+      url,
+      userId,
+      userEmail,
+      error,
+    });
     return {
       status: 500,
       body: { error: 'Failed to start scan' },
@@ -366,6 +383,7 @@ export async function startScan(
 export async function runScan(scanId: string, db = getDatabase()) {
   const initialScan = await db.getScan(scanId);
   if (!initialScan) return;
+  const scanUrl = initialScan.normalizedUrl || normalizeUrl(initialScan.url);
 
   let persistChain = Promise.resolve<ScanJob | null>(initialScan);
   const updateStoredScan = async (
@@ -393,7 +411,7 @@ export async function runScan(scanId: string, db = getDatabase()) {
       setLaneCurrentStep(scan.progress, 'site_scan', 'Crawling site');
     });
 
-    const crawlData = await crawlSite(initialScan.url, async (step: string) => {
+    const crawlData = await crawlSite(scanUrl, async (step: string) => {
       await updateStoredScan((scan) => {
         scan.progress.currentStep = step;
         setLaneCurrentStep(scan.progress, 'site_scan', step);
@@ -439,7 +457,7 @@ export async function runScan(scanId: string, db = getDatabase()) {
           .single();
 
         if (profile?.id) {
-          const domain = new URL(initialScan.url).hostname.replace(/^www\./, '');
+          const domain = new URL(scanUrl).hostname.replace(/^www\./, '');
           const access = await getUserAccess(profile.id, initialScan.email);
           const selectedPlatforms = await getSelectedPlatforms(profile.id, domain);
           filteredEngines = getScannableEngines(selectedPlatforms, access.tier, allAvailableEngines);
@@ -463,7 +481,7 @@ export async function runScan(scanId: string, db = getDatabase()) {
     );
 
     const currentScan = await db.getScan(scanId);
-    const domain = new URL(initialScan.url).hostname.replace(/^www\./, '');
+    const domain = new URL(scanUrl).hostname.replace(/^www\./, '');
     const latestCompletedScan = await db.findLatestScanByDomain(domain, initialScan.email);
     const cachedPrompts = currentScan
       ? resolveReusablePrompts(currentScan, latestCompletedScan, crawlData)

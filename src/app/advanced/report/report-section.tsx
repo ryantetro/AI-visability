@@ -16,6 +16,7 @@ interface ReportSectionProps {
   domain: string;
   onReaudit?: () => void;
   reauditing?: boolean;
+  onOpenUnlock?: () => void;
 }
 
 /** Returns a CSS color string (not a Tailwind class) matching the analysis page */
@@ -95,7 +96,7 @@ function toRichCheckItem(
   return base;
 }
 
-export function ReportSection({ report, files, domain, onReaudit, reauditing }: ReportSectionProps) {
+export function ReportSection({ report, files, domain, onReaudit, reauditing, onOpenUnlock }: ReportSectionProps) {
   const scores = report.score.scores;
   const webHealth = report.score.webHealth;
   const mentions = report.mentionSummary;
@@ -226,7 +227,6 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
       {/* ─── Take Action Section ─── */}
       <TakeActionSection
         report={report}
-        domain={domain}
         files={files}
         copyToLlm={copyToLlm}
         onCopyPrompt={handleCopyPrompt}
@@ -353,6 +353,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               defaultExpanded={false}
               showClickHint={false}
               hasPaid={hasPaid}
+              onLockedClick={!hasPaid ? onOpenUnlock : undefined}
             />
             </div>
           );
@@ -376,6 +377,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
             }))}
             defaultExpanded={false}
             hasPaid={hasPaid}
+            onLockedClick={!hasPaid ? onOpenUnlock : undefined}
           />
           </div>
         )}
@@ -410,6 +412,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               defaultExpanded={false}
               showClickHint={true}
               hasPaid={hasPaid}
+              onLockedClick={!hasPaid ? onOpenUnlock : undefined}
             />
             </div>
           );
@@ -444,6 +447,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               }))}
               defaultExpanded={false}
               hasPaid={hasPaid}
+              onLockedClick={!hasPaid ? onOpenUnlock : undefined}
             />
             </div>
           );
@@ -492,6 +496,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               ]}
               defaultExpanded={false}
               hasPaid={hasPaid}
+              onLockedClick={!hasPaid ? onOpenUnlock : undefined}
             />
             </div>
           );
@@ -532,6 +537,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing }: 
               ]}
               defaultExpanded={false}
               hasPaid={hasPaid}
+              onLockedClick={!hasPaid ? onOpenUnlock : undefined}
             />
             </div>
           );
@@ -554,20 +560,19 @@ interface ActionStep {
 
 function TakeActionSection({
   report,
-  domain,
   files,
   copyToLlm,
   onCopyPrompt,
   copiedPromptKey,
 }: {
   report: DashboardReportData;
-  domain: string;
   files: FilesData | null;
   copyToLlm: FilesData['copyToLlm'] | null;
   onCopyPrompt: (key: string, prompt: string | undefined) => void;
   copiedPromptKey: string | null;
 }) {
   const scores = report.score.scores;
+  const hasPaid = report.hasPaid;
   const overallScore = scores.overall ?? scores.aiVisibility;
   const mentions = report.mentionSummary;
   const fixes = report.score.fixes ?? report.fixes ?? [];
@@ -575,6 +580,7 @@ function TakeActionSection({
   const qualityPillar = webHealth?.pillars?.find((p) => p.key === 'quality');
   const securityPillar = webHealth?.pillars?.find((p) => p.key === 'security');
   const perfPillar = webHealth?.pillars?.find((p) => p.key === 'performance');
+  const maxActionSteps = hasPaid ? 5 : 3;
 
   const steps: ActionStep[] = [];
 
@@ -655,7 +661,7 @@ function TakeActionSection({
   }
 
   // 7. Top repair queue items
-  if (fixes.length > 0 && steps.length < 5) {
+  if (fixes.length > 0 && steps.length < maxActionSteps) {
     const topFix = fixes[0];
     steps.push({
       icon: <Zap className="h-5 w-5" />,
@@ -691,7 +697,7 @@ function TakeActionSection({
       </div>
 
       <div className="space-y-3">
-        {steps.slice(0, 5).map((step, index) => (
+        {steps.slice(0, maxActionSteps).map((step, index) => (
           <button
             key={`action-${index}`}
             type="button"

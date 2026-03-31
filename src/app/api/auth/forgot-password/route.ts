@@ -7,6 +7,7 @@ export async function POST(request: NextRequest) {
     await sendPasswordReset(body.email || '', {
       next: body.next || null,
       scanUrl: body.scanUrl || null,
+      appUrl: request.nextUrl.origin,
     });
 
     return NextResponse.json({ sent: true });

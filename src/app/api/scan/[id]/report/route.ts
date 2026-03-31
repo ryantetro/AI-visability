@@ -3,6 +3,8 @@ import { getDatabase } from '@/lib/services/registry';
 import { buildReportPromptBundle } from '@/lib/llm-prompts';
 import { buildSharePayload, serializeScoreResult } from '@/lib/report-serializer';
 import { ScoreResult } from '@/types/score';
+import type { MentionSummary } from '@/types/ai-mentions';
+import type { WebHealthSummary } from '@/types/score';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
 import { getDomain, getFaviconUrl } from '@/lib/url-utils';
@@ -40,6 +42,40 @@ function buildAssetPreview(scan: { url: string; crawlData?: unknown }) {
   };
 }
 
+function buildFreeWebHealthSummary(webHealth: WebHealthSummary | null | undefined): WebHealthSummary | null {
+  if (!webHealth) {
+    return null;
+  }
+
+  return {
+    ...webHealth,
+    metrics: [],
+    pillars: webHealth.pillars.map((pillar) => ({
+      ...pillar,
+      checks: [],
+    })),
+  };
+}
+
+function buildFreeMentionSummary(mentionSummary: MentionSummary | null | undefined): MentionSummary | null {
+  if (!mentionSummary) {
+    return null;
+  }
+
+  return {
+    ...mentionSummary,
+    results: [],
+    promptsUsed: [],
+    competitorsMentioned: [],
+    inferredCompetitors: undefined,
+    competitorDiscovery: undefined,
+    shareOfVoice: undefined,
+    sentimentSummary: undefined,
+    topicPerformance: undefined,
+    competitorLeaderboard: undefined,
+  };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -64,6 +100,17 @@ export async function GET(
   const assetPreview = buildAssetPreview(scan);
   const { progress, mentionSummary, enrichments } = resolveScanState(scan);
 
+  if (scan.status === 'failed') {
+    return NextResponse.json({
+      error: progress.error || 'Scan failed',
+      failed: true,
+      status: scan.status,
+      progress,
+      enrichments,
+      assetPreview,
+    }, { status: 409 });
+  }
+
   if (scan.status !== 'complete') {
     return NextResponse.json({
       error: 'Scan not complete',
@@ -81,8 +128,10 @@ export async function GET(
   }
 
   const scoreResult = scan.scoreResult as ScoreResult;
-  const copyToLlm = buildReportPromptBundle(scan.url, scoreResult);
   const score = serializeScoreResult(scoreResult);
+  const normalizedScanUrl = scan.normalizedUrl || scan.url;
+  const freeWebHealth = buildFreeWebHealthSummary(score.webHealth);
+  const freeMentionSummary = buildFreeMentionSummary(mentionSummary);
 
   // Derive hasPaid from plan-based access OR legacy scan.paid flag
   let hasPaid = !!scan.paid;
@@ -93,18 +142,28 @@ export async function GET(
     // Profile lookup failed — fall back to legacy scan.paid check
   }
 
+  const previewFixes = score.fixes.slice(0, 3);
+  const gatedScore = hasPaid
+    ? score
+    : {
+        ...score,
+        fixes: previewFixes,
+        dimensions: [],
+        webHealth: freeWebHealth,
+      };
+
   return NextResponse.json({
     id: scan.id,
-    url: scan.url,
-    score,
-    webHealth: score.webHealth,
-    fixes: score.fixes,
+    url: normalizedScanUrl,
+    score: gatedScore,
+    webHealth: hasPaid ? score.webHealth : freeWebHealth,
+    fixes: hasPaid ? score.fixes : previewFixes,
     scores: score.scores,
-    copyToLlm,
+    copyToLlm: hasPaid ? buildReportPromptBundle(normalizedScanUrl, scoreResult) : null,
     share: buildSharePayload(scan.id),
     enrichments,
-    mentionSummary,
-    assetPreview,
+    mentionSummary: hasPaid ? mentionSummary : freeMentionSummary,
+    assetPreview: hasPaid ? assetPreview : null,
     hasPaid,
   });
 }

@@ -60,6 +60,8 @@ interface YwsBreakdownSectionProps {
   hasPaid?: boolean;
   /** Help text shown in an info tooltip next to the section title */
   tooltip?: string;
+  /** Optional upgrade handler for locked checks */
+  onLockedClick?: () => void;
 }
 
 export function YwsBreakdownSection({
@@ -80,6 +82,7 @@ export function YwsBreakdownSection({
   showClickHint = false,
   hasPaid = false,
   tooltip,
+  onLockedClick,
 }: YwsBreakdownSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const displayScore = score !== null ? score : 0;
@@ -173,6 +176,7 @@ export function YwsBreakdownSection({
                       key={`${section.label || 'main'}-${check.label}-${index}`}
                       check={check}
                       locked={!hasPaid}
+                      onLockedClick={onLockedClick}
                     />
                   ))}
                 </div>
@@ -193,7 +197,15 @@ const ENGINE_ICON_COLORS: Record<EngineKey, string> = {
   grok: AI_ENGINE_META.grok.color,
 };
 
-function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boolean }) {
+function CheckCard({
+  check,
+  locked = false,
+  onLockedClick,
+}: {
+  check: CheckItem;
+  locked?: boolean;
+  onLockedClick?: () => void;
+}) {
   const hasData = !locked && check.detail !== undefined && check.verdict !== undefined;
   const EngineIcon = check.engineKey ? ENGINE_ICONS[check.engineKey] : null;
 
@@ -338,8 +350,8 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
   }
 
   /* Locked state - matches screenshot: bullet, title, info icon, upgrade text, Locked badge */
-  return (
-    <div className="flex items-start justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+  const lockedCard = (
+    <>
       <div className="flex min-w-0 flex-1 items-start gap-2">
         {EngineIcon ? (
           <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', ENGINE_ICON_COLORS[check.engineKey!])}>
@@ -362,6 +374,24 @@ function CheckCard({ check, locked = false }: { check: CheckItem; locked?: boole
         <Lock className="h-3.5 w-3.5" />
         Locked
       </span>
+    </>
+  );
+
+  if (onLockedClick) {
+    return (
+      <button
+        type="button"
+        onClick={onLockedClick}
+        className="flex w-full items-start justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 text-left transition-colors hover:border-white/12 hover:bg-white/[0.04]"
+      >
+        {lockedCard}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+      {lockedCard}
     </div>
   );
 }

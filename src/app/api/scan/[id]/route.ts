@@ -62,6 +62,7 @@ export async function GET(
 
   const scoreResult = scan.scoreResult as ScoreResult | undefined;
   const estimatedRemainingSec = estimateRemainingSeconds(scan);
+  const normalizedScanUrl = scan.normalizedUrl || scan.url;
 
   const serializedScore = scoreResult ? serializeScoreResult(scoreResult) : null;
   const assetPreview = buildAssetPreview(scan);
@@ -78,7 +79,7 @@ export async function GET(
 
   return NextResponse.json({
     id: scan.id,
-    url: scan.url,
+    url: normalizedScanUrl,
     status: scan.status,
     progress,
     enrichments,

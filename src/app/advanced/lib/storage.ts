@@ -1,9 +1,12 @@
 import { MONITORED_DOMAINS_KEY, HIDDEN_DOMAINS_KEY } from './constants';
+import { buildScopedStorageKey } from '@/lib/client-storage-scope';
 
-export function loadStoredDomains(): string[] {
+export function loadStoredDomains(scopeKey?: string | null): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = window.localStorage.getItem(MONITORED_DOMAINS_KEY);
+    const storageKey = buildScopedStorageKey(MONITORED_DOMAINS_KEY, scopeKey);
+    if (!storageKey) return [];
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as string[];
     return Array.isArray(parsed) ? parsed.filter((value) => typeof value === 'string') : [];
@@ -12,15 +15,19 @@ export function loadStoredDomains(): string[] {
   }
 }
 
-export function saveStoredDomains(domains: string[]) {
+export function saveStoredDomains(domains: string[], scopeKey?: string | null) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(MONITORED_DOMAINS_KEY, JSON.stringify(domains));
+  const storageKey = buildScopedStorageKey(MONITORED_DOMAINS_KEY, scopeKey);
+  if (!storageKey) return;
+  window.localStorage.setItem(storageKey, JSON.stringify(domains));
 }
 
-export function loadHiddenDomains(): string[] {
+export function loadHiddenDomains(scopeKey?: string | null): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = window.localStorage.getItem(HIDDEN_DOMAINS_KEY);
+    const storageKey = buildScopedStorageKey(HIDDEN_DOMAINS_KEY, scopeKey);
+    if (!storageKey) return [];
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as string[];
     return Array.isArray(parsed) ? parsed.filter((value) => typeof value === 'string') : [];
@@ -29,9 +36,11 @@ export function loadHiddenDomains(): string[] {
   }
 }
 
-export function saveHiddenDomains(domains: string[]) {
+export function saveHiddenDomains(domains: string[], scopeKey?: string | null) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(HIDDEN_DOMAINS_KEY, JSON.stringify(domains));
+  const storageKey = buildScopedStorageKey(HIDDEN_DOMAINS_KEY, scopeKey);
+  if (!storageKey) return;
+  window.localStorage.setItem(storageKey, JSON.stringify(domains));
 }
 
 export function loadStoredBoolean(key: string) {

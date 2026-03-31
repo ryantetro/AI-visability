@@ -12,13 +12,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const readiness = await getCurrentBillingReadiness(user.id, user.email);
-    const hasDomainOverage = readiness.snapshot.issues.some((issue) => issue.category === 'domains');
-    if (hasDomainOverage) {
-      return NextResponse.json(
-        { error: 'This workspace is over its active domain limit. Remove domains until it fits your plan before starting new scans.' },
-        { status: 403 },
-      );
+    try {
+      const readiness = await getCurrentBillingReadiness(user.id, user.email);
+      const hasDomainOverage = readiness.snapshot.issues.some((issue) => issue.category === 'domains');
+      if (hasDomainOverage) {
+        return NextResponse.json(
+          { error: 'This workspace is over its active domain limit. Remove domains until it fits your plan before starting new scans.' },
+          { status: 403 },
+        );
+      }
+    } catch (error) {
+      console.error('[api/scan] billing readiness check failed; allowing scan to continue', {
+        userId: user.id,
+        email: user.email,
+        error,
+      });
     }
 
     const result = await startScan(
@@ -37,7 +45,8 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json(result.body, { status: result.status });
-  } catch {
+  } catch (error) {
+    console.error('[api/scan] failed', error);
     return NextResponse.json({ error: 'Failed to start scan' }, { status: 500 });
   }
 }

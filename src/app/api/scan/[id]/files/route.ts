@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildReportPromptBundle } from '@/lib/llm-prompts';
 import { getAuthUserFromRequest } from '@/lib/auth';
+import { getUserAccess } from '@/lib/access';
 import { getDatabase } from '@/lib/services/registry';
 import { generateAllFiles } from '@/lib/generator';
 import { CrawlData } from '@/types/crawler';
@@ -32,6 +33,18 @@ export async function GET(
     return NextResponse.json({ error: 'Scan not complete' }, { status: 400 });
   }
 
+  let hasPaid = !!scan.paid;
+  try {
+    const access = await getUserAccess(user.id, user.email);
+    hasPaid = access.isPaid || hasPaid;
+  } catch {
+    // Fall back to the legacy scan flag if access lookup fails.
+  }
+
+  if (!hasPaid) {
+    return NextResponse.json({ error: 'Upgrade required to unlock generated files.' }, { status: 403 });
+  }
+
   // Generate files if not cached
   const generatedFiles = scan.generatedFiles as GeneratedFiles | undefined;
   if (!generatedFiles || !generatedFiles.detectedPlatform) {
@@ -44,7 +57,7 @@ export async function GET(
 
   return NextResponse.json({
     ...(scan.generatedFiles as GeneratedFiles),
-    url: scan.url,
-    copyToLlm: scoreResult ? buildReportPromptBundle(scan.url, scoreResult) : null,
+    url: scan.normalizedUrl || scan.url,
+    copyToLlm: scoreResult ? buildReportPromptBundle(scan.normalizedUrl || scan.url, scoreResult) : null,
   });
 }

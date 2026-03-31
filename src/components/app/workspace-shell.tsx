@@ -157,7 +157,7 @@ export function WorkspaceShell({
     }
     return (
       <CenteredWorkspaceState
-        label="Something went wrong loading your workspace. Please try refreshing the page."
+        label={loadError}
         tone="error"
       />
     );
@@ -168,7 +168,12 @@ export function WorkspaceShell({
     return (
       <div className="text-white">
         <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
-          <FirstScanPrompt domain={selectedDomain} expandedSite={expandedSite} onRunFirstScan={handleRunFirstScan} />
+          <FirstScanPrompt
+            domain={selectedDomain}
+            expandedSite={expandedSite}
+            onRunFirstScan={handleRunFirstScan}
+            actionError={actionError}
+          />
         </main>
         <FloatingFeedback />
       </div>
@@ -331,6 +336,7 @@ export interface WorkspaceContext {
 // --- Sub-components ---
 
 function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpenUnlock: () => void }) {
+  const searchParams = useSearchParams();
   const {
     addDomainInput,
     setAddDomainInput,
@@ -340,6 +346,8 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
     setConfirmChecked,
     inputFaviconUrl,
   } = useDomainContext();
+  const prefilledDomain = searchParams.get('prefillDomain')?.trim() ?? '';
+  const resumeLandingFlow = sectionKey === 'report' && searchParams.get('autoStart') === '1' && Boolean(prefilledDomain);
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
@@ -372,7 +380,9 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
       </div>
       <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">Add your first domain</h2>
       <p className="mx-auto mt-2 max-w-[420px] text-[13px] leading-6 text-zinc-500">
-        Start monitoring your AI visibility by adding a domain.
+        {resumeLandingFlow
+          ? `We saved ${prefilledDomain} from the landing page. Confirm ownership, then continue the scan.`
+          : 'Start monitoring your AI visibility by adding a domain.'}
       </p>
 
       <div className="mx-auto mt-6 w-full max-w-[420px] space-y-3">
@@ -397,7 +407,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
             onClick={() => void handleAddDomain()}
             className="h-11 shrink-0 rounded-lg bg-[var(--color-primary)] px-5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
           >
-            Add
+            {resumeLandingFlow ? 'Add & run scan' : 'Add'}
           </button>
         </div>
         {addError && <p className="text-[11px] text-red-400">{addError}</p>}
@@ -443,7 +453,8 @@ interface ScanProgressData {
 function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string }) {
   const [progress, setProgress] = useState<ScanProgressData | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [scanComplete, setScanComplete] = useState(false);
+  const [scanStatus, setScanStatus] = useState<'running' | 'complete' | 'failed'>('running');
+  const [scanError, setScanError] = useState<string | null>(null);
 
   // Poll scan status for live progress
   useEffect(() => {
@@ -458,8 +469,12 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
           if (active && data.progress) {
             setProgress(data.progress);
           }
-          if (active && (data.status === 'complete' || data.status === 'failed')) {
-            setScanComplete(true);
+          if (active && data.status === 'complete') {
+            setScanStatus('complete');
+          }
+          if (active && data.status === 'failed') {
+            setScanStatus('failed');
+            setScanError(data.progress?.error || 'Scan failed');
           }
         }
       } catch { /* ignore */ }
@@ -492,22 +507,32 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
           <div className="text-center">
             <div className={cn(
               'mx-auto flex h-16 w-16 items-center justify-center rounded-full border',
-              scanComplete
+              scanStatus === 'complete'
                 ? 'border-[#25c972]/30 bg-[#25c972]/10'
+                : scanStatus === 'failed'
+                  ? 'border-red-500/30 bg-red-500/10'
                 : 'border-[#356df4]/30 bg-[#356df4]/10'
             )}>
-              {scanComplete ? (
+              {scanStatus === 'complete' ? (
                 <CheckCircle2 className="h-7 w-7 text-[#25c972]" />
+              ) : scanStatus === 'failed' ? (
+                <AlertTriangle className="h-7 w-7 text-red-400" />
               ) : (
                 <Loader2 className="h-7 w-7 animate-spin text-[#356df4]" />
               )}
             </div>
             <h2 className="mt-5 text-xl font-semibold text-white">
-              {scanComplete ? 'Scan complete' : `Scanning ${domain}`}
+              {scanStatus === 'complete'
+                ? 'Scan complete'
+                : scanStatus === 'failed'
+                  ? 'Scan failed'
+                  : `Scanning ${domain}`}
             </h2>
             <p className="mt-2 text-[13px] text-zinc-400">
-              {scanComplete
+              {scanStatus === 'complete'
                 ? 'Loading your report...'
+                : scanStatus === 'failed'
+                  ? (scanError || 'We couldn’t finish this scan.')
                 : "Analyzing your site\u2019s AI visibility, web health, and mentions."}
             </p>
           </div>
@@ -597,13 +622,20 @@ function FirstScanPrompt({
   domain,
   expandedSite,
   onRunFirstScan,
+  actionError,
 }: {
   domain: string;
   expandedSite: SiteSummary;
   onRunFirstScan: (site: SiteSummary) => void;
+  actionError?: string;
 }) {
   return (
     <div className="mt-6 rounded-[1.2rem] border border-white/8 bg-[linear-gradient(180deg,rgba(12,13,14,0.98)_0%,rgba(8,8,9,0.99)_100%)] p-5">
+      {actionError && (
+        <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/8 px-3.5 py-2.5 text-xs text-red-300">
+          {actionError}
+        </div>
+      )}
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#25c972]">Domain added</p>
       <h3 className="mt-2 text-xl font-semibold text-white">Run the first scan for {domain}</h3>
       <p className="mt-3 max-w-2xl text-[13px] leading-6 text-zinc-400">

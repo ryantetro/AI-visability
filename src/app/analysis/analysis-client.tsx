@@ -487,6 +487,7 @@ export function AnalysisPageContent() {
   const searchParams = useSearchParams();
   const prefillUrl = searchParams.get('prefill');
   const { user, loading: authLoading } = useAuth();
+  const storageScope = user?.id ?? user?.email ?? 'anonymous';
   const scanId = searchParams.get('scan');
   const reportId = searchParams.get('report');
   const exampleMode = searchParams.get('example') === '1';
@@ -548,8 +549,8 @@ export function AnalysisPageContent() {
 
   useEffect(() => {
     if (!id || exampleMode) return;
-    rememberRecentScan(id);
-  }, [exampleMode, id]);
+    rememberRecentScan(id, storageScope);
+  }, [exampleMode, id, storageScope]);
 
   // Fetch per-account usage data
   useEffect(() => {
@@ -574,7 +575,7 @@ export function AnalysisPageContent() {
     if (!emptyState) return;
 
     let active = true;
-    const recentIds = getRecentScanEntries().map((entry) => entry.id);
+    const recentIds = getRecentScanEntries(storageScope).map((entry) => entry.id);
 
     if (recentIds.length === 0) {
       setRecentScans([]);
@@ -607,7 +608,7 @@ export function AnalysisPageContent() {
     return () => {
       active = false;
     };
-  }, [emptyState]);
+  }, [emptyState, storageScope]);
 
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'ai' | 'web'>('all');
   const [effortFilter, setEffortFilter] = useState<'all' | EffortBand>('all');

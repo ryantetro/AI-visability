@@ -21,7 +21,7 @@ export default function LandingB() {
       return;
     }
     if (!user) {
-      router.push(`/login?scanUrl=${encodeURIComponent(url)}`);
+      router.push(`/login?next=/report&scanUrl=${encodeURIComponent(url)}`);
       return;
     }
     setLoading(true);

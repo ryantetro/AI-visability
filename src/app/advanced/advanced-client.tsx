@@ -509,7 +509,7 @@ function DomainWorkspace({
 
       {activeSection === 'report' && (
         canAccess(tier, NAV_GATES.report as PlanTier) ? (
-          <ReportSection report={report} files={files} domain={domain} onReaudit={onReaudit} reauditing={reauditing} />
+          <ReportSection report={report} files={files} domain={domain} onReaudit={onReaudit} reauditing={reauditing} onOpenUnlock={onOpenUnlock} />
         ) : (
           <LockedFeatureOverlay featureName="Report" requiredTier="starter" onUpgrade={onOpenUnlock} />
         )

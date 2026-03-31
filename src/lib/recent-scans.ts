@@ -1,3 +1,5 @@
+import { buildScopedStorageKey } from '@/lib/client-storage-scope';
+
 export interface RecentScanEntry {
   id: string;
   touchedAt: number;
@@ -10,11 +12,13 @@ function canUseStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
 
-export function getRecentScanEntries(): RecentScanEntry[] {
+export function getRecentScanEntries(scopeKey?: string | null): RecentScanEntry[] {
   if (!canUseStorage()) return [];
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const storageKey = buildScopedStorageKey(STORAGE_KEY, scopeKey);
+    if (!storageKey) return [];
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return [];
 
     const parsed = JSON.parse(raw) as RecentScanEntry[];
@@ -29,16 +33,19 @@ export function getRecentScanEntries(): RecentScanEntry[] {
   }
 }
 
-export function rememberRecentScan(id: string) {
+export function rememberRecentScan(id: string, scopeKey?: string | null) {
   if (!canUseStorage() || !id) return;
+
+  const storageKey = buildScopedStorageKey(STORAGE_KEY, scopeKey);
+  if (!storageKey) return;
 
   const nextEntries = [
     { id, touchedAt: Date.now() },
-    ...getRecentScanEntries().filter((entry) => entry.id !== id),
+    ...getRecentScanEntries(scopeKey).filter((entry) => entry.id !== id),
   ].slice(0, MAX_RECENT);
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextEntries));
+    window.localStorage.setItem(storageKey, JSON.stringify(nextEntries));
   } catch {
     // Ignore storage failures so scan flow never breaks.
   }

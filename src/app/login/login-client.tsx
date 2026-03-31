@@ -18,6 +18,19 @@ function normalizeNext(next: string | null) {
   return next;
 }
 
+function buildPrefilledReportPath(scanUrl: string | null) {
+  if (!scanUrl?.trim()) {
+    return '/report';
+  }
+
+  const domain = getDomain(scanUrl.trim());
+  const params = new URLSearchParams({
+    prefillDomain: domain,
+    autoStart: '1',
+  });
+  return `/report?${params.toString()}`;
+}
+
 function resolveMode(value: string | null): AuthMode {
   if (value === 'sign-up') return 'sign-up';
   if (value === 'forgot-password') return 'forgot-password';
@@ -193,8 +206,8 @@ export function LoginPageContent() {
           router.replace(`/report?report=${id}`);
           return;
         }
-      } catch { /* fall through to dashboard */ }
-      router.replace('/dashboard');
+      } catch { /* fall through to the prefilled report flow */ }
+      router.replace(buildPrefilledReportPath(scanUrl));
       return;
     }
 

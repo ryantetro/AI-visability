@@ -12,9 +12,11 @@ export async function GET(request: NextRequest) {
     const status = await getBillingStatus(user.id, user.email);
     return NextResponse.json(status);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to load billing status' },
-      { status: 500 },
-    );
+    console.error('[api/billing/status] failed; returning null fallback', {
+      userId: user.id,
+      email: user.email,
+      error,
+    });
+    return NextResponse.json(null);
   }
 }

@@ -12,7 +12,12 @@ export async function GET(request: NextRequest) {
     const profile = await getOrCreateProfile(user.id, user.email);
     const usage = getUserUsage(profile);
     return NextResponse.json(usage);
-  } catch {
-    return NextResponse.json({ error: 'Failed to fetch usage' }, { status: 500 });
+  } catch (error) {
+    console.error('[api/auth/usage] failed; returning null fallback', {
+      userId: user.id,
+      email: user.email,
+      error,
+    });
+    return NextResponse.json(null);
   }
 }

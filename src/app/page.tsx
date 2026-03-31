@@ -28,7 +28,7 @@ export default function Home() {
 
   const handleSubmit = async (url: string) => {
     if (!user) {
-      router.push(`/login?scanUrl=${encodeURIComponent(url)}`);
+      router.push(`/login?next=/report&scanUrl=${encodeURIComponent(url)}`);
       return;
     }
     setLoading(true);

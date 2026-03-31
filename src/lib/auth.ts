@@ -84,8 +84,11 @@ function toAuthUser(user: {
   };
 }
 
-function getAppUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+function getAppUrl(preferredUrl?: string | null) {
+  const value = preferredUrl?.trim()
+    || process.env.NEXT_PUBLIC_APP_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+  return value.replace(/\/$/, '');
 }
 
 function isSupportedCallbackType(value: string | null | undefined): value is AuthCallbackType {
@@ -97,8 +100,8 @@ function isSupportedCallbackType(value: string | null | undefined): value is Aut
     || value === 'email';
 }
 
-function buildAuthCallbackUrl(next?: string | null, scanUrl?: string | null) {
-  const url = new URL('/auth/callback', getAppUrl());
+function buildAuthCallbackUrl(next?: string | null, scanUrl?: string | null, appUrl?: string | null) {
+  const url = new URL('/auth/callback', getAppUrl(appUrl));
   url.searchParams.set('next', sanitizeRedirectPath(next, '/dashboard'));
   if (scanUrl?.trim()) {
     url.searchParams.set('scanUrl', scanUrl.trim());
@@ -119,7 +122,7 @@ function validatePassword(password: string) {
 function mapSupabaseAuthError(error: { message?: string | null }, fallbackMessage: string) {
   const message = error.message?.trim() || fallbackMessage;
 
-  if (/user already registered/i.test(message)) {
+  if (/user already registered|email address .*already been registered|duplicate key value/i.test(message)) {
     return new AuthActionError('EMAIL_TAKEN', 'An account with this email already exists. Sign in or reset your password.');
   }
 
@@ -136,6 +139,54 @@ function mapSupabaseAuthError(error: { message?: string | null }, fallbackMessag
   }
 
   return new AuthActionError('AUTH_ERROR', message);
+}
+
+async function findAdminUserByEmail(email: string) {
+  const supabase = getSupabaseClient();
+  const perPage = 200;
+
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      throw mapSupabaseAuthError(error, 'Failed to look up your account.');
+    }
+
+    const existingUser = data.users.find((candidate) => normalizeEmail(candidate.email ?? '') === email);
+    if (existingUser) {
+      return existingUser;
+    }
+
+    if (data.users.length < perPage) {
+      return null;
+    }
+  }
+}
+
+async function confirmPendingUser(email: string, fullName?: string) {
+  const existingUser = await findAdminUserByEmail(email);
+  if (!existingUser) {
+    throw new AuthActionError('EMAIL_TAKEN', 'An account with this email already exists. Sign in or reset your password.');
+  }
+
+  const nextMetadata = fullName
+    ? { ...(existingUser.user_metadata ?? {}), full_name: fullName }
+    : undefined;
+
+  const { data, error } = await getSupabaseClient().auth.admin.updateUserById(existingUser.id, {
+    email_confirm: true,
+    ...(nextMetadata ? { user_metadata: nextMetadata } : {}),
+  });
+
+  if (error) {
+    throw mapSupabaseAuthError(error, 'Failed to finish setting up your account.');
+  }
+
+  const user = toAuthUser(data.user) ?? toAuthUser(existingUser);
+  if (!user) {
+    throw new AuthActionError('AUTH_ERROR', 'Your account exists, but we could not load your user profile.');
+  }
+
+  return user;
 }
 
 export function buildPostAuthRedirectPath(next: string | null | undefined, scanUrl?: string | null) {
@@ -294,19 +345,35 @@ export async function signUpWithPassword(
   }
   validatePassword(password);
 
-  const supabase = createRouteHandlerSupabaseClient();
   const fullName = options?.name?.trim();
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await getSupabaseClient().auth.admin.createUser({
     email: normalized,
     password,
-    options: {
-      emailRedirectTo: buildAuthCallbackUrl(options?.next, options?.scanUrl),
-      data: fullName ? { full_name: fullName } : undefined,
-    },
+    email_confirm: true,
+    ...(fullName ? { user_metadata: { full_name: fullName } } : {}),
   });
 
   if (error) {
-    throw mapSupabaseAuthError(error, 'Failed to create your account.');
+    const mappedError = mapSupabaseAuthError(error, 'Failed to create your account.');
+    if (mappedError.code !== 'EMAIL_TAKEN') {
+      throw mappedError;
+    }
+
+    try {
+      await signInWithPassword(normalized, password);
+      throw mappedError;
+    } catch (signInError) {
+      if (!(signInError instanceof AuthActionError) || signInError.code !== 'EMAIL_NOT_CONFIRMED') {
+        throw mappedError;
+      }
+    }
+
+    const user = await confirmPendingUser(normalized, fullName);
+    return {
+      user,
+      session: null,
+      requiresEmailVerification: false,
+    };
   }
 
   const user = toAuthUser(data.user);
@@ -314,10 +381,21 @@ export async function signUpWithPassword(
     throw new AuthActionError('AUTH_ERROR', 'Your account was created, but we could not load your user profile.');
   }
 
+  try {
+    const signedIn = await signInWithPassword(normalized, password);
+    return {
+      user: signedIn.user,
+      session: signedIn.session,
+      requiresEmailVerification: false,
+    };
+  } catch {
+    // Fall back to the client-side auto-login already built into the signup flow.
+  }
+
   return {
     user,
-    session: data.session,
-    requiresEmailVerification: !data.session,
+    session: null,
+    requiresEmailVerification: false,
   };
 }
 
@@ -351,7 +429,7 @@ export async function signInWithPassword(email: string, password: string) {
 
 export async function sendPasswordReset(
   email: string,
-  options?: { next?: string | null; scanUrl?: string | null }
+  options?: { next?: string | null; scanUrl?: string | null; appUrl?: string | null }
 ) {
   const normalized = normalizeEmail(email);
   if (!isValidEmail(normalized)) {
@@ -360,7 +438,7 @@ export async function sendPasswordReset(
 
   const supabase = createRouteHandlerSupabaseClient();
   const { error } = await supabase.auth.resetPasswordForEmail(normalized, {
-    redirectTo: buildAuthCallbackUrl(options?.next, options?.scanUrl),
+    redirectTo: buildAuthCallbackUrl(options?.next, options?.scanUrl, options?.appUrl),
   });
 
   if (error) {

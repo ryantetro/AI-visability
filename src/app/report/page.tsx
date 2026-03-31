@@ -26,6 +26,7 @@ function ReportContent({ ctx }: { ctx: WorkspaceContext }) {
         domain={ctx.domain}
         onReaudit={ctx.handleReaudit}
         reauditing={ctx.reauditing}
+        onOpenUnlock={ctx.onOpenUnlock}
       />
       {!trackingInstalled && (
         <div className="mt-6 rounded-[1.35rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(12,13,14,0.98)_0%,rgba(8,8,9,0.99)_100%)] p-5">

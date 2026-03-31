@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ChevronDown,
   ChevronUp,
@@ -15,6 +16,7 @@ import {
 
 import { FloatingFeedback } from '@/components/ui/floating-feedback';
 import { Sheet, SheetClose, SheetContent } from '@/components/ui/sheet';
+import { useAuth } from '@/hooks/use-auth';
 import { getRecentScanEntries } from '@/lib/recent-scans';
 import { getDomain, ensureProtocol, getFaviconUrl } from '@/lib/url-utils';
 import {
@@ -24,6 +26,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { LockedFeatureOverlay } from '@/components/ui/locked-feature-overlay';
+import { UnlockFeaturesModal } from '@/components/ui/unlock-features-modal';
+import { usePlan } from '@/hooks/use-plan';
+import { buildLoginHref, getCurrentAppPath } from '@/lib/app-paths';
+import { canAccess, NAV_GATES, type PaymentPlanString, type PlanTier } from '@/lib/pricing';
 import { cn } from '@/lib/utils';
 
 interface WebHealthPillar {
@@ -85,13 +92,31 @@ function scoreColor(score: number | null): string {
 }
 
 export default function HistoryPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { tier, loading: planLoading } = usePlan();
+  const storageScope = user?.id ?? user?.email ?? null;
   const [recentScans, setRecentScans] = useState<RecentScanData[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grouped' | 'timeline'>('grouped');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
+  const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [unlockLoading, setUnlockLoading] = useState(false);
+  const requiredTier: Exclude<PlanTier, 'free'> = (NAV_GATES.history ?? 'starter') as Exclude<PlanTier, 'free'>;
+  const hasHistoryAccess = canAccess(tier, requiredTier);
 
   useEffect(() => {
+    if (planLoading) {
+      return;
+    }
+
+    if (!hasHistoryAccess) {
+      setRecentScans([]);
+      setLoading(false);
+      return;
+    }
+
     let active = true;
 
     async function loadScans() {
@@ -112,7 +137,7 @@ export default function HistoryPage() {
       } catch { /* fall through to localStorage fallback */ }
 
       // Fallback: load from localStorage scan IDs
-      const recentIds = getRecentScanEntries().map((entry) => entry.id);
+      const recentIds = getRecentScanEntries(storageScope).map((entry) => entry.id);
       if (recentIds.length === 0) {
         if (active) {
           setRecentScans([]);
@@ -148,7 +173,84 @@ export default function HistoryPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [hasHistoryAccess, planLoading, storageScope]);
+
+  const handleUnlock = async (plan: PaymentPlanString) => {
+    setUnlockLoading(true);
+
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan,
+          returnPath: getCurrentAppPath('/history'),
+        }),
+      });
+
+      if (res.status === 401) {
+        router.push(buildLoginHref(getCurrentAppPath('/history')));
+        return;
+      }
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error || 'Unable to start checkout right now.');
+      }
+
+      const session = await res.json();
+      if (typeof session.url !== 'string' || session.url.length === 0) {
+        throw new Error('Checkout session did not include a redirect URL.');
+      }
+
+      setUnlockModalOpen(false);
+
+      if (/^https?:\/\//i.test(session.url)) {
+        window.location.href = session.url;
+        return;
+      }
+
+      router.push(session.url);
+    } catch (error) {
+      console.error('[history] failed to start upgrade checkout', error);
+    } finally {
+      setUnlockLoading(false);
+    }
+  };
+
+  if (planLoading) {
+    return (
+      <div className="relative mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
+        <section className="mt-6">
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-5 py-8 text-center text-sm text-[var(--text-muted)]">
+            Loading history...
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (!hasHistoryAccess) {
+    return (
+      <div className="relative mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">
+        <section className="mt-6">
+          <LockedFeatureOverlay
+            featureName="History"
+            requiredTier={requiredTier}
+            onUpgrade={() => setUnlockModalOpen(true)}
+          />
+        </section>
+        <UnlockFeaturesModal
+          open={unlockModalOpen}
+          onOpenChange={setUnlockModalOpen}
+          onUnlock={(plan) => void handleUnlock(plan)}
+          loading={unlockLoading}
+          contextFeature="History"
+          contextTier={requiredTier}
+        />
+      </div>
+    );
+  }
 
   return (
       <div className="relative mx-auto max-w-[1120px] px-4 py-6 sm:px-6 lg:px-8">

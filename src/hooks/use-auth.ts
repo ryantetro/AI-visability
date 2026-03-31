@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AuthSessionState, AuthUser } from '@/types/auth';
 import { invalidatePlanCache } from '@/hooks/use-plan';
+import { setClientStorageScope } from '@/lib/client-storage-scope';
 
 const REFRESH_INTERVAL_MS = 45 * 60 * 1000; // 45 minutes (before 1hr token expiry)
 const BROADCAST_CHANNEL_NAME = 'aiso_auth';
@@ -36,6 +37,7 @@ export function useAuth(): AuthState {
 
       if (payload.reason === 'no_session' || payload.reason === 'refresh_failed') {
         lastKnownAuthEmail = null;
+        setClientStorageScope(null);
         invalidatePlanCache();
         setUser(null);
         return;
@@ -46,6 +48,7 @@ export function useAuth(): AuthState {
         invalidatePlanCache();
       }
       lastKnownAuthEmail = nextEmail;
+      setClientStorageScope(nextEmail);
       setUser(payload.user ?? null);
     } catch {
       // Network/fetch error — transient, keep current user
@@ -58,6 +61,7 @@ export function useAuth(): AuthState {
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     lastKnownAuthEmail = null;
+    setClientStorageScope(null);
     invalidatePlanCache();
     setUser(null);
 
@@ -99,6 +103,7 @@ export function useAuth(): AuthState {
         const { type } = event.data ?? {};
         if (type === 'logout') {
           lastKnownAuthEmail = null;
+          setClientStorageScope(null);
           invalidatePlanCache();
           setUser(null);
           router.push('/login');
