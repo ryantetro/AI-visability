@@ -89,6 +89,47 @@ function normalizeCompetitorKey(value: string): string {
   return value.toLowerCase().replace(/^www\./, '').replace(/[^a-z0-9]+/g, '');
 }
 
+function getPromptLastTestedAtById(
+  results: Array<Pick<PromptResult, 'promptId' | 'testedAt'>>,
+): Map<string, number> {
+  const latestByPromptId = new Map<string, number>();
+
+  for (const result of results) {
+    const testedAt = Date.parse(result.testedAt);
+    if (!Number.isFinite(testedAt)) continue;
+    const current = latestByPromptId.get(result.promptId) ?? Number.NEGATIVE_INFINITY;
+    if (testedAt > current) {
+      latestByPromptId.set(result.promptId, testedAt);
+    }
+  }
+
+  return latestByPromptId;
+}
+
+function getPromptCreatedAt(prompt: Pick<MonitoredPrompt, 'createdAt'>): number {
+  const createdAt = Date.parse(prompt.createdAt);
+  return Number.isFinite(createdAt) ? createdAt : 0;
+}
+
+function sortPromptsByStaleness(
+  prompts: MonitoredPrompt[],
+  lastTestedAtByPromptId: Map<string, number>,
+): MonitoredPrompt[] {
+  return [...prompts].sort((left, right) => {
+    const leftLastTestedAt = lastTestedAtByPromptId.get(left.id) ?? Number.NEGATIVE_INFINITY;
+    const rightLastTestedAt = lastTestedAtByPromptId.get(right.id) ?? Number.NEGATIVE_INFINITY;
+
+    if (leftLastTestedAt !== rightLastTestedAt) {
+      return leftLastTestedAt - rightLastTestedAt;
+    }
+
+    const createdAtDelta = getPromptCreatedAt(left) - getPromptCreatedAt(right);
+    if (createdAtDelta !== 0) return createdAtDelta;
+
+    return left.id.localeCompare(right.id);
+  });
+}
+
 async function resolveMonitoringBusinessProfile(
   domain: string,
   database: Pick<DatabaseService, 'findLatestScanByDomain'>,
@@ -244,29 +285,23 @@ export function buildPromptMonitoringRunPlan(
     };
   }
 
-  const resultPromptIds = new Set(results.map((result) => result.promptId));
-  const missingPromptIds = activePrompts
-    .map((prompt) => prompt.id)
-    .filter((promptId) => !resultPromptIds.has(promptId));
+  const now = Date.now();
+  const promptLastTestedAtById = getPromptLastTestedAtById(results);
+  const queuedPromptIds = activePrompts
+    .filter((prompt) => {
+      const lastTestedAt = promptLastTestedAtById.get(prompt.id);
+      return !lastTestedAt || (now - lastTestedAt) > staleAfterMs;
+    })
+    .map((prompt) => prompt.id);
 
-  if (missingPromptIds.length > 0) {
+  if (queuedPromptIds.length > 0) {
+    const reason = queuedPromptIds.some((promptId) => !promptLastTestedAtById.has(promptId))
+      ? 'missing-results'
+      : 'stale-results';
     return {
       shouldQueue: true,
-      promptIds: missingPromptIds,
-      reason: 'missing-results',
-    };
-  }
-
-  const latestResultAt = results.reduce((latest, result) => {
-    const timestamp = Date.parse(result.testedAt);
-    return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
-  }, 0);
-
-  if (!latestResultAt || (Date.now() - latestResultAt) > staleAfterMs) {
-    return {
-      shouldQueue: true,
-      promptIds: activePrompts.map((prompt) => prompt.id),
-      reason: 'stale-results',
+      promptIds: queuedPromptIds,
+      reason,
     };
   }
 
@@ -343,11 +378,15 @@ export async function runPromptMonitoringForDomain({
   const allEngines = tester.availableEngines();
   const promptIdFilter = promptIds ? new Set(promptIds) : null;
   const runtimeCache = new Map<string, PromptRuntime>();
+  const previousResults = await pm.listPromptResults(domain, 500);
 
   const prompts = await pm.listPrompts(domain);
-  const activePrompts = prompts.filter((prompt) => (
-    prompt.active && (!promptIdFilter || promptIdFilter.has(prompt.id))
-  ));
+  const activePrompts = sortPromptsByStaleness(
+    prompts.filter((prompt) => (
+      prompt.active && (!promptIdFilter || promptIdFilter.has(prompt.id))
+    )),
+    getPromptLastTestedAtById(previousResults),
+  );
 
   if (activePrompts.length === 0) {
     return {
@@ -377,7 +416,6 @@ export async function runPromptMonitoringForDomain({
     };
   }
 
-  const previousResults = await pm.listPromptResults(domain, 500);
   const businessProfile = await businessProfileResolver(domain);
   const pendingResponses: Array<{
     promptId: string;
