@@ -16,6 +16,8 @@ export interface AccessInfo {
   maxRegions: number;
   maxSeats: number;
   maxContentPages: number;
+  maxContentStudioBriefs: number;
+  maxContentStudioDrafts: number;
   teamId: string | null;
   teamRole: 'owner' | 'member' | null;
   teamName: string | null;
@@ -82,6 +84,8 @@ export async function getUserAccess(userId: string, email: string): Promise<Acce
     maxRegions: planConfig.regions,
     maxSeats: planConfig.seats,
     maxContentPages: planConfig.contentPages,
+    maxContentStudioBriefs: planConfig.contentStudioBriefs,
+    maxContentStudioDrafts: planConfig.contentStudioDrafts,
     teamId,
     teamRole,
     teamName,

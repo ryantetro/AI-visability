@@ -12,6 +12,8 @@ export interface PlanConfig {
   regions: number;
   seats: number;
   contentPages: number;
+  contentStudioBriefs: number;
+  contentStudioDrafts: number;
   monitoring: 'none' | 'weekly' | 'daily';
   features: string[];
 }
@@ -48,6 +50,8 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     regions: 1,
     seats: 1,
     contentPages: 0,
+    contentStudioBriefs: 0,
+    contentStudioDrafts: 0,
     monitoring: 'none',
     features: [
       'AI visibility scan',
@@ -67,6 +71,8 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     regions: 1,
     seats: 1,
     contentPages: 0,
+    contentStudioBriefs: 2,
+    contentStudioDrafts: 0,
     monitoring: 'weekly',
     features: [
       'Unlimited scans',
@@ -92,6 +98,8 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     regions: 3,
     seats: 3,
     contentPages: 2,
+    contentStudioBriefs: 5,
+    contentStudioDrafts: 3,
     monitoring: 'daily',
     features: [
       'Everything in Starter',
@@ -118,6 +126,8 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     regions: -1, // unlimited
     seats: -1, // unlimited
     contentPages: 5,
+    contentStudioBriefs: 15,
+    contentStudioDrafts: 10,
     monitoring: 'daily',
     features: [
       'Everything in Pro',
@@ -155,6 +165,7 @@ export const NAV_GATES: Record<string, PlanTier> = {
   competitors: 'pro',
   history: 'starter',
   leaderboard: 'free',
+  optimize: 'free',
   settings: 'starter',
   export: 'pro',
 };
@@ -170,6 +181,9 @@ export const FEATURE_GATES: Record<string, PlanTier> = {
   sentiment_analysis: 'starter',
   prompt_metrics: 'starter',
   ai_referral: 'starter',
+  content_studio_brief: 'starter',
+  source_ecosystem: 'starter',
+  action_plan_full: 'starter',
 
   // Pro features
   multi_domain: 'pro',
@@ -182,6 +196,11 @@ export const FEATURE_GATES: Record<string, PlanTier> = {
   content_generation: 'pro',
   multi_region: 'pro',
   multi_seat: 'pro',
+  content_studio_draft: 'pro',
+  source_gaps: 'pro',
+  action_plan_autogen: 'pro',
+  brand_positioning: 'pro',
+  brand_consistency: 'pro',
 
   // Growth features
   prompt_tracking_200: 'growth',

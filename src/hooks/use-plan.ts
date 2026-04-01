@@ -19,6 +19,8 @@ interface PlanState {
   maxRegions: number;
   maxSeats: number;
   maxContentPages: number;
+  maxContentStudioBriefs: number;
+  maxContentStudioDrafts: number;
   email: string;
   teamId: string | null;
   teamRole: 'owner' | 'member' | null;
@@ -45,6 +47,8 @@ function readPlanSnapshot() {
     maxRegions: snapshot.maxRegions ?? 1,
     maxSeats: snapshot.maxSeats ?? 1,
     maxContentPages: snapshot.maxContentPages ?? 0,
+    maxContentStudioBriefs: snapshot.maxContentStudioBriefs ?? 0,
+    maxContentStudioDrafts: snapshot.maxContentStudioDrafts ?? 0,
     email: snapshot.email ?? '',
     teamId: snapshot.teamId ?? null,
     teamRole: snapshot.teamRole ?? null,

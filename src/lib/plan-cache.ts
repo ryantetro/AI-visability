@@ -11,6 +11,8 @@ export interface PlanCacheSnapshot {
   maxRegions: number | null;
   maxSeats: number | null;
   maxContentPages: number | null;
+  maxContentStudioBriefs: number | null;
+  maxContentStudioDrafts: number | null;
   email: string | null;
   teamId: string | null;
   teamRole: 'owner' | 'member' | null;
@@ -29,6 +31,8 @@ interface AuthMePayload {
   maxRegions?: number;
   maxSeats?: number;
   maxContentPages?: number;
+  maxContentStudioBriefs?: number;
+  maxContentStudioDrafts?: number;
   teamId?: string | null;
   teamRole?: 'owner' | 'member' | null;
   teamName?: string | null;
@@ -52,6 +56,8 @@ const EMPTY_PLAN_CACHE: PlanCacheSnapshot = {
   maxRegions: null,
   maxSeats: null,
   maxContentPages: null,
+  maxContentStudioBriefs: null,
+  maxContentStudioDrafts: null,
   email: null,
   teamId: null,
   teamRole: null,
@@ -72,6 +78,8 @@ function isAuthMePayload(value: unknown): value is AuthMePayload {
     || 'isPaid' in value
     || 'maxDomains' in value
     || 'maxPrompts' in value
+    || 'maxContentStudioBriefs' in value
+    || 'maxContentStudioDrafts' in value
   );
 }
 
@@ -99,6 +107,8 @@ export function hydratePlanCache(payload: AuthMePayload | null | undefined): Pla
     maxRegions: payload?.maxRegions ?? 1,
     maxSeats: payload?.maxSeats ?? 1,
     maxContentPages: payload?.maxContentPages ?? 0,
+    maxContentStudioBriefs: payload?.maxContentStudioBriefs ?? 0,
+    maxContentStudioDrafts: payload?.maxContentStudioDrafts ?? 0,
     email: payload?.user?.email ?? '',
     teamId: payload?.teamId ?? null,
     teamRole: payload?.teamRole ?? null,

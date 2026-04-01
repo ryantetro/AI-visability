@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
   let maxRegions = 1;
   let maxSeats = 1;
   let maxContentPages = 0;
+  let maxContentStudioBriefs = 0;
+  let maxContentStudioDrafts = 0;
   let teamId: string | null = null;
   let teamRole: string | null = null;
   let teamName: string | null = null;
@@ -47,6 +49,8 @@ export async function GET(request: NextRequest) {
     maxRegions = access.maxRegions;
     maxSeats = access.maxSeats;
     maxContentPages = access.maxContentPages;
+    maxContentStudioBriefs = access.maxContentStudioBriefs;
+    maxContentStudioDrafts = access.maxContentStudioDrafts;
     teamId = access.teamId;
     teamRole = access.teamRole;
     teamName = access.teamName;
@@ -70,6 +74,8 @@ export async function GET(request: NextRequest) {
     maxRegions,
     maxSeats,
     maxContentPages,
+    maxContentStudioBriefs,
+    maxContentStudioDrafts,
     teamId,
     teamRole,
     teamName,

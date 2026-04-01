@@ -15,6 +15,7 @@ import {
   Menu,
   Plus,
   Settings2,
+  Sparkles,
   Trophy,
   Users,
   X,
@@ -79,6 +80,13 @@ const NAV_ITEMS: SidebarItem[] = [
     icon: Trophy,
     matchFn: (p) => p.startsWith('/leaderboard'),
   },
+  {
+    key: 'optimize',
+    label: 'Optimize',
+    href: '/optimize',
+    icon: Sparkles,
+    matchFn: (p) => p.startsWith('/optimize'),
+  },
 ];
 
 const SETTINGS_ITEM: SidebarItem = {
@@ -98,7 +106,7 @@ const PRICING_ITEM: SidebarItem = {
 };
 
 /** Routes that represent the active workspace and should carry ?report= */
-const WORKSPACE_KEYS = new Set(['dashboard', 'report', 'brand', 'competitors', 'settings']);
+const WORKSPACE_KEYS = new Set(['dashboard', 'report', 'brand', 'competitors', 'settings', 'optimize']);
 
 function buildNavHref(base: string, reportId: string | null): string {
   if (!reportId) return base;
