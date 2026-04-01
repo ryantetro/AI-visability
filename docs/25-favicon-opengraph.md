@@ -2,7 +2,8 @@
 
 ## What it does
 
-- **Favicon**: `src/app/icon.svg` — SVG matching the in-app **AisoLogo** (tricolor ring) with a **transparent** background; a neutral gray guide ring keeps the circle readable on both light and dark tab bars.
+- **Favicon**: `src/app/icon.tsx` — 32×32 PNG generated via `ImageResponse`, matching the in-app **AisoLogo** (tricolor ring) with a **transparent** background; a neutral gray guide ring keeps the circle readable on both light and dark tab bars.
+- **ICO fallback**: `src/app/favicon.ico` — conventional favicon fallback for consumers that do better with classic raster `.ico` assets than App Router icon URLs.
 - **Apple touch icon**: `src/app/apple-icon.tsx` — 180×180 PNG generated via `ImageResponse` with the same mark.
 - **Site share preview**: `src/app/opengraph-image.tsx` — 1200×630 default OG image for the root layout (homepage and routes that do not define their own). Uses brand gradient, logo, headline, and Space Grotesk when Google Fonts fetch succeeds.
 
@@ -10,7 +11,8 @@
 
 | File | Role |
 |------|------|
-| `src/app/icon.svg` | Browser favicon (`/icon.svg`) |
+| `src/app/icon.tsx` | Browser icon (`/icon`) |
+| `src/app/favicon.ico` | Conventional favicon fallback (`/favicon.ico`) |
 | `src/app/apple-icon.tsx` | `/apple-icon` for iOS home screen |
 | `src/app/opengraph-image.tsx` | `/opengraph-image` — default `og:image` |
 | `src/app/layout.tsx` | `metadataBase`, `openGraph`, `twitter` (`summary_large_image`) |

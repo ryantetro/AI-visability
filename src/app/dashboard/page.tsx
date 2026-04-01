@@ -11,6 +11,7 @@ export default function DashboardPage() {
           report={ctx.report}
           recentScans={ctx.recentScans}
           domain={ctx.domain}
+          lastScannedAt={ctx.expandedSite.lastTouchedAt}
           monitoringConnected={ctx.monitoringConnected}
           monitoringLoading={ctx.monitoringLoading}
           onEnableMonitoring={ctx.handleEnableMonitoring}
