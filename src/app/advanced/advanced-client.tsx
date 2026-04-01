@@ -496,6 +496,7 @@ function DomainWorkspace({
             report={report}
             recentScans={recentScans}
             domain={domain}
+            lastScannedAt={expandedSite.lastTouchedAt}
             monitoringConnected={monitoringConnected}
             monitoringLoading={monitoringLoading}
             onEnableMonitoring={onEnableMonitoring}

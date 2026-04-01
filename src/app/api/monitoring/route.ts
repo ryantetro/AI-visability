@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { addMonitoringDomain, listMonitoringDomains } from '@/lib/monitoring';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getCurrentBillingReadiness } from '@/lib/billing';
+import { getDatabase } from '@/lib/services/registry';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
@@ -10,7 +11,19 @@ export async function GET(request: NextRequest) {
   }
 
   const domains = await listMonitoringDomains(user.email);
-  return NextResponse.json({ domains });
+  const db = getDatabase();
+  const enrichedDomains = await Promise.all(domains.map(async (domainRecord) => {
+    const latestScan = await db.findLatestScanByDomain(domainRecord.domain);
+    return {
+      ...domainRecord,
+      latestDomainScanId: latestScan?.id ?? null,
+      latestDomainScanAt: latestScan
+        ? (latestScan.completedAt ?? latestScan.createdAt ?? null)
+        : null,
+    };
+  }));
+
+  return NextResponse.json({ domains: enrichedDomains });
 }
 
 export async function POST(request: NextRequest) {

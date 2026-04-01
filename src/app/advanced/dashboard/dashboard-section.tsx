@@ -40,6 +40,7 @@ interface DashboardSectionProps {
   report: DashboardReportData;
   recentScans: RecentScanData[];
   domain: string;
+  lastScannedAt: number | null;
   monitoringConnected: boolean;
   monitoringLoading: boolean;
   onEnableMonitoring: () => void;
@@ -65,6 +66,7 @@ export function DashboardSection({
   report,
   recentScans,
   domain,
+  lastScannedAt,
   monitoringConnected,
   monitoringLoading,
   onEnableMonitoring,
@@ -608,6 +610,7 @@ export function DashboardSection({
       <MonitoringTrendsPanel
         recentScans={recentScans}
         domain={domain}
+        lastScannedAt={lastScannedAt}
         monitoringConnected={monitoringConnected}
         monitoringLoading={monitoringLoading}
         onEnableMonitoring={onEnableMonitoring}

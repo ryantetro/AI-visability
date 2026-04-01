@@ -34,12 +34,14 @@ function formatTrendLabel(timestamp: number, includeTime: boolean): string {
 export function MonitoringTrendsPanel({
   recentScans,
   domain,
+  lastScannedAt,
   monitoringConnected,
   monitoringLoading,
   onEnableMonitoring,
 }: {
   recentScans: RecentScanData[];
   domain: string;
+  lastScannedAt: number | null;
   monitoringConnected: boolean;
   monitoringLoading: boolean;
   onEnableMonitoring: () => void;
@@ -77,6 +79,7 @@ export function MonitoringTrendsPanel({
   });
 
   const lastScan = domainScans[domainScans.length - 1]?.scan ?? null;
+  const displayedLastScannedAt = lastScannedAt ?? (lastScan ? getScanTimestamp(lastScan) : null);
   const prevScan = domainScans.length >= 2 ? domainScans[domainScans.length - 2]?.scan ?? null : null;
   const scoreDelta =
     lastScan && prevScan && getTrendScore(lastScan) != null && getTrendScore(prevScan) != null
@@ -115,7 +118,7 @@ export function MonitoringTrendsPanel({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-4 text-[12px] text-zinc-400">
-        <span>Last scanned: {lastScan ? formatRelativeTime(lastScan.completedAt ?? lastScan.createdAt) : '--'}</span>
+        <span>Last scanned: {displayedLastScannedAt ? formatRelativeTime(displayedLastScannedAt) : '--'}</span>
         {scoreDelta !== null && (
           <span className={scoreDelta >= 0 ? 'text-[#25c972]' : 'text-[#ff5252]'}>
             {scoreDelta >= 0 ? '+' : ''}{scoreDelta} since previous

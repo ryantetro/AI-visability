@@ -123,6 +123,7 @@ export function DomainContextProvider({
   const [checkoutBanner, setCheckoutBanner] = useState<string | null>(null);
   const [monitoringLoading, setMonitoringLoading] = useState(false);
   const [monitoringConnected, setMonitoringConnected] = useState<Record<string, boolean>>({});
+  const [monitoringLatestScanAtByDomain, setMonitoringLatestScanAtByDomain] = useState<Record<string, number | null>>({});
   const [addDomainInput, setAddDomainInput] = useState('');
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -198,15 +199,18 @@ export function DomainContextProvider({
         const res = await fetch('/api/monitoring');
         if (!res.ok) return;
         const data = await res.json();
-        const domains: Array<{ domain: string; status: string }> = data.domains ?? [];
+        const domains: Array<{ domain: string; status: string; latestDomainScanAt?: number | null }> = data.domains ?? [];
         if (!active) return;
         const connected: Record<string, boolean> = {};
+        const latestScanAtByDomain: Record<string, number | null> = {};
         for (const d of domains) {
           if (d.status === 'active') {
             connected[d.domain] = true;
           }
+          latestScanAtByDomain[d.domain] = d.latestDomainScanAt ?? null;
         }
-        setMonitoringConnected(prev => ({ ...prev, ...connected }));
+        setMonitoringConnected(connected);
+        setMonitoringLatestScanAtByDomain(latestScanAtByDomain);
       } catch { /* keep current state on failure */ }
     })();
     return () => { active = false; };
@@ -384,7 +388,13 @@ export function DomainContextProvider({
     return [...domains].map<SiteSummary>((domain) => {
       const latestScan = getLatestScanByDomain(recentScans, domain);
       const latestPaidScan = getLatestPaidScanByDomain(recentScans, domain);
-      const lastTouchedAt = Math.max(latestPaidScan?.completedAt ?? 0, latestPaidScan?.createdAt ?? 0, latestScan?.completedAt ?? 0, latestScan?.createdAt ?? 0) || null;
+      const lastTouchedAt = Math.max(
+        latestPaidScan?.completedAt ?? 0,
+        latestPaidScan?.createdAt ?? 0,
+        latestScan?.completedAt ?? 0,
+        latestScan?.createdAt ?? 0,
+        monitoringLatestScanAtByDomain[domain] ?? 0,
+      ) || null;
       return {
         domain,
         url: latestPaidScan?.url ?? latestScan?.url ?? `https://${domain}`,
@@ -394,7 +404,7 @@ export function DomainContextProvider({
         source: manualDomains.includes(domain) ? 'tracked' : 'scan',
       };
     }).sort((a, b) => (b.lastTouchedAt ?? 0) - (a.lastTouchedAt ?? 0));
-  }, [hiddenDomains, manualDomains, paidDomains, recentScans, report?.url, initialReportId]);
+  }, [hiddenDomains, manualDomains, monitoringLatestScanAtByDomain, paidDomains, recentScans, report?.url, initialReportId]);
 
   const trackedSites = useMemo(
     () => monitoredSites.filter((site) => site.source === 'tracked'),
