@@ -1,34 +1,29 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { randomUUID } from 'node:crypto';
-import { getDatabase, getAlertService, getMentionTester, getPromptMonitoring } from '@/lib/services/registry';
-import { computeScore } from '@/lib/ai-mentions/mention-analyzer';
-import { analyzeResponsesWithLLM } from '@/lib/ai-mentions/llm-response-analyzer';
+import { getDatabase, getAlertService, getPromptMonitoring } from '@/lib/services/registry';
 import { listActiveMonitoringDomains, updateMonitoringDomain } from '@/lib/monitoring';
 import { getOpportunityAlertSummary, hasOpportunityAlertCooldownElapsed } from '@/lib/opportunity-alerts';
+import { runPromptMonitoringForDomain } from '@/lib/prompt-monitoring';
 import { startScan } from '@/lib/scan-workflow';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getDomain } from '@/lib/url-utils';
-import type { AIEngine, BusinessProfile, MentionPrompt, MentionResult } from '@/types/ai-mentions';
-import { getUserAccess } from '@/lib/access';
-import { getCurrentBillingReadiness } from '@/lib/billing';
-import { getScannableEngines, getSelectedPlatforms } from '@/lib/platform-gating';
-import { applyRegionContext, getSelectedRegions, DEFAULT_REGION_ID } from '@/lib/region-gating';
-import { buildBusinessProfile } from '@/lib/ai-mentions/prompt-generator';
-import type { CrawlData } from '@/types/crawler';
 
 /** Serverless wall-clock limit (seconds). Vercel Pro caps most routes at 300s — heavy cron work must stay under this. */
 export const maxDuration = 300;
 
-const VALID_CATEGORIES: MentionPrompt['category'][] = [
-  'direct', 'category', 'comparison', 'recommendation',
-  'workflow', 'use-case', 'problem-solution', 'buyer-intent',
-];
-
-function isValidCategory(cat: string): cat is MentionPrompt['category'] {
-  return (VALID_CATEGORIES as string[]).includes(cat);
-}
-
 const RESCAN_STALENESS_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CRON_RESPONSE_BUFFER_MS = 30_000;
+
+interface CronPromptMonitoringSummary {
+  promptsChecked: number;
+  promptErrors: number;
+  engineCallsThisRun: number;
+  successfulEngineCallsThisRun: number;
+  budgetExhausted: boolean;
+  engineCallBudget: number;
+  runtimeBudgetMs: number;
+  mode: 'inline' | 'background';
+  queued: boolean;
+}
 
 /** Site rescans run in background via after(). Default 1 per cron run, override 0–5 via CRON_MAX_RESCANS_PER_RUN. */
 function getCronMaxRescansPerRun(): number {
@@ -42,11 +37,100 @@ function getCronMaxRescansPerRun(): number {
 /** Cap AI engine calls in Phase 2 per cron invocation (each prompt × engine). Increase via CRON_MAX_PROMPT_ENGINE_CALLS if your platform allows longer functions. */
 function getCronMaxPromptEngineCalls(): number {
   const raw = process.env.CRON_MAX_PROMPT_ENGINE_CALLS;
-  const fallback = 80;
+  const fallback = 20;
   if (raw === undefined || raw === '') return fallback;
   const n = parseInt(raw, 10);
   if (!Number.isFinite(n) || n < 1) return fallback;
   return Math.min(400, n);
+}
+
+/** Reserve time for response serialization and non-prompt cron phases before the route hits maxDuration. */
+function getCronPromptMonitoringMaxRuntimeMs(): number {
+  const raw = process.env.CRON_PROMPT_MONITORING_MAX_RUNTIME_MS;
+  const fallback = Math.max(10_000, (maxDuration * 1000) - CRON_RESPONSE_BUFFER_MS);
+  if (raw === undefined || raw === '') return fallback;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.min((maxDuration * 1000) - 5_000, Math.max(5_000, n));
+}
+
+function shouldRunPromptMonitoringInline(): boolean {
+  const raw = process.env.CRON_PROMPT_MONITORING_MODE?.trim().toLowerCase();
+  if (raw === 'inline') return true;
+  if (raw === 'background') return false;
+  return process.env.NODE_ENV === 'test';
+}
+
+function createPromptMonitoringSummary(
+  maxPromptEngineCalls: number,
+  promptMonitoringMaxRuntimeMs: number,
+  mode: 'inline' | 'background',
+): CronPromptMonitoringSummary {
+  return {
+    promptsChecked: 0,
+    promptErrors: 0,
+    engineCallsThisRun: 0,
+    successfulEngineCallsThisRun: 0,
+    budgetExhausted: false,
+    engineCallBudget: maxPromptEngineCalls,
+    runtimeBudgetMs: promptMonitoringMaxRuntimeMs,
+    mode,
+    queued: false,
+  };
+}
+
+async function runPromptMonitoringCronPhase({
+  activeDomains,
+  maxPromptEngineCalls,
+  deadlineAt,
+}: {
+  activeDomains: string[];
+  maxPromptEngineCalls: number;
+  deadlineAt: number;
+}) {
+  let promptsChecked = 0;
+  let promptErrors = 0;
+  let promptEngineCalls = 0;
+  let successfulPromptEngineCalls = 0;
+  let promptMonitoringBudgetExhausted = false;
+
+  domainLoop: for (const domain of activeDomains) {
+    if (promptMonitoringBudgetExhausted) break domainLoop;
+    if (Date.now() >= deadlineAt) {
+      promptMonitoringBudgetExhausted = true;
+      break domainLoop;
+    }
+
+    const remainingBudget = maxPromptEngineCalls - promptEngineCalls;
+    if (remainingBudget <= 0) {
+      promptMonitoringBudgetExhausted = true;
+      break domainLoop;
+    }
+
+    const summary = await runPromptMonitoringForDomain({
+      domain,
+      maxEngineCalls: remainingBudget,
+      deadlineAt,
+    });
+
+    promptsChecked += summary.promptsChecked;
+    promptErrors += summary.promptErrors;
+    promptEngineCalls += summary.engineCalls;
+    successfulPromptEngineCalls += summary.successfulEngineCalls;
+
+    if (summary.budgetExhausted || promptEngineCalls >= maxPromptEngineCalls) {
+      promptMonitoringBudgetExhausted = true;
+      break domainLoop;
+    }
+  }
+
+  return {
+    promptsChecked,
+    promptErrors,
+    promptEngineCalls,
+    successfulPromptEngineCalls,
+    promptMonitoringBudgetExhausted,
+  };
 }
 
 async function getUserIdByEmail(email: string): Promise<string | null> {
@@ -63,84 +147,12 @@ async function getUserIdByEmail(email: string): Promise<string | null> {
   }
 }
 
-function getWeekStart(): string {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const diff = now.getUTCDate() - day + (day === 0 ? -6 : 1); // Monday
-  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff));
-  return monday.toISOString().slice(0, 10);
-}
-
-function normalizeCompetitorKey(value: string): string {
-  return value.toLowerCase().replace(/^www\./, '').replace(/[^a-z0-9]+/g, '');
-}
-
-async function resolveMonitoringBusinessProfile(domain: string): Promise<BusinessProfile> {
-  const db = getDatabase();
-  const latestScan = await db.findLatestScanByDomain(domain);
-
-  const crawlData = latestScan?.crawlData as CrawlData | undefined;
-  if (crawlData?.url) {
-    return buildBusinessProfile(crawlData);
-  }
-
-  const summary = latestScan?.mentionSummary as
-    | { competitorDiscovery?: { businessProfile?: BusinessProfile } }
-    | undefined;
-  if (summary?.competitorDiscovery?.businessProfile) {
-    return summary.competitorDiscovery.businessProfile;
-  }
-
-  const brand = domain
-    .replace(/\.(com|net|org|co|io|ai|app|biz|us|ca|dev|shop|store)$/i, '')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-
-  return {
-    brand,
-    domain,
-    industry: 'Technology',
-    location: undefined,
-    vertical: 'general',
-    businessType: 'unknown',
-    siteModel: 'unknown',
-    categoryPhrases: [],
-    productCategories: [],
-    serviceSignals: [],
-    geoSignals: [],
-    similarityKeywords: [],
-    scanCompetitorSeeds: [],
-  };
-}
-
-function getPreviousRunScore(results: Array<{ monitoringRunId: string | null; runWeightedScore: number | null }>): number | null {
-  for (const result of results) {
-    if (result.runWeightedScore != null) return result.runWeightedScore;
-  }
-  return null;
-}
-
-function getPreviousCompetitorPositionMap(results: Array<{
-  engine: AIEngine;
-  competitorsJson: Array<{ name: string; position: number | null }> | null;
-}>): Map<string, number | null> {
-  const map = new Map<string, number | null>();
-
-  for (const result of results) {
-    for (const competitor of result.competitorsJson ?? []) {
-      const key = `${result.engine}::${normalizeCompetitorKey(competitor.name)}`;
-      if (!map.has(key)) {
-        map.set(key, competitor.position ?? null);
-      }
-    }
-  }
-
-  return map;
-}
-
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   const authHeader = request.headers.get('authorization');
   const expectedToken = process.env.MONITORING_SECRET;
+  const promptMonitoringMaxRuntimeMs = getCronPromptMonitoringMaxRuntimeMs();
+  const promptMonitoringMode = shouldRunPromptMonitoringInline() ? 'inline' : 'background';
 
   if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -301,202 +313,49 @@ export async function GET(request: NextRequest) {
 
     // ── Phase 2: Prompt monitoring loop ──────────────────────────
     const pm = getPromptMonitoring();
-    const tester = getMentionTester();
-    const allEngines = tester.availableEngines();
-    const promptRuntimeCache = new Map<string, {
-      engines: AIEngine[];
-      primaryRegionId: string;
-      blocked: boolean;
-    }>();
-    let promptsChecked = 0;
-    let promptErrors = 0;
     const maxPromptEngineCalls = getCronMaxPromptEngineCalls();
-    let promptEngineCalls = 0;
-    let promptMonitoringBudgetExhausted = false;
+    const promptMonitoring = createPromptMonitoringSummary(
+      maxPromptEngineCalls,
+      promptMonitoringMaxRuntimeMs,
+      promptMonitoringMode,
+    );
 
     try {
       const activeDomains = await pm.listActiveDomainsWithPrompts();
 
-      domainLoop: for (const domain of activeDomains) {
-        if (promptMonitoringBudgetExhausted) break domainLoop;
-
-        const prompts = await pm.listPrompts(domain);
-        const active = prompts.filter((p) => p.active);
-        if (active.length === 0) continue;
-
-        const previousResults = await pm.listPromptResults(domain, 500);
-        const businessProfile = await resolveMonitoringBusinessProfile(domain);
-        const pendingResponses: Array<{ promptId: string; engine: AIEngine; response: { engine: AIEngine; prompt: MentionPrompt; text: string; testedAt: number; citations?: string[]; searchResults?: Array<{ url: string; title?: string | null }> } }> = [];
-
-        for (const prompt of active) {
-          if (promptMonitoringBudgetExhausted) break;
-
-          let promptEngines: AIEngine[] = allEngines;
-          let primaryRegionId = DEFAULT_REGION_ID;
-
-          try {
-            const cacheKey = `${prompt.userId}:${domain}`;
-            const cached = promptRuntimeCache.get(cacheKey);
-
-            if (cached) {
-              promptEngines = cached.engines;
-              primaryRegionId = cached.primaryRegionId;
-              if (cached.blocked) continue;
-            } else if (prompt.userId) {
-              const supabase = getSupabaseClient();
-              const { data: profile } = await supabase
-                .from('user_profiles')
-                .select('email')
-                .eq('id', prompt.userId)
-                .single();
-
-              if (profile?.email) {
-                const [access, selectedPlatforms, selectedRegions, readiness] = await Promise.all([
-                  getUserAccess(prompt.userId, profile.email),
-                  getSelectedPlatforms(prompt.userId, domain),
-                  getSelectedRegions(prompt.userId, domain),
-                  getCurrentBillingReadiness(prompt.userId, profile.email),
-                ]);
-
-                const issues = readiness.snapshot.issues;
-                const blocked = issues.some((issue) => (
-                  issue.memberUserId === prompt.userId
-                  && (
-                    issue.category === 'prompts'
-                    || (issue.category === 'platforms' && issue.domain === domain)
-                    || (issue.category === 'regions' && issue.domain === domain)
-                  )
-                ));
-
-                promptEngines = blocked
-                  ? []
-                  : getScannableEngines(selectedPlatforms, access.tier, allEngines);
-                primaryRegionId = selectedRegions?.[0] ?? DEFAULT_REGION_ID;
-                promptRuntimeCache.set(cacheKey, {
-                  engines: promptEngines,
-                  primaryRegionId,
-                  blocked,
-                });
-                if (blocked) continue;
-              }
-            }
-          } catch {
-            // Fall through to all available engines if lookup fails
-          }
-
-          const regionText = applyRegionContext(prompt.promptText, primaryRegionId);
-          const mentionPrompt: MentionPrompt = {
-            id: prompt.id,
-            text: regionText,
-            category: isValidCategory(prompt.category) ? prompt.category : 'direct',
-            industry: prompt.industry ?? '',
-          };
-
-          for (const engine of promptEngines) {
-            if (promptEngineCalls >= maxPromptEngineCalls) {
-              promptMonitoringBudgetExhausted = true;
-              break;
-            }
-            try {
-              const response = await tester.query(engine, mentionPrompt);
-              pendingResponses.push({ promptId: prompt.id, engine, response });
-              promptEngineCalls += 1;
-            } catch {
-              promptErrors++;
-            }
-          }
-
-          if (promptMonitoringBudgetExhausted) break;
-        }
-
-        if (pendingResponses.length === 0) {
-          if (promptMonitoringBudgetExhausted) break domainLoop;
-          continue;
-        }
-
-        const analyzedResults = await analyzeResponsesWithLLM(
-          pendingResponses.map((entry) => entry.response),
-          {
-            brand: businessProfile.brand,
-            domain,
-            businessProfile,
-          }
-        );
-
-        const monitoringRunId = randomUUID();
-        const runWeightedScore = computeScore(analyzedResults);
-        const previousRunScore = getPreviousRunScore(previousResults);
-        const runScoreDelta = previousRunScore != null
-          ? Math.round((runWeightedScore - previousRunScore) * 10) / 10
-          : null;
-        const notableScoreChange = runScoreDelta != null && Math.abs(runScoreDelta) > 10;
-        const previousPositions = getPreviousCompetitorPositionMap(previousResults);
-        const weekStart = getWeekStart();
-
-        for (let index = 0; index < analyzedResults.length; index++) {
-          const analysis = analyzedResults[index] as MentionResult;
-          const pending = pendingResponses[index];
-          const testedAt = new Date(analysis.testedAt).toISOString();
-
-          await pm.savePromptResult({
-            promptId: pending.promptId,
-            domain,
-            engine: pending.engine,
-            mentioned: analysis.mentioned,
-            mentionType: analysis.mentionType,
-            position: analysis.position,
-            positionContext: analysis.positionContext,
-            sentiment: analysis.sentiment,
-            sentimentLabel: analysis.sentimentLabel,
-            sentimentStrength: analysis.sentimentStrength,
-            sentimentReasoning: analysis.sentimentReasoning,
-            keyQuote: analysis.keyQuote,
-            citationPresent: analysis.citationPresent,
-            citationUrls: analysis.citationUrls,
-            descriptionAccuracy: analysis.descriptionAccuracy,
-            analysisSource: analysis.analysisSource,
-            competitorsJson: analysis.competitorsWithPositions,
-            monitoringRunId,
-            runWeightedScore,
-            runScoreDelta,
-            notableScoreChange,
-            rawSnippet: analysis.rawSnippet,
-            testedAt,
+      if (activeDomains.length > 0) {
+        if (promptMonitoringMode === 'inline') {
+          const summary = await runPromptMonitoringCronPhase({
+            activeDomains,
+            maxPromptEngineCalls,
+            deadlineAt: startedAt + promptMonitoringMaxRuntimeMs,
           });
-
-          for (const competitor of analysis.competitorsWithPositions) {
+          promptMonitoring.promptsChecked = summary.promptsChecked;
+          promptMonitoring.promptErrors = summary.promptErrors;
+          promptMonitoring.engineCallsThisRun = summary.promptEngineCalls;
+          promptMonitoring.successfulEngineCallsThisRun = summary.successfulPromptEngineCalls;
+          promptMonitoring.budgetExhausted = summary.promptMonitoringBudgetExhausted;
+        } else {
+          promptMonitoring.queued = true;
+          after(async () => {
             try {
-              const competitorKey = `${pending.engine}::${normalizeCompetitorKey(competitor.name)}`;
-              const previousPosition = previousPositions.get(competitorKey) ?? null;
-              const movementDelta = previousPosition != null && competitor.position != null
-                ? previousPosition - competitor.position
-                : null;
-
-              await pm.saveCompetitorAppearance({
-                domain,
-                competitor: competitor.name,
-                competitorDomain: null,
-                engine: pending.engine,
-                promptId: pending.promptId,
-                position: competitor.position,
-                previousPosition,
-                movementDelta,
-                isNewCompetitor: !previousPositions.has(competitorKey),
-                coMentioned: analysis.mentioned,
-                weekStart,
+              const summary = await runPromptMonitoringCronPhase({
+                activeDomains,
+                maxPromptEngineCalls,
+                deadlineAt: startedAt + promptMonitoringMaxRuntimeMs,
               });
-            } catch {
-              // non-critical — don't break on competitor save failure
+              console.info(
+                `[cron-monitor] prompt monitoring complete checked=${summary.promptsChecked} errors=${summary.promptErrors} calls=${summary.promptEngineCalls} ok=${summary.successfulPromptEngineCalls} budgetExhausted=${summary.promptMonitoringBudgetExhausted}`,
+              );
+            } catch (error) {
+              console.error('[cron-monitor] prompt monitoring background run failed', error);
             }
-          }
-
-          promptsChecked++;
+          });
         }
-        if (promptMonitoringBudgetExhausted) break domainLoop;
       }
     } catch {
       // Prompt monitoring failure shouldn't break the entire cron
-      promptErrors++;
+      promptMonitoring.promptErrors += 1;
     }
 
     for (const queued of queuedRescans) {
@@ -531,13 +390,8 @@ export async function GET(request: NextRequest) {
       checked: results.length,
       results,
       opportunityAlerts,
-      promptMonitoring: {
-        promptsChecked,
-        promptErrors,
-        engineCallsThisRun: promptEngineCalls,
-        budgetExhausted: promptMonitoringBudgetExhausted,
-        engineCallBudget: maxPromptEngineCalls,
-      },
+      promptMonitoring,
+      durationMs: Date.now() - startedAt,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

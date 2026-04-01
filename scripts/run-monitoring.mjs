@@ -1,36 +1,79 @@
 #!/usr/bin/env node
 
-const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-const MONITORING_SECRET = process.env.MONITORING_SECRET;
+import { pathToFileURL } from 'node:url';
 
-const normalizedAppUrl = APP_URL ? APP_URL.replace(/\/$/, '') : '';
+function parsePositiveInt(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
-if (!normalizedAppUrl || !MONITORING_SECRET) {
-  console.error('Missing APP_URL/NEXT_PUBLIC_APP_URL or MONITORING_SECRET environment variables.');
-  process.exit(1);
+function resolveMonitoringConfig(overrides = {}, env = process.env) {
+  const appUrl = String(overrides.appUrl ?? env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+  const monitoringSecret = String(overrides.monitoringSecret ?? env.MONITORING_SECRET ?? '');
+  const requestTimeoutMs = parsePositiveInt(overrides.requestTimeoutMs ?? env.MONITORING_REQUEST_TIMEOUT_MS, 285_000);
+
+  if (!appUrl || !monitoringSecret) {
+    throw new Error('Missing APP_URL/NEXT_PUBLIC_APP_URL or MONITORING_SECRET environment variables.');
+  }
+
+  return {
+    appUrl,
+    monitoringSecret,
+    requestTimeoutMs,
+  };
+}
+
+export function getMonitoringConfig(env = process.env) {
+  return resolveMonitoringConfig({}, env);
+}
+
+export async function runMonitoring(options = {}) {
+  const { appUrl, monitoringSecret, requestTimeoutMs } = resolveMonitoringConfig(options);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), requestTimeoutMs);
+  const startedAt = Date.now();
+
+  try {
+    const res = await fetch(`${appUrl}/api/cron/monitor`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${monitoringSecret}`,
+      },
+      signal: controller.signal,
+    }).catch((error) => {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Monitoring request timed out after ${requestTimeoutMs}ms`);
+      }
+
+      throw error;
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Monitoring failed with status ${res.status}: ${text}`);
+    }
+
+    return {
+      data: await res.json(),
+      durationMs: Date.now() - startedAt,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function main() {
-  console.log(`[Monitoring] Triggering re-scan at ${normalizedAppUrl}/api/cron/monitor`);
+  const { appUrl } = getMonitoringConfig();
+  console.log(`[Monitoring] Triggering re-scan at ${appUrl}/api/cron/monitor`);
 
-  const res = await fetch(`${normalizedAppUrl}/api/cron/monitor`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${MONITORING_SECRET}`,
-    },
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`[Monitoring] Failed with status ${res.status}: ${text}`);
-    process.exit(1);
-  }
-
-  const data = await res.json();
-  console.log(`[Monitoring] Success:`, JSON.stringify(data, null, 2));
+  const { data, durationMs } = await runMonitoring();
+  console.log(`[Monitoring] Success in ${durationMs}ms:`, JSON.stringify(data, null, 2));
 }
 
-main().catch((err) => {
-  console.error('[Monitoring] Unexpected error:', err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error('[Monitoring] Unexpected error:', err);
+    process.exit(1);
+  });
+}

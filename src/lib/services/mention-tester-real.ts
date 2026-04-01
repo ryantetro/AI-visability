@@ -6,7 +6,17 @@ import type {
 } from '@/lib/ai-mentions/engine-tester';
 import { getAIEngineModel, getConfiguredAIEngines } from '@/lib/ai-engines';
 
-const ANTHROPIC_TIMEOUT_MS = Number(process.env.ANTHROPIC_TIMEOUT_MS || process.env.AI_ENGINE_TIMEOUT_MS || 20000);
+function parseTimeoutMs(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const DEFAULT_TIMEOUT_MS = parseTimeoutMs(process.env.AI_ENGINE_TIMEOUT_MS, 20_000);
+const OPENAI_TIMEOUT_MS = parseTimeoutMs(process.env.OPENAI_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+const ANTHROPIC_TIMEOUT_MS = parseTimeoutMs(process.env.ANTHROPIC_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+const GOOGLE_TIMEOUT_MS = parseTimeoutMs(process.env.GOOGLE_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+const PERPLEXITY_TIMEOUT_MS = parseTimeoutMs(process.env.PERPLEXITY_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+const GROK_TIMEOUT_MS = parseTimeoutMs(process.env.GROK_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
 const ANTHROPIC_MIN_INTERVAL_MS = Number(process.env.ANTHROPIC_MIN_INTERVAL_MS || 15000);
 const ANTHROPIC_FALLBACK_RETRY_AFTER_MS = Number(process.env.ANTHROPIC_RETRY_AFTER_MS || 30000);
 const ANTHROPIC_MAX_RETRIES = 3;
@@ -36,6 +46,14 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+function mapAbortToTimeout(error: unknown, label: string, timeoutMs: number) {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return new Error(`${label} timeout after ${timeoutMs}ms`);
+  }
+
+  return error;
 }
 
 function parseRetryAfterMs(res: Response): number | null {
@@ -85,7 +103,7 @@ async function runAnthropicThrottled<T>(task: () => Promise<T>): Promise<T> {
 }
 
 async function queryOpenAI(prompt: string): Promise<QueryResult> {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -96,6 +114,8 @@ async function queryOpenAI(prompt: string): Promise<QueryResult> {
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 1000,
     }),
+  }, OPENAI_TIMEOUT_MS).catch((error) => {
+    throw mapAbortToTimeout(error, 'OpenAI API', OPENAI_TIMEOUT_MS);
   });
 
   if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
@@ -124,10 +144,7 @@ async function queryAnthropic(prompt: string): Promise<QueryResult> {
         }),
       }, ANTHROPIC_TIMEOUT_MS)
     ).catch((error) => {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Anthropic API timeout after ${ANTHROPIC_TIMEOUT_MS}ms`);
-      }
-      throw error;
+      throw mapAbortToTimeout(error, 'Anthropic API', ANTHROPIC_TIMEOUT_MS);
     });
 
     if (res.ok) {
@@ -167,7 +184,7 @@ async function queryGoogle(prompt: string): Promise<QueryResult> {
   if (!key) throw new Error('GOOGLE_GENAI_API_KEY is not set');
 
   const model = getAIEngineModel('gemini');
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {
       method: 'POST',
@@ -175,8 +192,11 @@ async function queryGoogle(prompt: string): Promise<QueryResult> {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
       }),
-    }
-  );
+    },
+    GOOGLE_TIMEOUT_MS,
+  ).catch((error) => {
+    throw mapAbortToTimeout(error, 'Google GenAI API', GOOGLE_TIMEOUT_MS);
+  });
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -200,7 +220,7 @@ async function queryPerplexity(prompt: string): Promise<QueryResult> {
   if (!key) throw new Error('PERPLEXITY_API_KEY is not set');
 
   const model = getAIEngineModel('perplexity');
-  const res = await fetch('https://api.perplexity.ai/v1/sonar', {
+  const res = await fetchWithTimeout('https://api.perplexity.ai/v1/sonar', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -211,6 +231,8 @@ async function queryPerplexity(prompt: string): Promise<QueryResult> {
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 1000,
     }),
+  }, PERPLEXITY_TIMEOUT_MS).catch((error) => {
+    throw mapAbortToTimeout(error, 'Perplexity API', PERPLEXITY_TIMEOUT_MS);
   });
 
   if (!res.ok) {
@@ -241,7 +263,7 @@ async function queryGrok(prompt: string): Promise<QueryResult> {
   if (!key) throw new Error('GROK_API_KEY is not set');
 
   const model = getAIEngineModel('grok');
-  const res = await fetch('https://api.x.ai/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -252,6 +274,8 @@ async function queryGrok(prompt: string): Promise<QueryResult> {
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 1000,
     }),
+  }, GROK_TIMEOUT_MS).catch((error) => {
+    throw mapAbortToTimeout(error, 'Grok API', GROK_TIMEOUT_MS);
   });
 
   if (!res.ok) {

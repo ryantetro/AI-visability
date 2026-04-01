@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
+import { buildPromptMonitoringRunPlan, queuePromptMonitoringRun } from '@/lib/prompt-monitoring';
 import { getPromptMonitoring } from '@/lib/services/registry';
 import type { AIEngine } from '@/types/ai-mentions';
 
@@ -29,7 +30,17 @@ export async function GET(request: NextRequest) {
   const pm = getPromptMonitoring();
 
   try {
+    const prompts = await pm.listPrompts(domain, user.id);
     const results = await pm.listPromptResults(domain, 500, user.id);
+    const runPlan = buildPromptMonitoringRunPlan(prompts, results);
+    const backgroundRunQueued = runPlan.shouldQueue
+      ? queuePromptMonitoringRun({
+          domain,
+          promptIds: runPlan.promptIds,
+          schedule(task) { after(task); },
+          source: 'api/prompts/trends:get',
+        })
+      : false;
 
     // Group by week + engine
     const buckets = new Map<string, { positions: number[]; mentioned: number; total: number }>();
@@ -71,7 +82,11 @@ export async function GET(request: NextRequest) {
       })
       .sort((a, b) => a.week.localeCompare(b.week));
 
-    return NextResponse.json({ trends });
+    return NextResponse.json({
+      trends,
+      backgroundRunQueued,
+      backgroundRunReason: backgroundRunQueued ? runPlan.reason : null,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch trends.' },

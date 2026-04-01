@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
+import { buildPromptMonitoringRunPlan, queuePromptMonitoringRun } from '@/lib/prompt-monitoring';
 import { getPromptMonitoring } from '@/lib/services/registry';
 import { getSupabaseClient } from '@/lib/supabase';
 
@@ -22,8 +23,22 @@ export async function GET(request: NextRequest) {
   const pm = getPromptMonitoring();
   const prompts = await pm.listPrompts(domain, user.id);
   const results = await pm.listPromptResults(domain, 200, user.id);
+  const runPlan = buildPromptMonitoringRunPlan(prompts, results);
+  const backgroundRunQueued = runPlan.shouldQueue
+    ? queuePromptMonitoringRun({
+        domain,
+        promptIds: runPlan.promptIds,
+        schedule(task) { after(task); },
+        source: 'api/prompts:get',
+      })
+    : false;
 
-  return NextResponse.json({ prompts, results });
+  return NextResponse.json({
+    prompts,
+    results,
+    backgroundRunQueued,
+    backgroundRunReason: backgroundRunQueued ? runPlan.reason : null,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -44,6 +59,7 @@ export async function POST(request: NextRequest) {
   if (!domain || !promptText) {
     return NextResponse.json({ error: 'domain and promptText are required.' }, { status: 400 });
   }
+  const normalizedDomain = String(domain).trim().toLowerCase();
 
   if (typeof promptText !== 'string' || promptText.trim().length < 5) {
     return NextResponse.json({ error: 'Prompt text must be at least 5 characters.' }, { status: 400 });
@@ -51,7 +67,7 @@ export async function POST(request: NextRequest) {
   if (promptText.length > 500) {
     return NextResponse.json({ error: 'promptText must be 500 characters or fewer.' }, { status: 400 });
   }
-  if (typeof domain === 'string' && domain.length > 253) {
+  if (normalizedDomain.length > 253) {
     return NextResponse.json({ error: 'domain must be 253 characters or fewer.' }, { status: 400 });
   }
   if (category !== undefined && category !== null && String(category).length > 50) {
@@ -83,7 +99,7 @@ export async function POST(request: NextRequest) {
 
   const pm = getPromptMonitoring();
   const prompt = await pm.createPrompt({
-    domain,
+    domain: normalizedDomain,
     userId: user.id,
     promptText: promptText.trim(),
     category: category || 'custom',
@@ -91,5 +107,15 @@ export async function POST(request: NextRequest) {
     active: true,
   });
 
-  return NextResponse.json(prompt, { status: 201 });
+  const backgroundRunQueued = queuePromptMonitoringRun({
+    domain: normalizedDomain,
+    promptIds: [prompt.id],
+    schedule(task) { after(task); },
+    source: 'api/prompts:post',
+  });
+
+  return NextResponse.json({
+    ...prompt,
+    backgroundRunQueued,
+  }, { status: 201 });
 }

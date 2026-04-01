@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Sparkles, X } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import { ExportButton } from '@/components/ui/export-button';
@@ -35,17 +35,49 @@ export function PromptLibraryPanel({
   const [suggestSource, setSuggestSource] = useState<'llm' | 'heuristic' | null>(null);
   const [addingSuggestedKey, setAddingSuggestedKey] = useState<string | null>(null);
   const [addingAllSuggested, setAddingAllSuggested] = useState(false);
+  const [backgroundRunQueued, setBackgroundRunQueued] = useState(false);
+  const autoRefreshAttemptsRef = useRef(0);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const normalizeSuggestionKey = (text: string) => text.trim().toLowerCase().replace(/\s+/g, ' ');
 
   const fetchData = async () => {
     try {
       const res = await fetch(`/api/prompts?domain=${encodeURIComponent(domain)}`);
-      if (res.ok) setData(await res.json());
+      if (res.ok) {
+        const payload = await res.json();
+        const nextResults = Array.isArray(payload.results) ? payload.results : [];
+        const queued = Boolean(payload.backgroundRunQueued);
+
+        setData(payload);
+        setBackgroundRunQueued(queued);
+
+        if (nextResults.length > 0) {
+          autoRefreshAttemptsRef.current = 0;
+          if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current);
+            refreshTimerRef.current = null;
+          }
+        } else if (queued && autoRefreshAttemptsRef.current < 3) {
+          const delay = autoRefreshAttemptsRef.current === 0 ? 3000 : 6000;
+          autoRefreshAttemptsRef.current += 1;
+          if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current);
+          }
+          refreshTimerRef.current = setTimeout(() => {
+            void fetchData();
+          }, delay);
+        }
+      }
     } catch { /* silently fail */ } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+  }, []);
 
   const handleAddPrompt = async () => {
     if (!newPrompt.trim() || newPrompt.trim().length < 5) { setAddError('Prompt must be at least 5 characters.'); return; }
@@ -247,6 +279,12 @@ export function PromptLibraryPanel({
         </p>
       )}
 
+      {backgroundRunQueued && results.length === 0 && (
+        <p className="mt-3 text-[11px] text-[#d8b4fe]">
+          Running initial prompt tests across your enabled AI engines. This panel will refresh automatically when results land.
+        </p>
+      )}
+
       {suggestions != null && suggestions.length > 0 && (
         <div className="mt-4 rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/[0.06] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -392,7 +430,7 @@ export function PromptLibraryPanel({
           <Sparkles className="mx-auto h-6 w-6 text-[#a855f7]/60" />
           <h4 className="mt-3 text-sm font-semibold text-white">Track how AI engines mention your brand</h4>
           <p className="mx-auto mt-2 max-w-[400px] text-[12px] leading-5 text-zinc-400">
-            Add prompts to monitor — we'll check ChatGPT, Perplexity, Gemini, and more for mentions of your brand.
+            Add prompts to monitor so we can check ChatGPT, Perplexity, Gemini, and more for mentions of your brand.
           </p>
           {maxPrompts != null && tier && (
             <p className="mt-3 text-[11px] text-zinc-500">

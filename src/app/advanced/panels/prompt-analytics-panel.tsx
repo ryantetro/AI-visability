@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
   Bar, BarChart, Cell,
@@ -32,6 +32,9 @@ export function PromptAnalyticsPanel({ domain }: { domain: string }) {
   const { tier } = usePlan();
   const [trends, setTrends] = useState<TrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [backgroundRunQueued, setBackgroundRunQueued] = useState(false);
+  const autoRefreshAttemptsRef = useRef(0);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasAccess = tier !== 'free';
 
@@ -39,17 +42,57 @@ export function PromptAnalyticsPanel({ domain }: { domain: string }) {
     if (!hasAccess) { setLoading(false); return; }
 
     let cancelled = false;
-    (async () => {
+    autoRefreshAttemptsRef.current = 0;
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+
+    const load = async () => {
       setLoading(true);
       try {
         const res = await fetch(`/api/prompts/trends?domain=${encodeURIComponent(domain)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setTrends(data.trends ?? []);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        const nextTrends = Array.isArray(data.trends) ? data.trends : [];
+        const queued = Boolean(data.backgroundRunQueued);
+
+        setTrends(nextTrends);
+        setBackgroundRunQueued(queued);
+
+        if (nextTrends.length > 0) {
+          autoRefreshAttemptsRef.current = 0;
+          if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current);
+            refreshTimerRef.current = null;
+          }
+        } else if (queued && autoRefreshAttemptsRef.current < 3) {
+          const delay = autoRefreshAttemptsRef.current === 0 ? 3000 : 6000;
+          autoRefreshAttemptsRef.current += 1;
+          if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current);
+          }
+          refreshTimerRef.current = setTimeout(() => {
+            void load();
+          }, delay);
         }
-      } catch { /* silently fail */ } finally { if (!cancelled) setLoading(false); }
-    })();
-    return () => { cancelled = true; };
+      } catch {
+        /* silently fail */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
   }, [domain, hasAccess]);
 
   if (!hasAccess) {
@@ -91,8 +134,14 @@ export function PromptAnalyticsPanel({ domain }: { domain: string }) {
           description="Track how your AI mention rate evolves week over week across engines."
         />
         <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
-          <p className="text-sm text-zinc-400">No prompt results yet.</p>
-          <p className="mt-1 text-[12px] text-zinc-600">Add prompts and wait for the monitoring cron to test them across AI engines.</p>
+          <p className="text-sm text-zinc-400">
+            {backgroundRunQueued ? 'Running your initial prompt tests now.' : 'No prompt results yet.'}
+          </p>
+          <p className="mt-1 text-[12px] text-zinc-600">
+            {backgroundRunQueued
+              ? 'We queued a background run across your enabled AI engines and will refresh this chart automatically.'
+              : 'Add prompts and the platform will begin testing them across AI engines.'}
+          </p>
         </div>
       </DashboardPanel>
     );

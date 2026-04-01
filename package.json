@@ -8,10 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test tests/scan-core.test.cjs",
+    "test:monitoring": "node --test tests/prompt-monitoring-cron.test.cjs tests/prompt-monitoring-runner.test.cjs tests/prompt-monitoring-enhanced.test.cjs tests/mention-tester-timeouts.test.cjs",
     "test:live": "node scripts/run-live-fixtures.cjs",
     "test:live:saas": "node scripts/run-live-fixtures.cjs tests/live-fixtures/saas-sites.json",
     "ai:engines": "node scripts/check-ai-engines.cjs",
-    "ai:backfill:claude": "node scripts/backfill-claude-ai-visibility.cjs 30"
+    "ai:backfill:claude": "node scripts/backfill-claude-ai-visibility.cjs 30",
+    "monitoring:smoke": "node scripts/monitoring-smoke.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

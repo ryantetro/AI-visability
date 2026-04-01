@@ -8,22 +8,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
       HAS_MONITORING_SECRET: ${{ secrets.MONITORING_SECRET != '' }}
       HAS_APP_URL: ${{ secrets.APP_URL != '' || secrets.NEXT_PUBLIC_APP_URL != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
+          cache: 'npm'
       - run: npm ci
       # Requires repo secrets (Settings → Secrets and variables → Actions). If unset, we skip with a warning so the workflow stays green.
       - name: Run monitoring cron
         if: env.HAS_MONITORING_SECRET == 'true' && env.HAS_APP_URL == 'true'
-        run: node scripts/run-monitoring.mjs
+        run: npm run monitoring:smoke
         env:
           APP_URL: ${{ secrets.APP_URL || secrets.NEXT_PUBLIC_APP_URL }}
           MONITORING_SECRET: ${{ secrets.MONITORING_SECRET }}
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+          MONITORING_EXPECT_MAX_MS: '90000'
+          MONITORING_REQUEST_TIMEOUT_MS: '120000'
       - name: Monitoring skipped (configure secrets)
         if: env.HAS_MONITORING_SECRET != 'true' || env.HAS_APP_URL != 'true'
         run: |

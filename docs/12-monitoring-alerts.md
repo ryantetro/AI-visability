@@ -36,7 +36,7 @@ Called with `GET /api/cron/monitor` + `Authorization: Bearer {MONITORING_SECRET}
 - **Phase 0**: For each active monitored domain, if last scan is older than 24h, triggers a rescan in the background via `after()` (default **1** per run via `CRON_MAX_RESCANS_PER_RUN`, max 5). Rescans execute after the response is sent, so Phases 1/1b/2 proceed immediately using existing scan data. The next cron run (6 hours later) picks up the fresh results.
 - **Phase 1**: For each active monitored domain, checks latest scan score against the domain's `alert_threshold`. If score is below threshold, calls `alertService.sendScoreAlert()`
 - **Phase 1b**: AI Opportunity Alerts — for each active domain with `opportunityAlertsEnabled=true`, computes a 30-day opportunity summary. If crawlerVisits >= 25, referralVisits <= 2, and crawl-to-referral ratio >= 20:1, sends `alertService.sendOpportunityAlert()`. Respects a 7-day cooldown via `lastOpportunityAlertAt`.
-- **Phase 2**: Prompt monitoring — tests active prompts against AI engines (capped per run by **`CRON_MAX_PROMPT_ENGINE_CALLS`** default `80` to reduce timeouts; response JSON includes `promptMonitoring.budgetExhausted` when cut short)
+- **Phase 2**: Prompt monitoring — by default, active prompts are queued into an `after()` background task so the cron endpoint can return headers quickly to the scheduler. In test mode (or when `CRON_PROMPT_MONITORING_MODE=inline`) it runs inline. Prompt checks are capped per run by **`CRON_MAX_PROMPT_ENGINE_CALLS`** default `20`, and the worker stops once **`CRON_PROMPT_MONITORING_MAX_RUNTIME_MS`** is reached.
 
 ### Email delivery
 When `RESEND_API_KEY` is set, `getAlertService()` returns `resendAlertService` which sends a styled HTML email via Resend's API. The email includes:
@@ -95,12 +95,13 @@ If either the secret or the URL secret is missing, the **Run monitoring cron** s
 
 ### Vercel timeouts (504)
 
-The cron route exports **`maxDuration = 300`** (seconds). Phase 0 rescans run in background via `after()` and no longer contribute to response time. If Phase 2 (prompt monitoring) still exceeds the limit, Vercel returns **504** with `FUNCTION_INVOCATION_TIMEOUT`. Mitigations:
+The cron route exports **`maxDuration = 300`** (seconds). Phase 0 rescans already run in background via `after()`, and Phase 2 prompt monitoring is now queued in background by default too, so the scheduler gets a fast response. Background work is still bounded by the same runtime budget, so tune the prompt-monitoring limits if provider slowness causes incomplete runs.
 
 | Mitigation | How |
 |------------|-----|
 | Fewer background rescans | Set **`CRON_MAX_RESCANS_PER_RUN=0`** to skip Phase 0, or keep default **`1`** |
-| Smaller Phase 2 batches | Lower **`CRON_MAX_PROMPT_ENGINE_CALLS`** (e.g. `40`) or raise it only if you have a higher platform limit |
+| Smaller Phase 2 batches | Lower **`CRON_MAX_PROMPT_ENGINE_CALLS`** (e.g. `10`) or raise it only if you have a higher platform limit |
+| Shorter prompt-monitoring wall clock | Lower **`CRON_PROMPT_MONITORING_MAX_RUNTIME_MS`** if you need the route to return faster under provider slowness |
 | Longer functions | Vercel Pro max is typically **300s** for this pattern; Enterprise / Fluid can go higher |
 
 Optional env vars (production / Vercel):
@@ -108,4 +109,20 @@ Optional env vars (production / Vercel):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CRON_MAX_RESCANS_PER_RUN` | `1` | Background site rescans triggered per cron invocation (0–5). Rescans run via `after()` and don't block the response. |
-| `CRON_MAX_PROMPT_ENGINE_CALLS` | `80` | Max successful `tester.query` calls in Phase 2 per invocation (hard cap 400). |
+| `CRON_MAX_PROMPT_ENGINE_CALLS` | `20` | Max attempted `tester.query` calls in Phase 2 per invocation (hard cap 400). Failed attempts count toward the cap. |
+| `CRON_PROMPT_MONITORING_MAX_RUNTIME_MS` | `270000` | Maximum wall-clock time reserved for Phase 2 before the cron route returns a partial success payload. |
+| `CRON_PROMPT_MONITORING_MODE` | auto | `background` to always queue Phase 2, `inline` to run it in-request. Defaults to `inline` in tests and `background` otherwise. |
+
+### Pre-production smoke test
+
+Run this against a preview or staging deployment before enabling production cron:
+
+```bash
+APP_URL=https://your-preview-url \
+MONITORING_SECRET=your-preview-monitoring-secret \
+npm run monitoring:smoke
+```
+
+Optional tuning:
+- `MONITORING_EXPECT_MAX_MS` — fail if the endpoint takes longer than this (default `90000`)
+- `MONITORING_REQUEST_TIMEOUT_MS` — abort the request entirely after this many milliseconds
