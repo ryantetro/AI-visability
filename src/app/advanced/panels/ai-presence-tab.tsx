@@ -24,7 +24,7 @@ import type { CompetitorComparisonData } from '@/types/competitors';
 type HeroMetric = 'visibility' | 'sov' | 'sentiment';
 
 const HERO_META: Record<HeroMetric, { label: string; description: string; accent: string; accentDim: string }> = {
-  visibility: { label: 'Visibility', description: 'Percentage of AI answers that mention your brand', accent: '#25c972', accentDim: 'rgba(37,201,114,0.12)' },
+  visibility: { label: 'Mention Rate', description: 'Percentage of tested AI answers that mention your brand', accent: '#25c972', accentDim: 'rgba(37,201,114,0.12)' },
   sov: { label: 'Share of Voice', description: 'Your brand mentions vs total competitor mentions', accent: '#3b82f6', accentDim: 'rgba(59,130,246,0.12)' },
   sentiment: { label: 'Sentiment', description: 'Positive sentiment ratio across AI engines', accent: '#a855f7', accentDim: 'rgba(168,85,247,0.12)' },
 };
@@ -389,7 +389,7 @@ function HeroSection({
     <DashboardPanel className="p-0 overflow-hidden">
       {/* Header bar with toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5 pb-4">
-        <SectionTitle eyebrow="AI Presence" title="Brand Overview" description="Toggle metrics to explore your AI visibility, share of voice, and sentiment." />
+        <SectionTitle eyebrow="AI Presence" title="Brand Overview" description="Toggle metrics to explore your mention rate, share of voice, and sentiment." />
         <div className="flex gap-0.5 rounded-xl bg-white/[0.03] p-1 border border-white/[0.04]">
           {(Object.keys(HERO_META) as HeroMetric[]).map((key) => (
             <button

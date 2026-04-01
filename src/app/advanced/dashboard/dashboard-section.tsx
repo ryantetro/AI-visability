@@ -237,14 +237,14 @@ export function DashboardSection({
 
       {/* KPI Cards Row — RealGEO Style */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {/* Visibility Score */}
+        {/* AI Visibility Score */}
         <Link href="/report" className="block">
           <DashboardPanel className="relative cursor-pointer overflow-hidden p-6 transition-all hover:border-white/16">
             <div className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl bg-[#25c972]/10">
               <Eye className="h-4.5 w-4.5 text-[#25c972]" />
             </div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-              Visibility Score
+              AI Visibility Score
               <InfoTooltip text="Your overall AI visibility score (0–100). Combines discoverability, content quality, web health, and AI mentions into one number." className="ml-1 align-middle" />
             </p>
             <div className="mt-2 flex items-baseline gap-1.5">
@@ -283,7 +283,7 @@ export function DashboardSection({
                 />
               </div>
             )}
-            <p className="mt-2.5 text-[11px] text-zinc-500">How prominently you appear in AI answers</p>
+            <p className="mt-2.5 text-[11px] text-zinc-500">Overall score across site readiness, content clarity, and AI mentions</p>
           </DashboardPanel>
         </Link>
 
@@ -324,15 +324,15 @@ export function DashboardSection({
           )}
         </DashboardPanel>
 
-        {/* AI Mentions */}
+        {/* Brand Mention Rate */}
         <Link href="/brand" className="block">
         <DashboardPanel className={cn('relative cursor-pointer overflow-hidden p-6 transition-all hover:border-white/16', totalMentions === 0 && totalChecks === 0 && 'border-dashed')}>
           <div className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl bg-[#a855f7]/10">
             <MessageSquare className="h-4.5 w-4.5 text-[#a855f7]" />
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-            AI Mentions
-            <InfoTooltip text="How often AI engines surface your brand in our test queries across ChatGPT, Perplexity, Gemini, and Claude." className="ml-1 align-middle" />
+            Brand Mention Rate
+            <InfoTooltip text="The percentage of tested AI answers that mention your brand across ChatGPT, Perplexity, Gemini, Claude, and other enabled engines." className="ml-1 align-middle" />
           </p>
           {totalMentions === 0 && totalChecks === 0 ? (
             <div className="mt-2">
@@ -378,7 +378,7 @@ export function DashboardSection({
         <DashboardPanel className="p-6">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Platform Performance</p>
-            <p className="mt-1 text-[13px] text-zinc-500">Real-time visibility across different AI platforms</p>
+            <p className="mt-1 text-[13px] text-zinc-500">Brand mention rate across different AI platforms</p>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -416,7 +416,7 @@ export function DashboardSection({
                     )}>
                       {pc.pct}%
                     </span>
-                    <span className="ml-2 text-[11px] text-zinc-500">visibility</span>
+                    <span className="ml-2 text-[11px] text-zinc-500">mention rate</span>
                   </div>
                 </div>
               );
