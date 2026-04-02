@@ -126,12 +126,12 @@ function NavItem({
         className={cn(
           'relative flex items-center gap-3 rounded-lg px-4 text-[13px] font-medium transition-colors',
           'h-[var(--sidebar-item-height)]',
-          'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-400'
+          'text-gray-500 hover:bg-gray-100 hover:text-gray-600'
         )}
       >
-        <Icon className="h-[18px] w-[18px] shrink-0 text-zinc-600" />
+        <Icon className="h-[18px] w-[18px] shrink-0 stroke-2 text-gray-600" />
         <span className="flex-1">{item.label}</span>
-        <Lock className="h-3 w-3 shrink-0 text-zinc-600" />
+        <Lock className="h-3 w-3 shrink-0 text-gray-500" />
       </Link>
     );
   }
@@ -144,14 +144,14 @@ function NavItem({
         'relative flex items-center gap-3 rounded-lg px-4 text-[13px] font-medium transition-colors',
         'h-[var(--sidebar-item-height)]',
         active
-          ? 'bg-white/[0.08] text-white'
-          : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
+          ? 'bg-blue-50 text-blue-700'
+          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       )}
     >
       {active && (
         <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--sidebar-accent)]" />
       )}
-      <Icon className={cn('h-[18px] w-[18px] shrink-0', active ? 'text-white' : 'text-zinc-500')} />
+        <Icon className={cn('h-[18px] w-[18px] shrink-0 stroke-2', active ? 'text-blue-700' : 'text-gray-700')} />
       <span>{item.label}</span>
     </Link>
   );
@@ -202,8 +202,8 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
         className={cn(
           'group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
           isActive
-            ? 'bg-white/[0.08] text-white'
-            : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
+            ? 'bg-blue-50 text-blue-700'
+            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
         )}
       >
         {isActive && (
@@ -215,7 +215,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
           className="h-4 w-4 shrink-0 rounded-sm"
         />
         <div className="min-w-0 flex-1">
-          <span className="block truncate text-[12px] font-medium">
+          <span className={cn('block truncate text-[12px] font-semibold', isActive ? 'text-blue-900' : 'text-gray-900')}>
             {site.domain}
           </span>
           <div className="mt-0.5 flex items-center gap-1.5">
@@ -234,7 +234,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
                       : `${ageDays}d ago`;
               const dotColor = ageDays < 1 ? 'bg-[#25c972]' : ageDays <= 7 ? 'bg-[#ffbb00]' : 'bg-[#ff5252]';
               return (
-                <span className="flex items-center gap-1 text-[10px] text-zinc-600">
+                <span className="flex items-center gap-1 text-[10px] font-medium text-gray-600">
                   <span className={cn('inline-block h-1.5 w-1.5 rounded-full', dotColor)} />
                   {label}
                 </span>
@@ -271,7 +271,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
               handleRemoveDomain(site.domain);
             }
           }}
-          className="shrink-0 rounded p-0.5 text-zinc-600 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100"
+          className="shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-all hover:text-gray-600 group-hover:opacity-100"
           aria-label={`Remove ${site.domain}`}
         >
           <X className="h-3 w-3" />
@@ -282,7 +282,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
 
   return (
     <div className="px-3">
-      <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">
+      <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">
         Domains
       </p>
 
@@ -292,12 +292,12 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
 
       {/* Add domain toggle */}
       {showAddInput ? (
-        <div className="mt-1.5 space-y-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] p-2">
+        <div className="mt-1.5 space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-2">
           <div className="flex items-center gap-1.5">
             {inputFaviconUrl ? (
               <img src={inputFaviconUrl} alt="" className="h-3.5 w-3.5 shrink-0 rounded-sm" />
             ) : (
-              <Globe2 className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              <Globe2 className="h-3.5 w-3.5 shrink-0 text-gray-500" />
             )}
             <input
               type="text"
@@ -305,31 +305,31 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
               onChange={(e) => setAddDomainInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && void handleSubmitDomain()}
               placeholder="example.com"
-              className="min-w-0 flex-1 bg-transparent text-[12px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent text-[12px] text-gray-900 placeholder:text-gray-400 focus:outline-none"
               autoFocus
             />
             <button
               type="button"
               onClick={() => void handleSubmitDomain()}
-              className="rounded p-0.5 text-zinc-400 transition-colors hover:text-white"
+              className="rounded p-0.5 text-gray-500 transition-colors hover:text-gray-800"
             >
               <Check className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
               onClick={() => { setShowAddInput(false); setAddDomainInput(''); }}
-              className="rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-300"
+              className="rounded p-0.5 text-gray-500 transition-colors hover:text-gray-700"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          <label className="flex cursor-pointer items-start gap-1.5 text-[10px] leading-4 text-zinc-500">
+          <label className="flex cursor-pointer items-start gap-1.5 text-[10px] leading-4 text-gray-500">
             <input
               type="checkbox"
               checked={confirmChecked}
               onChange={(e) => setConfirmChecked(e.target.checked)}
-              className="mt-0.5 h-3 w-3 shrink-0 accent-zinc-400"
+              className="mt-0.5 h-3 w-3 shrink-0 accent-blue-600"
             />
             <span>I own or am authorized to monitor this domain</span>
           </label>
@@ -342,7 +342,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
         <button
           type="button"
           onClick={() => setShowAddInput(true)}
-          className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-300"
+          className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
         >
           <Plus className="h-3.5 w-3.5" />
           Add domain
@@ -363,10 +363,10 @@ function SidebarOnboardingProgress() {
     <div className="px-3 py-2">
       <Link
         href="/dashboard"
-        className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors hover:bg-white/[0.04]"
+        className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors hover:bg-gray-100"
       >
         <svg className="h-5 w-5 shrink-0" viewBox="0 0 20 20">
-          <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
+          <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth="2.5" />
           <circle
             cx="10"
             cy="10"
@@ -380,8 +380,8 @@ function SidebarOnboardingProgress() {
           />
         </svg>
         <div className="min-w-0">
-          <p className="text-[11px] font-medium text-zinc-300">Getting Started</p>
-          <p className="text-[10px] text-zinc-500">{completedCount}/{totalSteps} complete</p>
+          <p className="text-[11px] font-medium text-gray-800">Getting Started</p>
+          <p className="text-[10px] text-gray-500">{completedCount}/{totalSteps} complete</p>
         </div>
       </Link>
     </div>
@@ -425,7 +425,7 @@ export function DashboardSidebar() {
       {/* Domain Selector — only show when context is available */}
       {hasDomainContext && (
         <>
-          <div className="mx-3 border-t border-white/[0.06]" />
+          <div className="mx-3 border-t border-gray-200" />
           <div className="py-2.5">
             <SidebarDomainList onCloseMobile={closeMobile} />
           </div>
@@ -435,7 +435,7 @@ export function DashboardSidebar() {
       {hasDomainContext && <SidebarOnboardingProgress />}
 
       {/* Separator */}
-      <div className="mx-3 border-t border-white/[0.06]" />
+      <div className="mx-3 border-t border-gray-200" />
 
       {/* Nav items */}
       <nav className="mt-2 flex-1 space-y-0.5 px-3">
@@ -457,7 +457,7 @@ export function DashboardSidebar() {
         })}
 
         {/* Separator */}
-        <div className="!my-3 border-t border-white/[0.06]" />
+        <div className="!my-3 border-t border-gray-200" />
 
           <NavItem
             item={{ ...SETTINGS_ITEM, href: buildNavHref(SETTINGS_ITEM.href, reportParam) }}
@@ -494,7 +494,7 @@ export function DashboardSidebar() {
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[var(--sidebar-bg)] text-zinc-300 md:hidden"
+        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-[var(--sidebar-bg)] text-gray-700 md:hidden"
         aria-label="Open navigation"
       >
         <Menu className="h-5 w-5" />
@@ -522,7 +522,7 @@ export function DashboardSidebar() {
             <button
               type="button"
               onClick={closeMobile}
-              className="absolute right-3 top-3 rounded-lg p-1.5 text-zinc-400 hover:text-white"
+              className="absolute right-3 top-3 rounded-lg p-1.5 text-gray-500 hover:text-gray-900"
               aria-label="Close navigation"
             >
               <X className="h-5 w-5" />

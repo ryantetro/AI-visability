@@ -5,7 +5,7 @@ import { DashboardSection } from '@/app/advanced/dashboard/dashboard-section';
 
 export default function DashboardPage() {
   return (
-    <WorkspaceShell sectionKey="dashboard">
+    <WorkspaceShell sectionKey="dashboard" wide>
       {(ctx) => (
         <DashboardSection
           report={ctx.report}

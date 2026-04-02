@@ -27,10 +27,10 @@ const FILE_OPTIONS = [
 ] as const;
 
 const STATUS_STYLES: Record<string, string> = {
-  ordered: 'bg-yellow-500/15 text-yellow-400',
-  in_progress: 'bg-blue-500/15 text-blue-400',
-  delivered: 'bg-[#25c972]/15 text-[#25c972]',
-  refunded: 'bg-zinc-500/15 text-zinc-400',
+  ordered: 'bg-yellow-50 text-yellow-700',
+  in_progress: 'bg-blue-50 text-blue-700',
+  delivered: 'bg-emerald-50 text-emerald-700',
+  refunded: 'bg-gray-100 text-gray-500',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -120,7 +120,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
   if (loading) {
     return (
       <DashboardPanel className="flex items-center justify-center p-12">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+        <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
       </DashboardPanel>
     );
   }
@@ -137,7 +137,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
 
         <div className="mt-6 space-y-4">
           <div>
-            <label htmlFor="fms-domain" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
+            <label htmlFor="fms-domain" className="mb-1.5 block text-[12px] font-medium text-gray-500">
               Domain
             </label>
             <input
@@ -146,12 +146,12 @@ export function FixMySitePanel({ domain }: { domain: string }) {
               value={orderDomain}
               onChange={(e) => setOrderDomain(e.target.value)}
               placeholder="example.com"
-              className="h-10 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm text-white placeholder:text-zinc-600 focus:border-[#25c972]/40 focus:outline-none focus:ring-1 focus:ring-[#25c972]/20"
+              className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-200"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-[12px] font-medium text-zinc-400">
+            <label className="mb-2 block text-[12px] font-medium text-gray-500">
               Files to optimize
             </label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -163,15 +163,15 @@ export function FixMySitePanel({ domain }: { domain: string }) {
                   className={cn(
                     'flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-[13px] transition-colors',
                     selectedFiles.has(opt.value)
-                      ? 'border-[#25c972]/30 bg-[#25c972]/[0.06] text-white'
-                      : 'border-white/8 bg-white/[0.02] text-zinc-500 hover:text-zinc-300',
+                      ? 'border-emerald-200 bg-emerald-50 text-gray-900'
+                      : 'border-gray-200 bg-gray-50 text-gray-500 hover:text-gray-700',
                   )}
                 >
                   <span className={cn(
                     'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
                     selectedFiles.has(opt.value)
-                      ? 'border-[#25c972]/40 bg-[#25c972]/20'
-                      : 'border-white/15 bg-transparent',
+                      ? 'border-emerald-300 bg-emerald-100'
+                      : 'border-gray-300 bg-transparent',
                   )}>
                     {selectedFiles.has(opt.value) && (
                       <Check className="h-2.5 w-2.5 text-[#25c972]" />
@@ -184,8 +184,8 @@ export function FixMySitePanel({ domain }: { domain: string }) {
           </div>
 
           <div>
-            <label htmlFor="fms-notes" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
-              Notes <span className="text-zinc-600">(optional)</span>
+            <label htmlFor="fms-notes" className="mb-1.5 block text-[12px] font-medium text-gray-500">
+              Notes <span className="text-gray-400">(optional)</span>
             </label>
             <textarea
               id="fms-notes"
@@ -193,12 +193,12 @@ export function FixMySitePanel({ domain }: { domain: string }) {
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Any specific requirements or context for our team..."
-              className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-[#25c972]/40 focus:outline-none focus:ring-1 focus:ring-[#25c972]/20"
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-200"
             />
           </div>
 
           {error && (
-            <p className="text-[13px] text-red-400">{error}</p>
+            <p className="text-[13px] text-red-500">{error}</p>
           )}
 
           <button
@@ -215,7 +215,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
             {submitting ? 'Creating order...' : 'Order for $499'}
           </button>
 
-          <p className="text-center text-[11px] text-zinc-600">
+          <p className="text-center text-[11px] text-gray-400">
             One-time payment. 3-5 business day delivery. Secure checkout via Stripe.
           </p>
         </div>
@@ -234,12 +234,12 @@ export function FixMySitePanel({ domain }: { domain: string }) {
             {orders.map(order => (
               <div
                 key={order.id}
-                className="rounded-xl border border-white/8 bg-white/[0.02] p-4"
+                className="rounded-xl border border-gray-200 bg-gray-50 p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-white">{order.domain}</p>
-                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                    <p className="text-sm font-semibold text-gray-900">{order.domain}</p>
+                    <p className="mt-0.5 text-[11px] text-gray-500">
                       {new Date(order.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -249,7 +249,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
                   </div>
                   <span className={cn(
                     'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold',
-                    STATUS_STYLES[order.status] ?? 'bg-zinc-500/15 text-zinc-400',
+                    STATUS_STYLES[order.status] ?? 'bg-gray-100 text-gray-500',
                   )}>
                     {STATUS_LABELS[order.status] ?? order.status}
                   </span>
@@ -260,7 +260,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
                     {order.files_requested.map(f => (
                       <span
                         key={f}
-                        className="rounded-md bg-white/[0.05] px-2 py-0.5 text-[11px] text-zinc-400"
+                        className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
                       >
                         {FILE_LABELS[f] ?? f}
                       </span>

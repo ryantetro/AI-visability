@@ -10,14 +10,11 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from '@/components/ui/ai-icons';
 import { PricingSection } from '@/components/pricing/pricing-section';
 import { HeroRotatingAiHeadline } from '@/components/ui/hero-rotating-ai-headline';
-import { ShiftSection } from '@/components/marketing/shift-section';
-import { CapabilityPillars } from '@/components/marketing/capability-pillars';
+import { FeatureShowcase } from '@/components/marketing/feature-showcase';
+import { InteractiveDemoSection } from '@/components/marketing/interactive-demo-section';
 import { HowItWorksSection } from '@/components/marketing/how-it-works-section';
 import { AiEnginesSection } from '@/components/marketing/ai-engines-section';
-import { DimensionsSection } from '@/components/marketing/dimensions-section';
-import { ReportPreviewBand } from '@/components/marketing/report-preview-band';
-import { SampleScoreCta } from '@/components/marketing/sample-score-cta';
-import { AgenciesCtaBand } from '@/components/marketing/agencies-cta-band';
+import { ServicesBand } from '@/components/marketing/services-band';
 import { FadeIn } from '@/components/marketing/motion';
 
 export default function Home() {
@@ -72,20 +69,12 @@ export default function Home() {
         />
 
         <div className="relative z-10 mx-auto max-w-3xl text-center">
-          {/* Kicker pill */}
-          <div className="mb-8 flex justify-center animate-hero-fade" style={{ animationDelay: '0ms' }}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-1.5 text-[12px] font-medium tracking-wide text-white/40 uppercase">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-primary-400)] animate-pulse" />
-              See How AI Finds Your Business
-            </span>
-          </div>
-
           <HeroRotatingAiHeadline
             className="animate-hero-fade sm:text-5xl lg:text-6xl"
-            style={{ animationDelay: '80ms' }}
+            style={{ animationDelay: '0ms' }}
           />
 
-          <p className="mx-auto mt-5 max-w-lg text-[17px] leading-relaxed animate-hero-fade text-white/45" style={{ animationDelay: '160ms' }}>
+          <p className="mx-auto mt-5 max-w-lg text-[17px] leading-relaxed animate-hero-fade text-gray-600" style={{ animationDelay: '160ms' }}>
             Your customers are asking AI for recommendations.
             Find out if AI can find and recommend you — in 30 seconds.
           </p>
@@ -97,14 +86,14 @@ export default function Home() {
 
           <div className="mt-5 flex items-center justify-center gap-6 animate-hero-fade" style={{ animationDelay: '320ms' }}>
             <div className="flex items-center gap-2">
-              <span className="text-[12px] text-white/25 font-medium tracking-wide uppercase">Works with</span>
+              <span className="text-[12px] font-semibold tracking-wide text-gray-600 uppercase">Works with</span>
               <div className="flex items-center gap-3">
                 {([
                   { Icon: ChatGPTIcon, color: 'text-[#8fd6c6]' },
                   { Icon: PerplexityIcon, color: 'text-[#62dbef]' },
                   { Icon: GeminiIcon, color: 'text-[#7ba9ff]' },
                   { Icon: ClaudeIcon, color: 'text-[#f1a07b]' },
-                  { Icon: GrokIcon, color: 'text-[#f5f5f5]' },
+                  { Icon: GrokIcon, color: 'text-neutral-600' },
                 ] as const).map(({ Icon, color }, i) => (
                   <span key={i} className={`flex items-center justify-center ${color}`}>
                     <Icon className="size-4.5" />
@@ -112,8 +101,8 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <span className="text-white/10">|</span>
-            <Link href="/pricing" className="text-[12px] font-medium text-white/30 transition-colors duration-150 hover:text-white/60 tracking-wide uppercase">
+            <span className="text-gray-300" aria-hidden>|</span>
+            <Link href="/pricing" className="text-[12px] font-semibold tracking-wide text-gray-700 uppercase transition-colors duration-150 hover:text-gray-900">
               View Pricing
             </Link>
           </div>
@@ -121,11 +110,11 @@ export default function Home() {
           {/* Stats Row */}
           <div className="relative z-10 mx-auto mt-20 flex w-full max-w-2xl flex-nowrap items-center justify-between animate-hero-fade" style={{ animationDelay: '400ms' }}>
             <AnimatedStat value={19} label="Factors Analyzed" />
-            <div className="h-6 w-px bg-white/[0.06]" />
+            <div className="h-6 w-px bg-gray-200" />
             <AnimatedStat value={6} label="AI Dimensions" />
-            <div className="h-6 w-px bg-white/[0.06]" />
+            <div className="h-6 w-px bg-gray-200" />
             <AnimatedStat value={30} suffix="s" label="Scan Time" />
-            <div className="h-6 w-px bg-white/[0.06]" />
+            <div className="h-6 w-px bg-gray-200" />
             <AnimatedStat value={100} suffix="%" label="Free Audit" />
           </div>
         </div>
@@ -135,12 +124,10 @@ export default function Home() {
       </section>
 
       <div className="relative overflow-hidden" style={{ backgroundColor: 'var(--surface-page)' }}>
-      <ShiftSection />
-      <CapabilityPillars />
+      <FeatureShowcase />
+      <InteractiveDemoSection />
       <HowItWorksSection />
       <AiEnginesSection />
-      <DimensionsSection />
-      <ReportPreviewBand />
 
       <PricingSection
         id="pricing"
@@ -150,14 +137,13 @@ export default function Home() {
         showFaq={false}
       />
 
-      <SampleScoreCta />
-      <AgenciesCtaBand />
+      <ServicesBand />
 
       {/* FAQ */}
       <section id="resources" className="relative px-4 py-24">
         <div className="mx-auto max-w-2xl">
           <FadeIn>
-            <h2 className="text-center text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">
             Frequently asked questions
             </h2>
           </FadeIn>
@@ -172,7 +158,7 @@ export default function Home() {
                 { q: 'What is an llms.txt file?', a: 'llms.txt is a new standard (like robots.txt, but for AI). It\'s a file on your site that describes your business in a format AI models can easily read. airadr generates a custom one from your actual site content.' },
               ].map((item, index) => (
                 <AccordionItem key={index} value={`item-${index}`}>
-                  <AccordionTrigger className="text-left text-lg hover:no-underline" style={{ color: 'var(--text-primary)' }}>
+                  <AccordionTrigger className="text-left text-lg font-semibold text-gray-900 hover:no-underline">
                     {item.q}
                   </AccordionTrigger>
                   <AccordionContent>
@@ -188,10 +174,10 @@ export default function Home() {
       {/* Bottom CTA */}
       <section className="relative px-4 py-24 text-center">
         <FadeIn>
-          <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900">
             Most businesses aren&apos;t optimized for AI search yet
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-white/40">
+          <p className="mx-auto mt-3 max-w-md text-gray-600">
             See what ChatGPT knows about you — takes 30 seconds, completely free.
           </p>
           <UrlInput onSubmit={handleSubmit} loading={loading} variant="elevated" className="mx-auto mt-8" />

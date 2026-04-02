@@ -12,7 +12,6 @@ import {
 import { FadeIn, StaggerGrid, StaggerItem } from '@/components/marketing/motion';
 import { cn } from '@/lib/utils';
 
-/** Per-row accents: left bar + tinted icon plate + points tint (aligned with product palette). */
 const DIMS: readonly {
   title: string;
   desc: string;
@@ -30,10 +29,10 @@ const DIMS: readonly {
     pts: '20 pts',
     Icon: FileSearch,
     accent: {
-      stripe: 'border-l-2 border-l-[#356df4]',
+      stripe: 'border-l-2 border-l-[#2563eb]',
       iconPlate:
-        'border-[#356df4]/40 bg-[#356df4]/12 text-[#9bb6ff] group-hover:border-[#356df4]/60 group-hover:bg-[#356df4]/18 group-hover:text-[#c5d4ff]',
-      pts: 'text-[#7d9eff]/95',
+        'border-blue-200 bg-blue-50 text-blue-700 group-hover:border-blue-300 group-hover:bg-blue-100 group-hover:text-blue-800',
+      pts: 'text-blue-700',
     },
   },
   {
@@ -42,10 +41,10 @@ const DIMS: readonly {
     pts: '20 pts',
     Icon: Braces,
     accent: {
-      stripe: 'border-l-2 border-l-[#16b7ca]',
+      stripe: 'border-l-2 border-l-[#0891b2]',
       iconPlate:
-        'border-[#16b7ca]/40 bg-[#16b7ca]/12 text-[#7ee8f0] group-hover:border-[#16b7ca]/60 group-hover:bg-[#16b7ca]/18 group-hover:text-[#b2f0f5]',
-      pts: 'text-[#5ed4e0]/95',
+        'border-cyan-200 bg-cyan-50 text-cyan-800 group-hover:border-cyan-300 group-hover:bg-cyan-100 group-hover:text-cyan-900',
+      pts: 'text-cyan-800',
     },
   },
   {
@@ -54,10 +53,10 @@ const DIMS: readonly {
     pts: '20 pts',
     Icon: FileText,
     accent: {
-      stripe: 'border-l-2 border-l-[#25c972]',
+      stripe: 'border-l-2 border-l-[#16a34a]',
       iconPlate:
-        'border-[#25c972]/40 bg-[#25c972]/12 text-[#7ee0ae] group-hover:border-[#25c972]/58 group-hover:bg-[#25c972]/18 group-hover:text-[#b8f0cf]',
-      pts: 'text-[#4ade80]/95',
+        'border-green-200 bg-green-50 text-green-800 group-hover:border-green-300 group-hover:bg-green-100 group-hover:text-green-900',
+      pts: 'text-green-800',
     },
   },
   {
@@ -66,10 +65,10 @@ const DIMS: readonly {
     pts: '20 pts',
     Icon: BookOpen,
     accent: {
-      stripe: 'border-l-2 border-l-[#f0a04d]',
+      stripe: 'border-l-2 border-l-[#ea580c]',
       iconPlate:
-        'border-[#f0a04d]/45 bg-[#f0a04d]/12 text-[#fac898] group-hover:border-[#f0a04d]/65 group-hover:bg-[#f0a04d]/20 group-hover:text-[#ffd9b3]',
-      pts: 'text-[#e8a05c]/95',
+        'border-orange-200 bg-orange-50 text-orange-800 group-hover:border-orange-300 group-hover:bg-orange-100 group-hover:text-orange-900',
+      pts: 'text-orange-800',
     },
   },
   {
@@ -78,10 +77,10 @@ const DIMS: readonly {
     pts: '10 pts',
     Icon: Fingerprint,
     accent: {
-      stripe: 'border-l-2 border-l-[#b794f6]',
+      stripe: 'border-l-2 border-l-[#7c3aed]',
       iconPlate:
-        'border-[#b794f6]/42 bg-[#b794f6]/12 text-[#d4c4fc] group-hover:border-[#b794f6]/62 group-hover:bg-[#b794f6]/20 group-hover:text-[#ece6ff]',
-      pts: 'text-[#c4b0fd]/95',
+        'border-violet-200 bg-violet-50 text-violet-800 group-hover:border-violet-300 group-hover:bg-violet-100 group-hover:text-violet-900',
+      pts: 'text-violet-800',
     },
   },
   {
@@ -90,41 +89,41 @@ const DIMS: readonly {
     pts: '10 pts',
     Icon: ShieldCheck,
     accent: {
-      stripe: 'border-l-2 border-l-[#7ba9ff]',
+      stripe: 'border-l-2 border-l-[#4f46e5]',
       iconPlate:
-        'border-[#7ba9ff]/42 bg-[#7ba9ff]/14 text-[#aec8ff] group-hover:border-[#7ba9ff]/62 group-hover:bg-[#7ba9ff]/22 group-hover:text-[#dce6ff]',
-      pts: 'text-[#94b8ff]/95',
+        'border-indigo-200 bg-indigo-50 text-indigo-800 group-hover:border-indigo-300 group-hover:bg-indigo-100 group-hover:text-indigo-900',
+      pts: 'text-indigo-800',
     },
   },
 ];
 
 export function DimensionsSection() {
   return (
-    <section className="relative border-t border-white/[0.07] px-4 py-16 sm:py-20 lg:py-24" aria-labelledby="dimensions-heading">
-      <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+    <section className="relative border-t border-gray-200 px-4 py-16 sm:py-20 lg:py-24" aria-labelledby="dimensions-heading">
+      <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
 
       <div className="mx-auto max-w-6xl">
         <FadeIn>
           <div className="grid items-end gap-8 lg:grid-cols-12 lg:gap-12 lg:gap-y-10">
             <div className="lg:col-span-5">
-              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600">
                 Scoring model
               </p>
               <h2
                 id="dimensions-heading"
-                className="font-display mt-4 bg-gradient-to-br from-white via-white to-zinc-400 bg-clip-text text-[1.875rem] font-semibold leading-[1.1] tracking-[-0.035em] text-transparent sm:text-[2.125rem] lg:text-[2.25rem]"
+                className="font-display mt-4 text-[1.875rem] font-semibold leading-[1.1] tracking-[-0.035em] text-gray-900 sm:text-[2.125rem] lg:text-[2.25rem]"
               >
                 What we check
               </h2>
             </div>
-            <p className="text-[15px] leading-[1.72] text-zinc-400 lg:col-span-7 lg:pb-1 lg:pl-2">
+            <p className="text-[15px] font-medium leading-[1.72] text-gray-600 lg:col-span-7 lg:pb-1 lg:pl-2">
               Six dimensions that determine how AI search engines see your business. Each maps to concrete checks from your
               crawl—not abstract “AI scores” from a black box.
             </p>
           </div>
         </FadeIn>
 
-        <StaggerGrid className="mt-12 divide-y divide-white/[0.07] border-t border-white/[0.07] sm:mt-14 lg:mt-16">
+        <StaggerGrid className="mt-12 divide-y divide-gray-200 border-t border-gray-200 sm:mt-14 lg:mt-16">
           {DIMS.map((dim) => (
             <StaggerItem key={dim.title}>
               <article
@@ -140,21 +139,21 @@ export function DimensionsSection() {
                   )}
                   aria-hidden
                 >
-                  <dim.Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={1.6} />
+                  <dim.Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={2} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-4">
-                    <h3 className="text-[1.0625rem] font-semibold tracking-tight text-white">{dim.title}</h3>
+                    <h3 className="text-[1.0625rem] font-semibold tracking-tight text-gray-900">{dim.title}</h3>
                     <span
                       className={cn(
-                        'font-mono text-[11px] font-medium uppercase tracking-[0.14em]',
+                        'font-mono text-[11px] font-bold uppercase tracking-[0.14em]',
                         dim.accent.pts,
                       )}
                     >
                       {dim.pts}
                     </span>
                   </div>
-                  <p className="mt-2.5 max-w-2xl text-[14px] leading-[1.65] text-zinc-400 sm:text-[15px] sm:leading-[1.7]">
+                  <p className="mt-2.5 max-w-2xl text-[14px] font-medium leading-[1.65] text-gray-600 sm:text-[15px] sm:leading-[1.7]">
                     {dim.desc}
                   </p>
                 </div>

@@ -113,7 +113,7 @@ export function UrlInput({
               onChange={(e) => { setUrl(e.target.value); setError(''); }}
               placeholder={placeholder ?? 'example.com or your-site.co.uk'}
               autoFocus={autoFocus}
-              className="aiso-input min-h-[60px] flex-1 px-5 py-4 text-base"
+              className="aiso-input min-h-[60px] flex-1 px-5 py-4 text-base placeholder:text-gray-500"
               style={{ boxShadow: 'none' }}
               disabled={loading}
             />

@@ -20,13 +20,13 @@ export function ReportPreviewBand() {
       <div className="mx-auto max-w-6xl">
         <FadeIn>
           <div className="mx-auto mb-12 max-w-2xl text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--color-primary-300)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--color-primary-700)]">
               Inside the audit
             </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-gray-900">
               A report you can act on the same day
             </h2>
-            <p className="mt-3 text-[15px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+            <p className="mt-3 text-[15px] font-medium leading-relaxed text-gray-600">
               Scores, dimension breakdowns, and prioritized fixes—styled like your real workspace so you know what to
               expect after you scan.
             </p>

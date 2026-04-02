@@ -44,8 +44,8 @@ export function ScoreRing({
         <div
           className="absolute inset-0 rounded-full"
           style={{
-            background: `radial-gradient(circle at 35% 35%, ${color}44 0%, transparent 62%)`,
-            filter: 'blur(18px)',
+            background: `radial-gradient(circle at 35% 35%, ${color}22 0%, transparent 62%)`,
+            filter: 'blur(14px)',
             animation: loading ? 'pulse 2.2s ease-in-out infinite' : undefined,
           }}
         />
@@ -56,7 +56,7 @@ export function ScoreRing({
             r={radius}
             fill="none"
             strokeWidth={strokeWidth}
-            style={{ stroke: 'rgba(131, 160, 255, 0.12)' }}
+            style={{ stroke: 'rgba(0,0,0,0.07)' }}
           />
           {loading ? (
             <>
@@ -105,11 +105,9 @@ export function ScoreRing({
           style={{
             width: Math.max(36, size - 40),
             height: Math.max(36, size - 40),
-            borderColor: `${color}22`,
-            background:
-              'linear-gradient(180deg, rgba(16, 25, 43, 0.96) 0%, rgba(8, 14, 26, 0.98) 100%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-            backdropFilter: 'blur(16px)',
+            borderColor: `${color}20`,
+            background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
           }}
         >
           <span
@@ -137,10 +135,7 @@ export function ScoreRing({
             {loading ? loadingText : score === null ? '--' : animatedScore}
           </span>
           {loading ? (
-            <span
-              className="mt-2 text-[0.64rem] font-semibold uppercase tracking-[0.28em]"
-              style={{ color: 'var(--text-muted)' }}
-            >
+            <span className="mt-2 text-[0.64rem] font-semibold uppercase tracking-[0.28em] text-gray-400">
               Waiting for score
             </span>
           ) : null}
@@ -149,11 +144,11 @@ export function ScoreRing({
       {(label || caption) && (
         <div className="text-center">
           {label ? (
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--text-muted)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gray-500">
               {label}
             </p>
           ) : null}
-          {caption ? <p className="mt-1 text-sm text-[var(--text-secondary)]">{caption}</p> : null}
+          {caption ? <p className="mt-1 text-sm text-gray-600">{caption}</p> : null}
         </div>
       )}
     </div>

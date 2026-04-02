@@ -45,12 +45,15 @@ import type { SiteSummary } from '@/app/advanced/lib/types';
 export function WorkspaceShell({
   sectionKey,
   requiredTier,
+  wide,
   children,
 }: {
   /** The NAV_GATES key for this section, e.g. 'dashboard', 'report', 'brand' */
   sectionKey: string;
   /** Override the required tier (defaults to NAV_GATES[sectionKey]) */
   requiredTier?: PlanTier;
+  /** Expand to a wider, less padded container — ideal for data-dense pages like the dashboard */
+  wide?: boolean;
   /** Section content renderer — receives workspace data */
   children: (ctx: WorkspaceContext) => React.ReactNode;
 }) {
@@ -113,11 +116,15 @@ export function WorkspaceShell({
     return <CenteredLoading label="Loading workspace..." />;
   }
 
+  const containerCls = wide
+    ? 'relative mx-auto w-full max-w-[1440px] px-3 pb-20 pt-4 sm:px-5 lg:px-7'
+    : 'relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8';
+
   // Gating check — show locked overlay if tier is insufficient
   if (!hasAccess) {
     return (
-      <div className="text-white">
-        <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
+      <div>
+        <main className={containerCls}>
           <LockedFeatureOverlay
             featureName={sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1)}
             requiredTier={minTier}
@@ -132,8 +139,8 @@ export function WorkspaceShell({
   // No domains yet
   if (monitoredSites.length === 0) {
     return (
-      <div className="text-white">
-        <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
+      <div>
+        <main className={containerCls}>
           <NoDomainState sectionKey={sectionKey} onOpenUnlock={() => setUnlockModalOpen(true)} />
         </main>
         <FloatingFeedback />
@@ -166,8 +173,8 @@ export function WorkspaceShell({
   // No scan yet — prompt to run first scan
   if (!expandedSite.latestScan) {
     return (
-      <div className="text-white">
-        <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
+      <div>
+        <main className={containerCls}>
           <FirstScanPrompt
             domain={selectedDomain}
             expandedSite={expandedSite}
@@ -209,10 +216,10 @@ export function WorkspaceShell({
   };
 
   return (
-    <div className="text-white">
-      <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
+    <div>
+      <main className={containerCls}>
         {checkoutBanner && (
-          <div className="mb-4 rounded-2xl border border-[#25c972]/30 bg-[#25c972]/10 px-4 py-3 text-sm text-[#25c972]">
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
@@ -222,7 +229,7 @@ export function WorkspaceShell({
                 type="button"
                 onClick={dismissCheckoutBanner}
                 aria-label="Dismiss message"
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#25c972]/80 transition-colors hover:bg-[#25c972]/12 hover:text-[#9af1be]"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-emerald-500 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -231,11 +238,11 @@ export function WorkspaceShell({
         )}
 
         {billingStatus.status?.pendingChange && (
-          <div className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-300/8 px-4 py-3 text-sm text-amber-100">
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-200" />
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
                   <span>
                     {billingStatus.status.pendingChange.targetLabel} is scheduled for{' '}
                     {billingStatus.status.pendingChange.effectiveAt
@@ -243,7 +250,7 @@ export function WorkspaceShell({
                       : 'the next renewal'}.
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-amber-50/80">
+                <p className="mt-1 text-xs text-amber-700/80">
                   {billingStatus.status.readiness.viewerIssues.length > 0
                     ? `${billingStatus.status.readiness.viewerIssues.length} cleanup item${billingStatus.status.readiness.viewerIssues.length === 1 ? '' : 's'} still need attention.`
                     : 'No blockers are currently assigned to you.'}
@@ -257,14 +264,14 @@ export function WorkspaceShell({
                   <Link
                     key={`${issue.category}:${issue.memberUserId ?? 'shared'}:${issue.domain ?? 'global'}`}
                     href={issue.cleanupHref}
-                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-black/35"
+                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-50"
                   >
                     {issue.cleanupLabel}
                   </Link>
                 ))}
                 <Link
                   href="/settings#general"
-                  className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-black/35"
+                  className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-50"
                 >
                   Billing details
                 </Link>
@@ -274,14 +281,14 @@ export function WorkspaceShell({
         )}
 
         {billingStatus.status?.overageMode === 'cleanup_required' && (
-          <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-300" />
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
                   <span>Some actions are temporarily in cleanup-only mode.</span>
                 </div>
-                <p className="mt-1 text-xs text-red-100/75">
+                <p className="mt-1 text-xs text-red-700/75">
                   Additive actions are blocked until the active plan limits are back in range.
                 </p>
               </div>
@@ -290,7 +297,7 @@ export function WorkspaceShell({
                   <Link
                     key={`${issue.category}:${issue.memberUserId ?? 'shared'}:${issue.domain ?? 'global'}`}
                     href={issue.cleanupHref}
-                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-black/35"
+                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-50"
                   >
                     {issue.cleanupLabel}
                   </Link>
@@ -301,7 +308,7 @@ export function WorkspaceShell({
         )}
 
         {actionError && (
-          <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/8 px-3.5 py-2.5 text-xs text-red-300">
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700">
             {actionError}
           </div>
         )}
@@ -352,8 +359,8 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
       {/* Welcome header */}
-      <h1 className="text-3xl font-bold tracking-tight text-white">Welcome to airadr</h1>
-      <p className="mt-2 text-[14px] text-zinc-400">Get your AI visibility score in three simple steps</p>
+      <h1 className="text-3xl font-bold tracking-tight text-gray-900">Welcome to airadr</h1>
+      <p className="mt-2 text-[14px] text-gray-500">Get your AI visibility score in three simple steps</p>
 
       {/* 3-step visual flow */}
       <div className="mx-auto mt-8 flex items-center gap-3">
@@ -367,19 +374,19 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
               <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#356df4]/30 bg-[#356df4]/10 text-[14px] font-bold text-[#356df4]">
                 {step.num}
               </div>
-              <span className="text-[11px] font-medium text-zinc-400">{step.label}</span>
+              <span className="text-[11px] font-medium text-gray-500">{step.label}</span>
             </div>
-            {i < 2 && <div className="mb-5 h-px w-8 bg-white/10" />}
+            {i < 2 && <div className="mb-5 h-px w-8 bg-gray-200" />}
           </div>
         ))}
       </div>
 
       {/* Existing add domain section */}
-      <div className="mt-8 flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
-        <Plus className="h-6 w-6 text-zinc-300" />
+      <div className="mt-8 flex h-14 w-14 items-center justify-center rounded-full border border-gray-200 bg-gray-50">
+        <Plus className="h-6 w-6 text-gray-400" />
       </div>
-      <h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">Add your first domain</h2>
-      <p className="mx-auto mt-2 max-w-[420px] text-[13px] leading-6 text-zinc-500">
+      <h2 className="mt-5 text-2xl font-semibold tracking-tight text-gray-900">Add your first domain</h2>
+      <p className="mx-auto mt-2 max-w-[420px] text-[13px] leading-6 text-gray-500">
         {resumeLandingFlow
           ? `We saved ${prefilledDomain} from the landing page. Confirm ownership, then continue the scan.`
           : 'Start monitoring your AI visibility by adding a domain.'}
@@ -387,11 +394,11 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
 
       <div className="mx-auto mt-6 w-full max-w-[420px] space-y-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-white/10 bg-[#1b1b1c] px-3">
+          <div className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-gray-200 bg-white px-3">
             {inputFaviconUrl ? (
               <img src={inputFaviconUrl} alt="" className="h-4 w-4 shrink-0 rounded-sm" />
             ) : (
-              <Globe2 className="h-4 w-4 shrink-0 text-zinc-500" />
+              <Globe2 className="h-4 w-4 shrink-0 text-gray-400" />
             )}
             <input
               type="text"
@@ -399,7 +406,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
               onChange={(e) => setAddDomainInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && void handleAddDomain()}
               placeholder="example.com"
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-gray-900 placeholder:text-gray-400 focus:outline-none"
             />
           </div>
           <button
@@ -410,15 +417,15 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
             {resumeLandingFlow ? 'Add & run scan' : 'Add'}
           </button>
         </div>
-        {addError && <p className="text-[11px] text-red-400">{addError}</p>}
+        {addError && <p className="text-[11px] text-red-500">{addError}</p>}
         <label className="flex cursor-pointer items-start gap-2.5">
           <input
             type="checkbox"
             checked={confirmChecked}
             onChange={(e) => setConfirmChecked(e.target.checked)}
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-zinc-400"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-gray-500"
           />
-          <span className="text-[12px] leading-5 text-zinc-500">
+          <span className="text-[12px] leading-5 text-gray-500">
             I confirm that I own this domain or have authorization to monitor it.
           </span>
         </label>
@@ -502,37 +509,37 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-6">
       <div className="w-full max-w-lg">
-        <div className="rounded-2xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(12,13,14,0.98)_0%,rgba(8,8,9,0.99)_100%)] p-8">
+        <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           {/* Header */}
           <div className="text-center">
             <div className={cn(
               'mx-auto flex h-16 w-16 items-center justify-center rounded-full border',
               scanStatus === 'complete'
-                ? 'border-[#25c972]/30 bg-[#25c972]/10'
+                ? 'border-emerald-200 bg-emerald-50'
                 : scanStatus === 'failed'
-                  ? 'border-red-500/30 bg-red-500/10'
-                : 'border-[#356df4]/30 bg-[#356df4]/10'
+                  ? 'border-red-200 bg-red-50'
+                : 'border-blue-200 bg-blue-50'
             )}>
               {scanStatus === 'complete' ? (
-                <CheckCircle2 className="h-7 w-7 text-[#25c972]" />
+                <CheckCircle2 className="h-7 w-7 text-emerald-500" />
               ) : scanStatus === 'failed' ? (
-                <AlertTriangle className="h-7 w-7 text-red-400" />
+                <AlertTriangle className="h-7 w-7 text-red-500" />
               ) : (
-                <Loader2 className="h-7 w-7 animate-spin text-[#356df4]" />
+                <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
               )}
             </div>
-            <h2 className="mt-5 text-xl font-semibold text-white">
+            <h2 className="mt-5 text-xl font-semibold text-gray-900">
               {scanStatus === 'complete'
                 ? 'Scan complete'
                 : scanStatus === 'failed'
                   ? 'Scan failed'
                   : `Scanning ${domain}`}
             </h2>
-            <p className="mt-2 text-[13px] text-zinc-400">
+            <p className="mt-2 text-[13px] text-gray-500">
               {scanStatus === 'complete'
                 ? 'Loading your report...'
                 : scanStatus === 'failed'
-                  ? (scanError || 'We couldn’t finish this scan.')
+                  ? (scanError || 'We couldn\u2019t finish this scan.')
                 : "Analyzing your site\u2019s AI visibility, web health, and mentions."}
             </p>
           </div>
@@ -540,14 +547,14 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
           {/* Progress bar */}
           <div className="mt-6">
             <div className="flex items-center justify-between text-[12px]">
-              <span className="font-medium text-zinc-300">{progressPct}% complete</span>
-              <span className="tabular-nums text-zinc-500">
+              <span className="font-medium text-gray-700">{progressPct}% complete</span>
+              <span className="tabular-nums text-gray-400">
                 {mins}:{secs.toString().padStart(2, '0')} elapsed
               </span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#356df4] to-[#25c972] transition-all duration-700 ease-out"
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-700 ease-out"
                 style={{ width: `${Math.max(progressPct, 3)}%` }}
               />
             </div>
@@ -566,33 +573,33 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
                   key={step.label}
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2 transition-colors',
-                    isRunning && 'bg-[#356df4]/8',
+                    isRunning && 'bg-blue-50',
                   )}
                 >
                   <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                     {isDone ? (
-                      <CheckCircle2 className="h-4 w-4 text-[#25c972]" />
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                     ) : isRunning ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-[#356df4]" />
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
                     ) : isError ? (
-                      <Circle className="h-4 w-4 text-amber-400" />
+                      <Circle className="h-4 w-4 text-amber-500" />
                     ) : (
-                      <Circle className="h-4 w-4 text-zinc-600" />
+                      <Circle className="h-4 w-4 text-gray-300" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className={cn(
                       'text-[13px] font-medium',
-                      isDone ? 'text-zinc-400' : isRunning ? 'text-white' : 'text-zinc-500'
+                      isDone ? 'text-gray-400' : isRunning ? 'text-gray-900' : 'text-gray-500'
                     )}>
                       {step.label}
                     </p>
                     {isRunning && detail && (
-                      <p className="mt-0.5 text-[11px] text-zinc-500">{detail}</p>
+                      <p className="mt-0.5 text-[11px] text-gray-400">{detail}</p>
                     )}
                   </div>
                   {isDone && (
-                    <span className="text-[11px] text-zinc-600">Done</span>
+                    <span className="text-[11px] text-gray-400">Done</span>
                   )}
                 </div>
               );
@@ -601,15 +608,15 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
 
           {/* Current step highlight */}
           {currentStep && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-[#356df4]/20 bg-[#356df4]/5 px-4 py-3">
-              <Sparkles className="h-4 w-4 shrink-0 text-[#356df4]" />
-              <p className="text-[12px] text-zinc-300">
-                Currently: <span className="font-medium text-white">{currentStep.label}</span>
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+              <Sparkles className="h-4 w-4 shrink-0 text-blue-500" />
+              <p className="text-[12px] text-gray-600">
+                Currently: <span className="font-medium text-gray-900">{currentStep.label}</span>
               </p>
             </div>
           )}
 
-          <p className="mt-5 text-center text-[11px] text-zinc-600">
+          <p className="mt-5 text-center text-[11px] text-gray-400">
             This usually takes 4–5 minutes. The page will update automatically.
           </p>
         </div>
@@ -630,15 +637,15 @@ function FirstScanPrompt({
   actionError?: string;
 }) {
   return (
-    <div className="mt-6 rounded-[1.2rem] border border-white/8 bg-[linear-gradient(180deg,rgba(12,13,14,0.98)_0%,rgba(8,8,9,0.99)_100%)] p-5">
+    <div className="mt-6 rounded-[1.2rem] border border-gray-200 bg-white p-5 shadow-sm">
       {actionError && (
-        <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/8 px-3.5 py-2.5 text-xs text-red-300">
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700">
           {actionError}
         </div>
       )}
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#25c972]">Domain added</p>
-      <h3 className="mt-2 text-xl font-semibold text-white">Run the first scan for {domain}</h3>
-      <p className="mt-3 max-w-2xl text-[13px] leading-6 text-zinc-400">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Domain added</p>
+      <h3 className="mt-2 text-xl font-semibold text-gray-900">Run the first scan for {domain}</h3>
+      <p className="mt-3 max-w-2xl text-[13px] leading-6 text-gray-500">
         Generate a report to see your AI visibility score and fixes.
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
@@ -653,7 +660,7 @@ function FirstScanPrompt({
           href={expandedSite.url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]"
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
         >
           Visit site<ArrowUpRight className="h-4 w-4" />
         </a>

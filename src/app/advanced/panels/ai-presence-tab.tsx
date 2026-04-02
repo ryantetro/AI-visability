@@ -56,7 +56,7 @@ function RingGauge({ value, size = 160, strokeWidth = 10, color }: {
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="rgba(255,255,255,0.04)"
+        stroke="rgba(0,0,0,0.06)"
         strokeWidth={strokeWidth}
       />
       {/* Glow */}
@@ -94,7 +94,7 @@ function RingGauge({ value, size = 160, strokeWidth = 10, color }: {
 
 function ProgressBar({ value, color, className }: { value: number; color: string; className?: string }) {
   return (
-    <div className={cn('relative h-2 w-full rounded-full overflow-hidden bg-white/[0.04]', className)}>
+    <div className={cn('relative h-2 w-full rounded-full overflow-hidden bg-gray-200', className)}>
       {/* Glow layer */}
       <div
         className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
@@ -129,12 +129,12 @@ function EngineProgressRow({ engine, value, color }: { engine: string; value: nu
         >
           <EngineIcon engine={engine} className="size-3.5" />
         </div>
-        <span className="text-[13px] font-medium capitalize text-zinc-300">{engine}</span>
+        <span className="text-[13px] font-medium capitalize text-gray-700">{engine}</span>
       </div>
       <div className="flex-1 min-w-0">
         <ProgressBar value={value} color={color} />
       </div>
-      <span className="w-12 shrink-0 text-right text-[13px] font-semibold tabular-nums text-zinc-200">{value}%</span>
+      <span className="w-12 shrink-0 text-right text-[13px] font-semibold tabular-nums text-gray-800">{value}%</span>
     </div>
   );
 }
@@ -212,8 +212,8 @@ export function AiPresenceTab({ report, domain }: { report: DashboardReportData;
   if (!ms && (aiState?.status === 'pending' || aiState?.status === 'running')) {
     return (
       <DashboardPanel className="p-5">
-        <p className="text-center text-sm text-zinc-300">AI mention testing is still running for this scan.</p>
-        <p className="mt-2 text-center text-sm text-zinc-500">
+        <p className="text-center text-sm text-gray-700">AI mention testing is still running for this scan.</p>
+        <p className="mt-2 text-center text-sm text-gray-500">
           {aiState?.phase === 'prompt_generation'
             ? 'Generating prompts'
             : aiState?.phase === 'engine_testing'
@@ -229,7 +229,7 @@ export function AiPresenceTab({ report, domain }: { report: DashboardReportData;
   if (!ms) {
     return (
       <DashboardPanel className="p-5">
-        <p className="text-center text-sm text-zinc-500">No AI mention data available. Run a scan to see your AI presence metrics.</p>
+        <p className="text-center text-sm text-gray-500">No AI mention data available. Run a scan to see your AI presence metrics.</p>
       </DashboardPanel>
     );
   }
@@ -248,14 +248,14 @@ export function AiPresenceTab({ report, domain }: { report: DashboardReportData;
 
     return (
       <DashboardPanel className="p-5">
-        <p className="text-center text-sm text-zinc-300">
+        <p className="text-center text-sm text-gray-700">
           AI mention testing did not finish for this scan.
         </p>
-        <p className="mt-2 text-center text-sm text-zinc-500">
+        <p className="mt-2 text-center text-sm text-gray-500">
           Live providers timed out or rate-limited the run, so this scan does not have a reliable AI visibility score yet.
         </p>
         {failingEngines.length > 0 && (
-          <p className="mt-3 text-center text-xs text-zinc-500">
+          <p className="mt-3 text-center text-xs text-gray-500">
             Affected engines: {failingEngines.join(', ')}
           </p>
         )}
@@ -273,7 +273,7 @@ export function AiPresenceTab({ report, domain }: { report: DashboardReportData;
     <div className="space-y-6">
       {mentionTestingDegraded && (
         <DashboardPanel className="p-4">
-          <p className="text-sm text-amber-200">
+          <p className="text-sm text-amber-700">
             This AI mention run completed with fallback prompts or heuristic analysis after provider slowdowns.
           </p>
         </DashboardPanel>
@@ -390,7 +390,7 @@ function HeroSection({
       {/* Header bar with toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5 pb-4">
         <SectionTitle eyebrow="AI Presence" title="Brand Overview" description="Toggle metrics to explore your mention rate, share of voice, and sentiment." />
-        <div className="flex gap-0.5 rounded-xl bg-white/[0.03] p-1 border border-white/[0.04]">
+        <div className="flex gap-0.5 rounded-xl bg-gray-100 p-1 border border-gray-200">
           {(Object.keys(HERO_META) as HeroMetric[]).map((key) => (
             <button
               key={key}
@@ -399,8 +399,8 @@ function HeroSection({
               className={cn(
                 'rounded-lg px-3.5 py-1.5 text-[12px] font-medium transition-all duration-200',
                 activeMetric === key
-                  ? 'bg-white/[0.08] text-white shadow-sm border border-white/[0.06]'
-                  : 'text-zinc-500 hover:text-zinc-300 border border-transparent'
+                  ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                  : 'text-gray-500 hover:text-gray-700 border border-transparent'
               )}
             >
               {HERO_META[key].label}
@@ -417,13 +417,13 @@ function HeroSection({
             <div className="relative shrink-0">
               <RingGauge value={value} size={120} strokeWidth={8} color={meta.accent} />
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold tabular-nums text-white">{value}</span>
-                <span className="text-[11px] font-medium text-zinc-500">%</span>
+                <span className="text-3xl font-bold tabular-nums text-gray-900">{value}</span>
+                <span className="text-[11px] font-medium text-gray-500">%</span>
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-zinc-200">{meta.label}</p>
-              <p className="mt-1 text-[13px] leading-relaxed text-zinc-500">{meta.description}</p>
+              <p className="text-sm font-semibold text-gray-800">{meta.label}</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-gray-500">{meta.description}</p>
               <div className="mt-2.5 flex items-center gap-1.5">
                 {value >= 50 ? (
                   <TrendingUp className="h-3.5 w-3.5 text-[#25c972]" />
@@ -444,8 +444,8 @@ function HeroSection({
 
           {/* Engine progress bars */}
           {chartData.length > 0 && (
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] p-4">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">By Engine</p>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">By Engine</p>
               {chartData.map((entry) => (
                 <EngineProgressRow
                   key={entry.name}
@@ -459,45 +459,45 @@ function HeroSection({
         </div>
 
         {/* Right: Brand Leaderboard */}
-        <div className="border-t border-white/[0.04] lg:border-t-0 lg:border-l lg:border-white/[0.04] px-6 pb-6 pt-5 lg:pt-0">
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Brand Rankings</p>
+        <div className="border-t border-gray-200 lg:border-t-0 lg:border-l lg:border-gray-200 px-6 pb-6 pt-5 lg:pt-0">
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">Brand Rankings</p>
           {!ms.competitorDiscovery ? (
-            <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-[12px] text-zinc-400">
+            <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-[12px] text-gray-500">
               Competitor data needs refresh. Run a new scan to see validated competitors.
             </div>
           ) : (
-            <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-[12px] text-zinc-400">
+            <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-[12px] text-gray-500">
               Only high-confidence competitors shown. We prefer fewer real brands over filler entries.
             </div>
           )}
-          <div className="rounded-xl border border-white/[0.05] bg-white/[0.015] overflow-hidden">
+          <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
             <div className="max-h-[340px] overflow-y-auto">
               {allBrands.map((entry, i) => (
                 <div
                   key={entry.name}
                   className={cn(
-                    'flex items-center justify-between px-4 py-2.5 text-[13px] border-b border-white/[0.03] last:border-b-0 transition-colors',
-                    entry.isBrand ? 'bg-[#25c972]/[0.06]' : 'hover:bg-white/[0.02]'
+                    'flex items-center justify-between px-4 py-2.5 text-[13px] border-b border-gray-100 last:border-b-0 transition-colors',
+                    entry.isBrand ? 'bg-emerald-50' : 'hover:bg-gray-50'
                   )}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={cn(
                       'flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-bold tabular-nums',
                       i === 0 ? 'bg-[#fbbf24]/15 text-[#fbbf24]' :
-                      i === 1 ? 'bg-white/[0.06] text-zinc-300' :
+                      i === 1 ? 'bg-gray-100 text-gray-500' :
                       i === 2 ? 'bg-[#cd7f32]/15 text-[#cd7f32]' :
-                      'text-zinc-600'
+                      'text-gray-500'
                     )}>
                       {i + 1}
                     </span>
                     <BrandFavicon name={entry.name} size={18} />
-                    <span className="truncate text-zinc-300">
+                    <span className="truncate text-gray-700">
                       {entry.name}
                       {entry.isBrand && (
-                        <span className="ml-2 inline-flex items-center rounded-md bg-[#25c972]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#25c972]">YOU</span>
+                        <span className="ml-2 inline-flex items-center rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700">YOU</span>
                       )}
                       {!entry.isBrand && entry.source && (
-                        <span className="ml-2 inline-flex items-center rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                        <span className="ml-2 inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-500">
                           {entry.source === 'tracked' ? 'Tracked' : entry.source === 'scan_inferred' ? 'Scan' : 'AI'}
                         </span>
                       )}
@@ -505,14 +505,14 @@ function HeroSection({
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="hidden sm:block w-20">
-                      <ProgressBar value={entry.visibilityPct} color={entry.isBrand ? '#25c972' : 'rgba(255,255,255,0.2)'} className="h-1" />
+                      <ProgressBar value={entry.visibilityPct} color={entry.isBrand ? '#25c972' : 'rgba(0,0,0,0.15)'} className="h-1" />
                     </div>
-                    <span className="w-10 text-right tabular-nums font-medium text-zinc-200">{entry.visibilityPct}%</span>
+                    <span className="w-10 text-right tabular-nums font-medium text-gray-800">{entry.visibilityPct}%</span>
                   </div>
                 </div>
               ))}
               {!ms.competitorDiscovery && allBrands.length === 1 && (
-                <div className="px-4 py-4 text-[12px] text-zinc-500">
+                <div className="px-4 py-4 text-[12px] text-gray-500">
                   Brand rankings are hidden for older scans until the site is rescanned with validated competitor discovery.
                 </div>
               )}
@@ -538,36 +538,36 @@ function SentimentPanel({ positives, negatives }: { positives: string[]; negativ
     <DashboardPanel className="p-5">
       <SectionTitle eyebrow="Sentiment" title="Sentiment Analysis" description="What AI engines say about your brand — strengths and areas for improvement." />
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-[#25c972]/10 bg-[#25c972]/[0.04] p-5">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
           <div className="mb-3 flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#25c972]/15">
               <ThumbsUp className="h-4 w-4 text-[#25c972]" />
             </div>
             <div>
               <p className="text-[13px] font-semibold text-[#25c972]">Strengths</p>
-              <p className="text-[11px] text-zinc-500">What AI says you do well</p>
+              <p className="text-[11px] text-gray-500">What AI says you do well</p>
             </div>
           </div>
           {positiveProse ? (
-            <p className="text-[13px] leading-relaxed text-zinc-300">{positiveProse}</p>
+            <p className="text-[13px] leading-relaxed text-gray-700">{positiveProse}</p>
           ) : (
-            <p className="text-[13px] text-zinc-500 italic">No positive signals extracted yet.</p>
+            <p className="text-[13px] text-gray-500 italic">No positive signals extracted yet.</p>
           )}
         </div>
-        <div className="rounded-xl border border-[#ff5252]/10 bg-[#ff5252]/[0.04] p-5">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5">
           <div className="mb-3 flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff5252]/15">
               <ThumbsDown className="h-4 w-4 text-[#ff5252]" />
             </div>
             <div>
               <p className="text-[13px] font-semibold text-[#ff5252]">Weaknesses</p>
-              <p className="text-[11px] text-zinc-500">Areas for improvement</p>
+              <p className="text-[11px] text-gray-500">Areas for improvement</p>
             </div>
           </div>
           {negativeProse ? (
-            <p className="text-[13px] leading-relaxed text-zinc-300">{negativeProse}</p>
+            <p className="text-[13px] leading-relaxed text-gray-700">{negativeProse}</p>
           ) : (
-            <p className="text-[13px] text-zinc-500 italic">No negative signals found — great job!</p>
+            <p className="text-[13px] text-gray-500 italic">No negative signals found -- great job!</p>
           )}
         </div>
       </div>
@@ -584,18 +584,18 @@ function TopicPerformanceSection({ topics }: { topics: Array<{ topic: string; vi
       <div className="mt-5 overflow-x-auto">
         <table className="w-full text-left text-[12px]">
           <thead>
-            <tr className="border-b border-white/[0.06] text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-600">
+            <tr className="border-b border-gray-200 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">
               <th className="pb-2.5 pr-3">Topic</th>
               <th className="pb-2.5 pr-3 text-right" title="Percentage of AI responses that mention your brand for this topic">Visibility</th>
               <th className="pb-2.5 pr-3 text-right" title="Your brand's share of all brand mentions for this topic">Share of Voice</th>
               <th className="pb-2.5 pr-3">Top Brands</th>
-              <th className="pb-2.5 text-right text-zinc-600">Prompts</th>
+              <th className="pb-2.5 text-right text-gray-500">Prompts</th>
             </tr>
           </thead>
           <tbody>
             {topics.map((t) => (
-              <tr key={t.topic} className="border-b border-white/[0.03] hover:bg-white/[0.01] transition-colors">
-                <td className="py-3.5 pr-3 text-zinc-200">{t.topic}</td>
+              <tr key={t.topic} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <td className="py-3.5 pr-3 text-gray-800">{t.topic}</td>
                 <td className="py-3.5 pr-3 text-right tabular-nums">
                   <span className={cn(
                     'inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold',
@@ -606,18 +606,18 @@ function TopicPerformanceSection({ topics }: { topics: Array<{ topic: string; vi
                     {t.visibilityPct}%
                   </span>
                 </td>
-                <td className="py-3.5 pr-3 text-right tabular-nums text-zinc-300">{t.shareOfVoice}%</td>
+                <td className="py-3.5 pr-3 text-right tabular-nums text-gray-700">{t.shareOfVoice}%</td>
                 <td className="py-3.5 pr-3">
                   <div className="flex items-center gap-1.5">
                     {t.topBrands.slice(0, 3).map((b) => (
                       <div key={b} className="flex items-center gap-1.5" title={b}>
                         <BrandFavicon name={b} size={20} />
-                        <span className="text-[11px] text-zinc-400 hidden sm:inline">{b.length > 12 ? b.slice(0, 10) + '..' : b}</span>
+                        <span className="text-[11px] text-gray-500 hidden sm:inline">{b.length > 12 ? b.slice(0, 10) + '..' : b}</span>
                       </div>
                     ))}
                   </div>
                 </td>
-                <td className="py-3.5 text-right tabular-nums text-zinc-500">{t.promptCount}</td>
+                <td className="py-3.5 text-right tabular-nums text-gray-500">{t.promptCount}</td>
               </tr>
             ))}
           </tbody>
@@ -672,7 +672,7 @@ function PromptMetricsSection({ ms }: { ms: MentionSummary }) {
       <div className="mt-5 overflow-x-auto">
         <table className="w-full text-left text-[12px]">
           <thead>
-            <tr className="border-b border-white/[0.06] text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-600">
+            <tr className="border-b border-gray-200 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">
               <th className="pb-2.5 pr-3 w-8"></th>
               <th className="pb-2.5 pr-3">Prompt</th>
               <th className="pb-2.5 pr-3">Topic</th>
@@ -729,20 +729,20 @@ function TablePromptRow({
   return (
     <>
       <tr
-        className={cn('border-b border-white/[0.03] cursor-pointer hover:bg-white/[0.015] transition-colors', isExpanded && 'bg-white/[0.02]')}
+        className={cn('border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors', isExpanded && 'bg-gray-50')}
         onClick={onToggle}
       >
         <td className="py-3.5 pr-2">
-          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />}
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-gray-400" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400" />}
         </td>
         <td className="py-3.5 pr-3 max-w-[280px]">
-          <p className="truncate text-zinc-200">{row.prompt.text}</p>
+          <p className="truncate text-gray-800">{row.prompt.text}</p>
         </td>
         <td className="py-3.5 pr-3">
-          <span className="rounded-md bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">{row.topic}</span>
+          <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-500">{row.topic}</span>
         </td>
         <td className="py-3.5 pr-3 text-right">
-          <p className="text-[13px] font-bold tabular-nums text-zinc-200">{row.visibilityPct}%</p>
+          <p className="text-[13px] font-bold tabular-nums text-gray-800">{row.visibilityPct}%</p>
         </td>
         <td className="py-3.5 text-right">
           {row.dominantSentiment && row.sentimentPct != null ? (
@@ -753,19 +753,19 @@ function TablePromptRow({
               {row.sentimentPct}% {row.dominantSentiment}
             </span>
           ) : (
-            <span className="text-zinc-600">--</span>
+            <span className="text-gray-400">--</span>
           )}
         </td>
       </tr>
       {isExpanded && (
-        <tr className="border-b border-white/[0.03]">
-          <td colSpan={5} className="px-4 py-3 bg-white/[0.01]">
+        <tr className="border-b border-gray-100">
+          <td colSpan={5} className="px-4 py-3 bg-gray-50/50">
             <div className="flex flex-wrap gap-2">
               {engines.map((engine) => {
                 const er = row.promptResults.find((r) => r.engine === engine);
                 const engineColor = ENGINE_COLORS[engine] ?? '#71717a';
                 if (!er) return (
-                  <span key={engine} className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-[11px] text-zinc-600">
+                  <span key={engine} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] text-gray-500">
                     <EngineIcon engine={engine} className="size-3.5" />
                     <span className="capitalize">{engine}</span> — not tested
                   </span>
@@ -789,7 +789,7 @@ function TablePromptRow({
               })}
             </div>
             {lastRun > 0 && (
-              <p className="mt-2 text-[10px] text-zinc-600">
+              <p className="mt-2 text-[10px] text-gray-500">
                 Last tested: {new Date(lastRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </p>
             )}
@@ -827,7 +827,7 @@ function EngineBreakdownSection({ ms }: { ms: MentionSummary }) {
           return (
             <div
               key={entry.engine}
-              className="group relative flex flex-col items-center rounded-xl border border-white/[0.05] bg-white/[0.015] p-5 transition-all duration-200 hover:border-white/[0.08] hover:bg-white/[0.025]"
+              className="group relative flex flex-col items-center rounded-xl border border-gray-200 bg-white p-5 transition-all duration-200 hover:border-gray-300 hover:bg-gray-50"
             >
               {/* Subtle glow on hover */}
               <div
@@ -849,12 +849,12 @@ function EngineBreakdownSection({ ms }: { ms: MentionSummary }) {
               </div>
 
               {/* Engine name */}
-              <p className="text-[13px] font-semibold capitalize text-zinc-200">{entry.engine}</p>
+              <p className="text-[13px] font-semibold capitalize text-gray-800">{entry.engine}</p>
 
               {/* Percentage */}
-              <p className="mt-1 text-2xl font-bold tabular-nums text-white">{entry.mentionRate}%</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{entry.mentionRate}%</p>
 
-              <p className="mt-1 text-[11px] text-zinc-500">
+              <p className="mt-1 text-[11px] text-gray-500">
                 Live engine testing
               </p>
             </div>

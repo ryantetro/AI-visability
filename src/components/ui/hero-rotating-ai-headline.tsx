@@ -79,7 +79,7 @@ export function HeroRotatingAiHeadline({
         </span>
         <span
           className={cn(
-            'bg-gradient-to-r from-[var(--color-primary-300)] to-[var(--color-primary-500)] bg-clip-text text-transparent',
+            'bg-gradient-to-r from-[var(--color-primary-500)] to-[var(--color-primary-700)] bg-clip-text text-transparent',
             secondLineClassName,
           )}
         >
@@ -110,7 +110,7 @@ export function HeroRotatingAiHeadline({
       <span
         aria-hidden="true"
         className={cn(
-          'bg-gradient-to-r from-[var(--color-primary-300)] to-[var(--color-primary-500)] bg-clip-text text-transparent',
+          'bg-gradient-to-r from-[var(--color-primary-500)] to-[var(--color-primary-700)] bg-clip-text text-transparent',
           secondLineClassName,
         )}
       >

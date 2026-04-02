@@ -19,12 +19,12 @@ interface ReportSectionProps {
   onOpenUnlock?: () => void;
 }
 
-/** Returns a CSS color string (not a Tailwind class) matching the analysis page */
+/** Returns a CSS color string tuned for the light-theme report page */
 function scoreColor(score: number | null): string {
-  if (score === null) return 'var(--color-warning, #ff8a1e)';
-  if (score >= 80) return '#25c972';
-  if (score >= 60) return '#ff8a1e';
-  return '#ff5252';
+  if (score === null) return '#d97706'; // amber-600
+  if (score >= 80) return '#059669';   // emerald-600
+  if (score >= 60) return '#d97706';   // amber-600
+  return '#dc2626';                    // red-600
 }
 
 /** Convert a check from our data to a rich CheckItem with fix content */
@@ -182,7 +182,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
                   type="button"
                   onClick={onReaudit}
                   disabled={reauditing}
-                  className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
                 >
                   <RefreshCw className={cn('h-4 w-4', reauditing && 'animate-spin')} />
                   {reauditing ? 'Scanning...' : 'Rescan'}
@@ -192,7 +192,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
                 <button
                   type="button"
                   onClick={() => handleCopyPrompt('full', copyToLlm.fullPrompt)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
                 >
                   <Copy className="h-4 w-4" />
                   {copiedPromptKey === 'full' ? 'Copied full-site prompt' : 'Copy full-site fix prompt'}
@@ -201,7 +201,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
               <button
                 type="button"
                 onClick={handleShareReport}
-                className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 hover:text-emerald-300"
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
               >
                 {shareState === 'copied' ? (
                   <Check className="h-4 w-4" />
@@ -214,7 +214,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
                 href={`https://${domain}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
               >
                 Visit site
                 <ArrowUpRight className="h-4 w-4" />
@@ -234,7 +234,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
       />
 
       {/* Click hint */}
-      <div className="mb-2 flex items-center justify-end gap-1.5 text-[11px] text-zinc-400">
+      <div className="mb-2 flex items-center justify-end gap-1.5 text-[11px] text-gray-400">
         <span className="animate-bounce">👇</span>
         Click to open / close
       </div>
@@ -265,12 +265,12 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
           return (
             <div id="section-ai-mentions" className="scroll-mt-4 rounded-xl transition-all duration-500">
             {mentionsDegraded && (
-              <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-sm text-amber-200">
+              <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                 AI Mentions completed with fallback prompts or heuristic analysis because one or more providers slowed down or timed out during this run.
               </div>
             )}
             {mentionsUnavailable && (
-              <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3 text-sm text-red-200">
+              <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 AI Mentions did not complete cleanly for this scan, so this section is unavailable for reliable scoring.
               </div>
             )}
@@ -679,14 +679,14 @@ function TakeActionSection({
   steps.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
   return (
-    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-6">
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
-          <Zap className="h-4 w-4 text-emerald-400" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+          <Zap className="h-4 w-4 text-blue-600" />
         </div>
         <div>
-          <h3 className="text-[15px] font-semibold text-white">Take Action</h3>
-          <p className="text-xs text-zinc-400">
+          <h3 className="text-[15px] font-semibold text-gray-900">Take Action</h3>
+          <p className="text-xs text-gray-500">
             {overallScore >= 80
               ? 'Great score! Here are ways to stay ahead.'
               : overallScore >= 60
@@ -713,32 +713,32 @@ function TakeActionSection({
               }
             }}
             className={cn(
-              'flex w-full items-start gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 text-left transition-colors',
-              step.scrollTarget && 'cursor-pointer hover:border-emerald-500/20 hover:bg-emerald-500/[0.03]',
+              'flex w-full items-start gap-4 rounded-lg border border-gray-200 bg-white p-4 text-left transition-colors',
+              step.scrollTarget && 'cursor-pointer hover:border-gray-300 hover:bg-gray-50',
             )}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-zinc-400">
-              <span className="text-xs font-bold text-zinc-300">{index + 1}</span>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">
+              <span className="text-xs font-bold text-gray-600">{index + 1}</span>
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className={cn(
-                  'text-zinc-400',
-                  step.priority === 'high' && 'text-emerald-400',
+                  'text-gray-400',
+                  step.priority === 'high' && 'text-blue-500',
                 )}>
                   {step.icon}
                 </span>
-                <p className="text-sm font-medium text-white">{step.title}</p>
+                <p className="text-sm font-medium text-gray-900">{step.title}</p>
                 {step.priority === 'high' && (
-                  <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-400">
+                  <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-blue-600">
                     Priority
                   </span>
                 )}
                 {step.scrollTarget && (
-                  <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 text-zinc-600" />
+                  <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 text-gray-300" />
                 )}
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-400">{step.description}</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-500">{step.description}</p>
               {step.action && (
                 <div className="mt-2">
                   {step.action.href ? (
@@ -747,7 +747,7 @@ function TakeActionSection({
                       target="_blank"
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
                     >
                       {step.action.label}
                       <ArrowUpRight className="h-3 w-3" />
@@ -758,7 +758,7 @@ function TakeActionSection({
                       tabIndex={0}
                       onClick={(e) => { e.stopPropagation(); step.action?.onClick?.(); }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); step.action?.onClick?.(); } }}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
                     >
                       {step.action.label}
                     </span>
@@ -791,12 +791,12 @@ function OgPreviewCard({
 
   return (
     <div className="space-y-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
         Live Open Graph preview
       </p>
-      <div className="overflow-hidden rounded-lg border border-white/10 bg-[#18191a]">
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
         {imageUrl && (
-          <div className="relative aspect-[1.91/1] w-full overflow-hidden bg-zinc-900">
+          <div className="relative aspect-[1.91/1] w-full overflow-hidden bg-gray-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imageUrl}
@@ -808,13 +808,13 @@ function OgPreviewCard({
         )}
         <div className="px-3 py-2.5">
           {displayDomain && (
-            <p className="text-[10px] uppercase tracking-wide text-zinc-500">{displayDomain}</p>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400">{displayDomain}</p>
           )}
           {title && (
-            <p className="mt-0.5 text-[13px] font-semibold leading-tight text-zinc-100 line-clamp-2">{title}</p>
+            <p className="mt-0.5 text-[13px] font-semibold leading-tight text-gray-900 line-clamp-2">{title}</p>
           )}
           {description && (
-            <p className="mt-1 text-[11px] leading-relaxed text-zinc-400 line-clamp-2">{description}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-gray-500 line-clamp-2">{description}</p>
           )}
         </div>
       </div>
@@ -840,13 +840,13 @@ function TwitterPreviewCard({
 
   return (
     <div className="space-y-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
         Live Twitter/X card preview
       </p>
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-[#15202b]">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
         {isLargeImage && imageUrl ? (
           <>
-            <div className="relative aspect-[2/1] w-full overflow-hidden bg-zinc-900">
+            <div className="relative aspect-[2/1] w-full overflow-hidden bg-gray-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageUrl}
@@ -857,20 +857,20 @@ function TwitterPreviewCard({
             </div>
             <div className="px-3 py-2.5">
               {title && (
-                <p className="text-[13px] font-semibold leading-tight text-zinc-100 line-clamp-1">{title}</p>
+                <p className="text-[13px] font-semibold leading-tight text-gray-900 line-clamp-1">{title}</p>
               )}
               {description && (
-                <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400 line-clamp-2">{description}</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-gray-500 line-clamp-2">{description}</p>
               )}
               {domain && (
-                <p className="mt-1 text-[10px] text-zinc-500">{domain}</p>
+                <p className="mt-1 text-[10px] text-gray-400">{domain}</p>
               )}
             </div>
           </>
         ) : (
           <div className="flex gap-3 p-3">
             {imageUrl && (
-              <div className="h-[108px] w-[108px] shrink-0 overflow-hidden rounded-lg bg-zinc-900">
+              <div className="h-[108px] w-[108px] shrink-0 overflow-hidden rounded-lg bg-gray-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageUrl}
@@ -882,13 +882,13 @@ function TwitterPreviewCard({
             )}
             <div className="min-w-0 flex-1">
               {title && (
-                <p className="text-[13px] font-semibold leading-tight text-zinc-100 line-clamp-2">{title}</p>
+                <p className="text-[13px] font-semibold leading-tight text-gray-900 line-clamp-2">{title}</p>
               )}
               {description && (
-                <p className="mt-1 text-[11px] leading-relaxed text-zinc-400 line-clamp-3">{description}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-gray-500 line-clamp-3">{description}</p>
               )}
               {domain && (
-                <p className="mt-1 text-[10px] text-zinc-500">{domain}</p>
+                <p className="mt-1 text-[10px] text-gray-400">{domain}</p>
               )}
             </div>
           </div>
@@ -902,11 +902,11 @@ function TwitterPreviewCard({
 function FaviconPreview({ url, domain }: { url: string; domain?: string }) {
   return (
     <div className="space-y-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
         Detected favicon
       </p>
-      <div className="flex items-center gap-4 rounded-lg border border-white/8 bg-black/25 px-4 py-3.5">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+      <div className="flex items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3.5">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={url}
@@ -916,9 +916,9 @@ function FaviconPreview({ url, domain }: { url: string; domain?: string }) {
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-zinc-100">Favicon detected</p>
-          {domain && <p className="mt-0.5 text-[11px] text-zinc-500">{domain}</p>}
-          <p className="mt-0.5 truncate text-[10px] text-zinc-600">{url}</p>
+          <p className="text-sm font-medium text-gray-900">Favicon detected</p>
+          {domain && <p className="mt-0.5 text-[11px] text-gray-500">{domain}</p>}
+          <p className="mt-0.5 truncate text-[10px] text-gray-400">{url}</p>
         </div>
       </div>
     </div>

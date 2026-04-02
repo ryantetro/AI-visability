@@ -50,7 +50,7 @@ export function normalizeDomainInput(value: string) {
 }
 
 export function scoreColor(score: number | null): string {
-  if (score === null) return 'text-zinc-500';
+  if (score === null) return 'text-gray-500';
   if (score >= 80) return 'text-[#25c972]';
   if (score >= 60) return 'text-[#ffbb00]';
   if (score >= 40) return 'text-[#ff8a1e]';

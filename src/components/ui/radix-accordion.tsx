@@ -172,7 +172,7 @@ const AccordionContent = React.forwardRef<
                             className="overflow-hidden"
                             ref={ref}
                         >
-                            <div className={cn('pb-6 pt-0 text-base text-[var(--text-tertiary)] leading-relaxed', className)}>
+                            <div className={cn('pb-6 pt-0 text-base font-medium leading-relaxed text-gray-600', className)}>
                                 {children}
                             </div>
                         </motion.div>

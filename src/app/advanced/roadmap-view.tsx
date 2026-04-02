@@ -73,9 +73,9 @@ const TABS: { id: Tab; label: string }[] = [
 
 function StatCard({ value, label, color }: { value: number; label: string; color: string }) {
   return (
-    <div className="bg-[#111113] p-5 text-center">
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-5 text-center">
       <div className={cn('text-3xl font-extrabold', color)}>{value}</div>
-      <div className="mt-1 text-[11px] text-zinc-500">{label}</div>
+      <div className="mt-1 text-[11px] text-gray-500">{label}</div>
     </div>
   );
 }
@@ -90,12 +90,12 @@ function GapAnalysisTab() {
 
   return (
     <div>
-      <p className="mb-4 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+      <p className="mb-4 text-[11px] uppercase tracking-[0.16em] text-gray-500">
         Feature-by-feature comparison — {GAP_COMPARISONS.length} capabilities mapped
       </p>
 
       {/* Summary stat cards */}
-      <div className="mb-8 grid grid-cols-2 gap-px bg-white/5 sm:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard value={stats.have} label="You have" color="text-[#25c972]" />
         <StatCard value={stats.partial} label="Partial" color="text-[#ffbb00]" />
         <StatCard value={stats.missing} label="Missing" color="text-[#ff5252]" />
@@ -107,24 +107,24 @@ function GapAnalysisTab() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[13px]">
             <thead>
-              <tr className="border-b border-white/8">
-                <th className="w-[28%] px-4 py-2.5 text-left text-[11px] uppercase tracking-[0.16em] font-normal text-zinc-500">Feature</th>
-                <th className="w-[26%] px-4 py-2.5 text-left text-[11px] uppercase tracking-[0.16em] font-normal text-[#3b82f6]">Your App</th>
-                <th className="w-[26%] px-4 py-2.5 text-left text-[11px] uppercase tracking-[0.16em] font-normal text-[#a855f7]">Competitor</th>
-                <th className="w-[10%] px-4 py-2.5 text-center text-[11px] uppercase tracking-[0.16em] font-normal text-zinc-500">Gap</th>
+              <tr className="border-b border-gray-200">
+                <th className="w-[28%] px-4 py-2.5 text-left text-[11px] uppercase tracking-[0.16em] font-normal text-gray-500">Feature</th>
+                <th className="w-[26%] px-4 py-2.5 text-left text-[11px] uppercase tracking-[0.16em] font-normal text-blue-600">Your App</th>
+                <th className="w-[26%] px-4 py-2.5 text-left text-[11px] uppercase tracking-[0.16em] font-normal text-purple-600">Competitor</th>
+                <th className="w-[10%] px-4 py-2.5 text-center text-[11px] uppercase tracking-[0.16em] font-normal text-gray-500">Gap</th>
               </tr>
             </thead>
             <tbody>
               {GAP_COMPARISONS.map((row, i) => (
-                <tr key={row.feature} className={cn('border-b border-white/5', i % 2 === 1 && 'bg-white/[0.015]')}>
-                  <td className="px-4 py-3 font-medium text-white">{row.feature}</td>
+                <tr key={row.feature} className={cn('border-b border-gray-100', i % 2 === 1 && 'bg-gray-50/50')}>
+                  <td className="px-4 py-3 font-medium text-gray-900">{row.feature}</td>
                   <td className="px-4 py-3">
                     <span className={cn('text-[11px]', STATE_COLOR[row.us.state])}>{STATE_LABEL[row.us.state]}</span>
-                    <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{row.us.note}</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{row.us.note}</p>
                   </td>
                   <td className="px-4 py-3">
                     <span className={cn('text-[11px]', STATE_COLOR[row.competitor.state])}>{STATE_LABEL[row.competitor.state]}</span>
-                    <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{row.competitor.note}</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{row.competitor.note}</p>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className={cn('inline-block whitespace-nowrap border px-2 py-0.5 text-[10px] uppercase tracking-wider', SEVERITY_COLOR[row.gap], SEVERITY_BG[row.gap])}>
@@ -139,8 +139,8 @@ function GapAnalysisTab() {
       </DashboardPanel>
 
       {/* "Where you're ahead" callout */}
-      <div className="mt-6 rounded-lg border border-[#25c972]/20 bg-[#18181b] px-5 py-4 text-[13px] leading-relaxed text-white">
-        <span className="font-bold text-[#25c972]">Where you&apos;re ahead: </span>
+      <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-[13px] leading-relaxed text-gray-800">
+        <span className="font-bold text-emerald-600">Where you&apos;re ahead: </span>
         Your technical site audit (6-dimension crawl-based scoring) is more detailed than the competitor&apos;s — they only offer it on paid tiers and it&apos;s clearly not their core focus. This is a real differentiator for the SMB market.
       </div>
     </div>
@@ -152,7 +152,7 @@ function EnhancementCard({ item }: { item: (typeof ENHANCEMENTS)[number] }) {
   const pColor = PRIORITY_COLOR[item.priority];
 
   return (
-    <div className="mb-2 border border-white/8 bg-[#111113]">
+    <div className="mb-2 rounded-lg border border-gray-200 bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -167,21 +167,21 @@ function EnhancementCard({ item }: { item: (typeof ENHANCEMENTS)[number] }) {
             >
               {item.priority}
             </span>
-            <span className="text-[10px] uppercase tracking-wider text-zinc-500">
+            <span className="text-[10px] uppercase tracking-wider text-gray-500">
               Effort: {item.effort}
             </span>
           </div>
-          <p className="text-[15px] font-bold text-white">{item.title}</p>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{item.subtitle}</p>
+          <p className="text-[15px] font-bold text-gray-900">{item.title}</p>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-gray-500">{item.subtitle}</p>
         </div>
-        <ChevronDown className={cn('mt-2 h-4 w-4 shrink-0 text-zinc-500 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('mt-2 h-4 w-4 shrink-0 text-gray-400 transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
-        <div className="border-t border-white/8 px-5 py-5">
+        <div className="border-t border-gray-200 px-5 py-5">
           {/* Impact */}
           <div
-            className="mb-5 rounded-md border px-4 py-3 text-[13px] leading-relaxed text-white"
+            className="mb-5 rounded-md border px-4 py-3 text-[13px] leading-relaxed text-gray-800"
             style={{ borderColor: `${pColor}25`, background: `${pColor}08` }}
           >
             <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: pColor }}>
@@ -192,17 +192,17 @@ function EnhancementCard({ item }: { item: (typeof ENHANCEMENTS)[number] }) {
 
           {/* Current state */}
           <div className="mb-5">
-            <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-zinc-500">Current State</p>
-            <div className="bg-[#18181b] px-3.5 py-2.5 font-mono text-[12px] leading-relaxed text-zinc-400">
+            <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">Current State</p>
+            <div className="rounded-md border border-gray-200 bg-gray-50 px-3.5 py-2.5 font-mono text-[12px] leading-relaxed text-gray-600">
               {item.currentState}
             </div>
           </div>
 
           {/* What to build */}
           <div>
-            <p className="mb-2.5 text-[10px] uppercase tracking-[0.16em] text-zinc-500">What To Build</p>
+            <p className="mb-2.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">What To Build</p>
             {item.whatToBuild.map((step, idx) => (
-              <div key={idx} className="mb-2 flex gap-2.5 text-[12px] leading-relaxed text-white">
+              <div key={idx} className="mb-2 flex gap-2.5 text-[12px] leading-relaxed text-gray-800">
                 <span className="shrink-0 font-mono" style={{ color: pColor }}>
                   {String(idx + 1).padStart(2, '0')}
                 </span>
@@ -226,7 +226,7 @@ function EnhancementPlanTab() {
 
   return (
     <div>
-      <p className="mb-6 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+      <p className="mb-6 text-[11px] uppercase tracking-[0.16em] text-gray-500">
         {ENHANCEMENTS.length} enhancements — click any to see impact, current state, and build plan
       </p>
       {groups.map(({ priority, items }) => {
@@ -236,7 +236,7 @@ function EnhancementPlanTab() {
             <div className="mb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.2em]" style={{ color }}>
               <div className="h-px w-5" style={{ background: color }} />
               {priority} PRIORITY — {items.length} items
-              <div className="h-px flex-1 bg-white/8" />
+              <div className="h-px flex-1 bg-gray-200" />
             </div>
             {items.map((item) => (
               <EnhancementCard key={item.id} item={item} />
@@ -257,22 +257,22 @@ function BuildOrderTab() {
 
   return (
     <div>
-      <p className="mb-6 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+      <p className="mb-6 text-[11px] uppercase tracking-[0.16em] text-gray-500">
         Sequenced build order — each sprint unlocks the next
       </p>
 
-      <div className="overflow-hidden border border-white/8">
+      <div className="overflow-hidden rounded-lg border border-gray-200">
         {BUILD_ORDER.map((sprint, si) => {
           const color = SPRINT_COLOR[si + 1] ?? '#3b82f6';
           return (
             <div
               key={sprint.sprint}
-              className={cn('grid grid-cols-1 sm:grid-cols-[160px_1fr]', si < BUILD_ORDER.length - 1 && 'border-b border-white/8')}
+              className={cn('grid grid-cols-1 sm:grid-cols-[160px_1fr]', si < BUILD_ORDER.length - 1 && 'border-b border-gray-200')}
             >
-              <div className="border-b border-white/8 bg-[#18181b] px-5 py-5 sm:border-b-0 sm:border-r">
+              <div className="border-b border-gray-200 bg-gray-50 px-5 py-5 sm:border-b-0 sm:border-r">
                 <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color }}>{sprint.sprint}</p>
-                <p className="mt-1.5 text-[14px] font-bold text-white">{sprint.label}</p>
-                <p className="mt-1 text-[11px] text-zinc-500">Weeks {sprint.weeks}</p>
+                <p className="mt-1.5 text-[14px] font-bold text-gray-900">{sprint.label}</p>
+                <p className="mt-1 text-[11px] text-gray-500">Weeks {sprint.weeks}</p>
               </div>
               <div className="px-5 py-5">
                 <div className="mb-3 flex flex-wrap gap-2">
@@ -283,7 +283,7 @@ function BuildOrderTab() {
                     return (
                       <span
                         key={id}
-                        className="inline-block border bg-[#18181b] px-3.5 py-1.5 text-[12px] text-white"
+                        className="inline-block rounded-md border bg-gray-50 px-3.5 py-1.5 text-[12px] text-gray-800"
                         style={{ borderColor: `${borderColor}50` }}
                       >
                         {item.title}
@@ -291,7 +291,7 @@ function BuildOrderTab() {
                     );
                   })}
                 </div>
-                <p className="text-[12px] leading-relaxed text-zinc-500">
+                <p className="text-[12px] leading-relaxed text-gray-500">
                   <span style={{ color }}>→ </span>
                   {sprint.rationale}
                 </p>
@@ -302,20 +302,20 @@ function BuildOrderTab() {
       </div>
 
       {/* Snapshot vs Monitoring callout */}
-      <div className="mt-8 border border-white/8 bg-[#18181b] p-6">
-        <p className="mb-4 text-[10px] uppercase tracking-[0.2em] text-[#a855f7]">The Core Difference To Internalize</p>
+      <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-6">
+        <p className="mb-4 text-[10px] uppercase tracking-[0.2em] text-purple-600">The Core Difference To Internalize</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="border border-white/8 bg-[#09090b] p-4">
-            <p className="mb-2 text-[11px] text-zinc-500">Your app right now</p>
-            <p className="mb-2 text-[14px] font-bold text-white">Snapshot tool</p>
-            <p className="text-[12px] leading-relaxed text-zinc-500">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="mb-2 text-[11px] text-gray-500">Your app right now</p>
+            <p className="mb-2 text-[14px] font-bold text-gray-900">Snapshot tool</p>
+            <p className="text-[12px] leading-relaxed text-gray-500">
               Runs once per scan. User triggers it. Results stored on device. No continuous signal. No trend.
             </p>
           </div>
-          <div className="border border-[#a855f7]/30 bg-[#09090b] p-4">
-            <p className="mb-2 text-[11px] text-[#a855f7]">What you need to become</p>
-            <p className="mb-2 text-[14px] font-bold text-white">Monitoring platform</p>
-            <p className="text-[12px] leading-relaxed text-zinc-500">
+          <div className="rounded-lg border border-purple-200 bg-white p-4">
+            <p className="mb-2 text-[11px] text-purple-600">What you need to become</p>
+            <p className="mb-2 text-[14px] font-bold text-gray-900">Monitoring platform</p>
+            <p className="text-[12px] leading-relaxed text-gray-500">
               Runs continuously in background. User sets it up once. Results accumulate on server. Trends are the product.
             </p>
           </div>
@@ -337,13 +337,13 @@ export function RoadmapView() {
     <div>
       {/* Header */}
       <div className="mb-8">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500">
           Competitive Analysis — Internal Reference
         </p>
-        <h1 className="mt-2 text-[clamp(24px,3.5vw,40px)] font-extrabold tracking-tight text-white">
+        <h1 className="mt-2 text-[clamp(24px,3.5vw,40px)] font-extrabold tracking-tight text-gray-900">
           Product Roadmap
         </h1>
-        <div className="mt-2 flex flex-wrap gap-5 text-[13px] text-zinc-500">
+        <div className="mt-2 flex flex-wrap gap-5 text-[13px] text-gray-500">
           <span><span className="font-bold text-[#ff5252]">{critCount} critical</span> gaps</span>
           <span><span className="font-bold text-[#ff8a1e]">{highCount} high</span> priority</span>
           <span><span className="font-bold text-[#25c972]">1 area</span> where you&apos;re already ahead</span>
@@ -351,7 +351,7 @@ export function RoadmapView() {
       </div>
 
       {/* Tab switcher */}
-      <div className="mb-8 inline-flex border border-white/10">
+      <div className="mb-8 inline-flex rounded-lg border border-gray-200 overflow-hidden">
         {TABS.map((t, i) => (
           <button
             key={t.id}
@@ -359,10 +359,10 @@ export function RoadmapView() {
             onClick={() => setTab(t.id)}
             className={cn(
               'px-5 py-2.5 text-[12px] uppercase tracking-wider transition-colors',
-              i > 0 && 'border-l border-white/10',
+              i > 0 && 'border-l border-gray-200',
               tab === t.id
-                ? 'bg-[#a855f7] font-semibold text-white'
-                : 'text-zinc-500 hover:text-zinc-300',
+                ? 'bg-purple-600 font-semibold text-white'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
             )}
           >
             {t.label}

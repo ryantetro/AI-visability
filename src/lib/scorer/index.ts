@@ -70,11 +70,11 @@ export function scoreCrawlData(data: CrawlData, webHealth?: WebHealthSummary): S
 
   let overall: number | null;
   if (perfScore !== null && trustScore !== null) {
-    // AI Visibility (1.0) + Performance (0.5) + Trust (0.5) = weight sum 2.0
-    overall = Math.round((aiVisibility * 1.0 + perfScore * 0.5 + trustScore * 0.5) / 2.0);
+    // AI Visibility (1.0) + Speed/Performance (0.8) + Trust/Security (0.8) = weight sum 2.6
+    overall = Math.round((aiVisibility * 1.0 + perfScore * 0.8 + trustScore * 0.8) / 2.6);
   } else if (webHealthPercentage !== null) {
-    // Fallback: use aggregate web health at half weight
-    overall = Math.round((aiVisibility * 1.0 + webHealthPercentage * 0.5) / 1.5);
+    // Fallback: use aggregate web health at 0.6 weight (up from 0.5)
+    overall = Math.round((aiVisibility * 1.0 + webHealthPercentage * 0.6) / 1.6);
   } else {
     overall = null;
   }

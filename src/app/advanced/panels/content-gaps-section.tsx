@@ -66,28 +66,28 @@ export function ContentGapsSection({ domain }: { domain: string }) {
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-[#ff5252]/15 bg-[#ff5252]/5 px-3 py-3 text-center">
             <p className="text-lg font-bold text-[#ff5252]">{critical.length}</p>
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Never mentioned</p>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Never mentioned</p>
           </div>
           <div className="rounded-xl border border-[#ff8a1e]/15 bg-[#ff8a1e]/5 px-3 py-3 text-center">
             <p className="text-lg font-bold text-[#ff8a1e]">{partial.length}</p>
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Low mention rate</p>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Low mention rate</p>
           </div>
         </div>
 
         <div className="mt-5 space-y-3">
           {gaps.map((gap, i) => (
-            <div key={i} className="rounded-[1.1rem] border border-white/8 bg-white/[0.02] p-4">
+            <div key={i} className="rounded-[1.1rem] border border-gray-200 bg-gray-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-zinc-200 line-clamp-2">&ldquo;{gap.promptText}&rdquo;</p>
+                  <p className="text-sm font-medium text-gray-700 line-clamp-2">&ldquo;{gap.promptText}&rdquo;</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400">{gap.category}</span>
-                    {gap.engines.length > 0 && <span className="text-[10px] text-zinc-500">Missing in: {gap.engines.join(', ')}</span>}
+                    <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-500">{gap.category}</span>
+                    {gap.engines.length > 0 && <span className="text-[10px] text-gray-500">Missing in: {gap.engines.join(', ')}</span>}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className={cn('text-sm font-bold tabular-nums', gap.mentionRate === 0 ? 'text-[#ff5252]' : 'text-[#ff8a1e]')}>{Math.round(gap.mentionRate * 100)}%</p>
-                  <p className="text-[9px] text-zinc-600">mention rate</p>
+                  <p className="text-[9px] text-gray-400">mention rate</p>
                 </div>
               </div>
             </div>
@@ -96,7 +96,7 @@ export function ContentGapsSection({ domain }: { domain: string }) {
 
         <div className="mt-5 rounded-xl border border-[#6c63ff]/15 bg-[#6c63ff]/5 px-4 py-3">
           <p className="text-[12px] font-medium text-[#6c63ff]">Content strategy tip</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+          <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
             Create dedicated pages or FAQ sections that directly address these prompts.
             AI engines are more likely to cite your brand when your content closely matches
             the questions users ask.

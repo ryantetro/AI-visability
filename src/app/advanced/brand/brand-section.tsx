@@ -100,7 +100,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
   return (
     <div className="space-y-6">
       {/* Sub-tab bar */}
-      <div className="flex gap-1 border-b border-white/[0.06] pb-px">
+      <div className="flex gap-1 border-b border-gray-200 pb-px">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -109,8 +109,8 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
             className={cn(
               'px-4 py-2.5 text-[13px] font-medium transition-colors border-b-2 -mb-px',
               activeTab === tab.id
-                ? 'border-[#25c972] text-white'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                ? 'border-emerald-500 text-gray-900'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             )}
           >
             {tab.label}
@@ -134,7 +134,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
                 return (
                   <WorkstreamSection
                     key={group.key}
-                    icon={<GroupIcon className="h-4 w-4 text-zinc-400" />}
+                    icon={<GroupIcon className="h-4 w-4 text-gray-400" />}
                     title={group.title}
                     count={group.fixes.length}
                     defaultOpen={groupIdx === 0}
@@ -166,7 +166,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
             </div>
           ) : (
             <DashboardPanel className="p-5">
-              <p className="text-center text-sm text-zinc-500">No fixes needed. Your site is in great shape!</p>
+              <p className="text-center text-sm text-gray-500">No fixes needed. Your site is in great shape!</p>
             </DashboardPanel>
           )}
 
@@ -195,15 +195,15 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
               const Icon = meta.icon;
               const verifyTarget = verificationPath(files.url, file.filename);
               return (
-                <div key={file.filename} className="rounded-[1.1rem] border border-white/8 bg-white/[0.02] p-4">
+                <div key={file.filename} className="rounded-[1.1rem] border border-gray-200 bg-gray-50 p-4">
                   {/* File info — always on top */}
                   <div className="flex items-start gap-2.5">
-                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white">{file.filename}</p>
-                      <p className="mt-0.5 text-[12px] text-zinc-500">{meta.subtitle}</p>
+                      <p className="text-sm font-semibold text-gray-900">{file.filename}</p>
+                      <p className="mt-0.5 text-[12px] text-gray-500">{meta.subtitle}</p>
                       {file.installInstructions && (
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-600">{file.installInstructions.split('.')[0]}.</p>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400">{file.installInstructions.split('.')[0]}.</p>
                       )}
                     </div>
                   </div>
@@ -213,15 +213,15 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
                       <Zap className="h-3.5 w-3.5" />
                       {copiedSinglePrompt === file.filename ? 'Prompt copied!' : 'Copy Prompt'}
                     </button>
-                    <button type="button" onClick={() => handleCopyFile(file)} className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
+                    <button type="button" onClick={() => handleCopyFile(file)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100">
                       <Copy className="h-3.5 w-3.5" />
                       {copiedFile === file.filename ? 'Copied' : 'Copy'}
                     </button>
-                    <button type="button" onClick={() => downloadTextFile(file.filename, file.content)} className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
+                    <button type="button" onClick={() => downloadTextFile(file.filename, file.content)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100">
                       <Download className="h-3.5 w-3.5" />
                       Download
                     </button>
-                    <a href={verifyTarget} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.05]">
+                    <a href={verifyTarget} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100">
                       Verify <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   </div>
@@ -234,7 +234,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
 
       {activeTab === 'files' && (!files || files.files.length === 0) && (
         <DashboardPanel className="p-5">
-          <p className="text-center text-sm text-zinc-500">No generated files available. Run a scan to generate deployment files.</p>
+          <p className="text-center text-sm text-gray-500">No generated files available. Run a scan to generate deployment files.</p>
         </DashboardPanel>
       )}
 
@@ -264,28 +264,28 @@ function FixSummaryCards({ fixes }: { fixes: PrioritizedFix[] }) {
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3.5">
-        <Zap className="h-5 w-5 shrink-0 text-emerald-400" />
+      <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
+        <Zap className="h-5 w-5 shrink-0 text-emerald-500" />
         <div className="min-w-0">
-          <p className="text-[14px] font-semibold text-white">
+          <p className="text-[14px] font-semibold text-gray-900">
             Quick Wins
-            <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500/15 px-1.5 text-[11px] font-bold text-emerald-300">
+            <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-50 px-1.5 text-[11px] font-bold text-emerald-600">
               {quickCount}
             </span>
           </p>
-          <p className="text-[11px] text-zinc-500">Minimal effort</p>
+          <p className="text-[11px] text-gray-500">Minimal effort</p>
         </div>
       </div>
-      <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3.5">
-        <Wrench className="h-5 w-5 shrink-0 text-blue-400" />
+      <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
+        <Wrench className="h-5 w-5 shrink-0 text-blue-500" />
         <div className="min-w-0">
-          <p className="text-[14px] font-semibold text-white">
+          <p className="text-[14px] font-semibold text-gray-900">
             Deep Fixes
-            <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500/15 px-1.5 text-[11px] font-bold text-blue-300">
+            <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-50 px-1.5 text-[11px] font-bold text-blue-600">
               {deepCount}
             </span>
           </p>
-          <p className="text-[11px] text-zinc-500">Requires more effort</p>
+          <p className="text-[11px] text-gray-500">Requires more effort</p>
         </div>
       </div>
     </div>
@@ -310,18 +310,18 @@ function WorkstreamSection({
   const [open, setOpen] = useState(defaultOpen ?? false);
 
   return (
-    <div className="rounded-xl border border-white/8 overflow-hidden">
+    <div className="rounded-xl border border-gray-200 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2.5 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.03]"
+        className="flex w-full items-center gap-2.5 px-4 py-3.5 text-left transition-colors hover:bg-gray-50"
       >
         {icon}
-        <span className="text-sm font-semibold text-white">{title}</span>
-        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white/[0.08] px-1.5 text-[11px] font-bold text-zinc-300">
+        <span className="text-sm font-semibold text-gray-900">{title}</span>
+        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-100 px-1.5 text-[11px] font-bold text-gray-500">
           {count}
         </span>
-        <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-zinc-500 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-gray-400 transition-transform', open && 'rotate-180')} />
       </button>
       {open && <div className="pt-0">{children}</div>}
     </div>

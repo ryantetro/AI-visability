@@ -138,15 +138,15 @@ function FieldRow({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 border-b border-white/[0.06] px-5 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <p className="text-[13px] font-medium text-zinc-300">{label}</p>
+        <p className="text-[13px] font-medium text-gray-700">{label}</p>
         {description && (
-          <p className="mt-0.5 text-[12px] leading-5 text-zinc-500">{description}</p>
+          <p className="mt-0.5 text-[12px] leading-5 text-gray-500">{description}</p>
         )}
       </div>
       {value !== undefined && (
-        <p className="shrink-0 text-[13px] font-medium text-white">{value}</p>
+        <p className="shrink-0 text-[13px] font-medium text-gray-900">{value}</p>
       )}
       {action && <div className="flex shrink-0 items-center gap-2.5">{action}</div>}
       {children && <div className="mt-2 w-full sm:mt-0">{children}</div>}
@@ -157,7 +157,7 @@ function FieldRow({
 /* ── Section card: very subtle bg, thin border, rounded ───────────── */
 function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.015]', className)}>
+    <div className={cn('overflow-hidden rounded-xl border border-gray-200 bg-gray-50', className)}>
       {children}
     </div>
   );
@@ -183,7 +183,7 @@ function ToggleSwitch({
         'relative inline-flex h-6 w-11 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         checked
           ? 'border-[#25c972]/40 bg-[#25c972]/20'
-          : 'border-white/[0.08] bg-white/[0.06]'
+          : 'border-gray-200 bg-gray-100'
       )}
     >
       <span
@@ -1266,21 +1266,21 @@ export function SettingsSection({
 
   /* ── Shared button styles ──────────────────────────────────────── */
   const btnBase = 'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors disabled:opacity-50';
-  const btnPrimary = cn(btnBase, 'bg-white/[0.08] text-zinc-200 hover:bg-white/[0.12]');
+  const btnPrimary = cn(btnBase, 'bg-gray-100 text-gray-700 hover:bg-gray-200');
   const btnAccent = cn(btnBase, 'bg-[var(--color-primary)] text-white hover:opacity-90');
 
   return (
     <div className="mx-auto max-w-3xl pb-12">
       {/* ─── Page header ─────────────────────────────────────────── */}
       <div>
-        <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-white">Settings</h1>
-        <p className="mt-1 text-[13px] text-zinc-500">
-          Manage workspace preferences for <span className="text-zinc-400">{domain}</span>
+        <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-gray-900">Settings</h1>
+        <p className="mt-1 text-[13px] text-gray-500">
+          Manage workspace preferences for <span className="text-gray-500">{domain}</span>
         </p>
       </div>
 
       {/* ─── Tab navigation ──────────────────────────────────────── */}
-      <nav className="mt-6 flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.015] p-1">
+      <nav className="mt-6 flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -1289,8 +1289,8 @@ export function SettingsSection({
             className={cn(
               'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-medium transition-all',
               activeTab === tab.key
-                ? 'bg-white/[0.08] text-white shadow-sm'
-                : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300'
+                ? 'bg-gray-100 text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
             )}
           >
             {tab.icon}
@@ -1307,8 +1307,8 @@ export function SettingsSection({
       <>
       {/* ─── Plan & Billing ──────────────────────────────────────── */}
       <section>
-        <h2 className="text-[15px] font-semibold text-white">Plan & Billing</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">Your current subscription and usage limits.</p>
+        <h2 className="text-[15px] font-semibold text-gray-900">Plan & Billing</h2>
+        <p className="mt-1 text-[12px] text-gray-500">Your current subscription and usage limits.</p>
 
         {billingStatus.status?.trimmedAt && !billingStatus.status?.trimBannerDismissed && (
           <div className="mb-4 rounded-xl border border-sky-300/15 bg-sky-300/[0.06] px-4 py-3">
@@ -1316,12 +1316,12 @@ export function SettingsSection({
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-sky-300" />
                 <div>
-                  <p className="text-[12px] font-medium text-zinc-200">
+                  <p className="text-[12px] font-medium text-gray-700">
                     {billingStatus.status.trimFailed
                       ? "We couldn't fully adjust your workspace. Please review your settings."
                       : 'Your workspace was adjusted to fit your new plan.'}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-zinc-500">
+                  <p className="mt-0.5 text-[11px] text-gray-500">
                     Adjusted on {new Date(billingStatus.status.trimmedAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -1340,14 +1340,14 @@ export function SettingsSection({
                     await fetch('/api/user/trim-banner', { method: 'PATCH' });
                     await billingStatus.refresh();
                   }}
-                  className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-white"
+                  className="text-[11px] font-medium text-gray-500 transition-colors hover:text-gray-900"
                 >
                   Dismiss
                 </button>
               </div>
             </div>
             {trimExpanded && (
-              <div className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] leading-5 text-zinc-400">
+              <div className="mt-3 border-t border-gray-200 pt-3 text-[11px] leading-5 text-gray-500">
                 <p>Your workspace was automatically adjusted to fit your plan limits. Domains may have been hidden, competitors removed, or platforms/regions adjusted.</p>
                 <p className="mt-1">Visit your domain and team settings to review the changes.</p>
               </div>
@@ -1359,11 +1359,11 @@ export function SettingsSection({
           <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-300/15 bg-amber-300/[0.06] px-4 py-3">
             <div className="flex items-center gap-3">
               <Clock className="h-4 w-4 shrink-0 text-amber-300" />
-              <p className="text-[12px] text-zinc-200">
+              <p className="text-[12px] text-gray-700">
                 Switching to <span className="font-semibold">{billingStatus.status.pendingChange.targetLabel}</span> on{' '}
                 {new Date(billingStatus.status.pendingChange.effectiveAt ?? '').toLocaleDateString()}
                 {billingStatus.status.readiness.viewerIssues.length > 0 && (
-                  <span className="text-zinc-400">
+                  <span className="text-gray-500">
                     {' · '}{billingStatus.status.readiness.viewerIssues.length} auto-adjustment{billingStatus.status.readiness.viewerIssues.length === 1 ? '' : 's'} pending
                   </span>
                 )}
@@ -1390,12 +1390,12 @@ export function SettingsSection({
                       ? 'Billing record needs review'
                       : 'Billing record needs reconnection'}
                 </p>
-                <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                <p className="mt-2 text-[13px] leading-6 text-gray-900">
                   {billingRepairing
-                    ? 'We’re reconnecting your Stripe billing record now.'
+                    ? "We're reconnecting your Stripe billing record now."
                     : billingRecoveryMessage ?? 'Billing changes are temporarily unavailable for this workspace.'}
                 </p>
-                <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                <p className="mt-1 text-[12px] leading-5 text-gray-500">
                   {billingConnectionState === 'unrecoverable'
                     ? `Plan changes and Stripe portal actions stay paused for ${billingOwnerEmail ?? 'this workspace'} until the record is reviewed.`
                     : 'Plan changes and Stripe portal actions will unlock automatically as soon as the billing record is healthy again.'}
@@ -1406,7 +1406,7 @@ export function SettingsSection({
                   type="button"
                   onClick={() => void handleReconnectBilling()}
                   disabled={billingRepairing}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200/20 bg-black/20 px-4 py-2 text-[12px] font-medium text-amber-100 transition-colors hover:border-amber-200/30 hover:text-white disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200/20 bg-gray-50 px-4 py-2 text-[12px] font-medium text-amber-100 transition-colors hover:border-amber-200/30 hover:text-gray-900 disabled:opacity-50"
                 >
                   {billingRepairing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                   {billingRepairing ? 'Reconnecting...' : 'Retry connection'}
@@ -1423,10 +1423,10 @@ export function SettingsSection({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100/80">
                   Custom billing arrangement
                 </p>
-                <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                <p className="mt-2 text-[13px] leading-6 text-gray-900">
                   {billingRecoveryMessage}
                 </p>
-                <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                <p className="mt-1 text-[12px] leading-5 text-gray-500">
                   Stripe self-serve billing actions are disabled for this workspace. Reach out internally before changing the plan or billing method.
                 </p>
               </div>
@@ -1476,22 +1476,22 @@ export function SettingsSection({
             value={trackedPromptsValue}
           />
           {hasScheduledCancellation && (
-            <div className="border-b border-white/[0.06] px-5 py-4">
+            <div className="border-b border-gray-200 px-5 py-4">
               <div className="rounded-2xl border border-amber-300/15 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),rgba(255,255,255,0.02)_58%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.015)_100%)] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="max-w-xl">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100/80">Cancellation scheduled</p>
-                    <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                    <p className="mt-2 text-[13px] leading-6 text-gray-900">
                       {accessEndsOnLabel !== '--'
                         ? `Your ${planConfig.name} features stay available until ${accessEndsOnLabel}.`
                         : 'Your current plan stays available through the end of this billing period.'}
                     </p>
-                    <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                    <p className="mt-1 text-[12px] leading-5 text-gray-500">
                       You can still use the dashboard normally until access ends. Use Keep Current Plan below to remove the scheduled cancellation instantly.
                     </p>
                   </div>
                   {remainingAccessLabel && (
-                    <div className="inline-flex items-center rounded-full border border-amber-200/15 bg-black/20 px-3 py-1.5 text-[11px] font-medium text-amber-50/90">
+                    <div className="inline-flex items-center rounded-full border border-amber-200/15 bg-gray-50 px-3 py-1.5 text-[11px] font-medium text-amber-50/90">
                       {remainingAccessLabel}
                     </div>
                   )}
@@ -1501,13 +1501,13 @@ export function SettingsSection({
           )}
 
           {!canManageBilling && billingOwnerEmail && (
-            <div className="border-b border-white/[0.06] px-5 py-4">
+            <div className="border-b border-gray-200 px-5 py-4">
               <div className="rounded-2xl border border-sky-300/15 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.14),rgba(255,255,255,0.02)_60%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.015)_100%)] p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100/80">Managed by owner</p>
-                <p className="mt-2 text-[13px] leading-6 text-zinc-100">
-                  Billing for this workspace is managed by <span className="text-white">{billingOwnerEmail}</span>.
+                <p className="mt-2 text-[13px] leading-6 text-gray-900">
+                  Billing for this workspace is managed by <span className="text-gray-900">{billingOwnerEmail}</span>.
                 </p>
-                <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                <p className="mt-1 text-[12px] leading-5 text-gray-500">
                   You can still see upcoming downgrade requirements here, but only the billing owner can schedule or cancel plan changes.
                 </p>
               </div>
@@ -1515,22 +1515,22 @@ export function SettingsSection({
           )}
 
           {pendingChange && !hasScheduledCancellation && (
-            <div className="border-b border-white/[0.06] px-5 py-4">
-              <div className="rounded-2xl border border-[#25c972]/20 bg-[radial-gradient(circle_at_top,rgba(37,201,114,0.16),rgba(255,255,255,0.02)_62%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.015)_100%)] p-4">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <div className="rounded-2xl border border-emerald-200 bg-[radial-gradient(circle_at_top,rgba(37,201,114,0.16),rgba(255,255,255,0.02)_62%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.015)_100%)] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="max-w-xl">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#9ef0c1]">Plan change scheduled</p>
-                    <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                    <p className="mt-2 text-[13px] leading-6 text-gray-900">
                       {pendingChange.targetLabel} is scheduled for {pendingEffectiveLabel !== '--' ? pendingEffectiveLabel : 'your next billing renewal'}.
                     </p>
-                    <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                    <p className="mt-1 text-[12px] leading-5 text-gray-500">
                       {readiness?.blockers
                         ? `${readiness.blockers} cleanup item${readiness.blockers === 1 ? '' : 's'} still need attention before the lower plan becomes active.`
                         : 'Your workspace is already aligned with the scheduled plan change.'}
                     </p>
                   </div>
                   {pendingRemainingLabel && (
-                    <div className="inline-flex items-center rounded-full border border-[#25c972]/20 bg-black/20 px-3 py-1.5 text-[11px] font-medium text-[#bff5d6]">
+                    <div className="inline-flex items-center rounded-full border border-emerald-200 bg-gray-50 px-3 py-1.5 text-[11px] font-medium text-[#bff5d6]">
                       {pendingRemainingLabel}
                     </div>
                   )}
@@ -1540,20 +1540,20 @@ export function SettingsSection({
           )}
 
           {(pendingChange || viewerOverageIssues.length > 0) && (
-            <div className="border-b border-white/[0.06] px-5 py-4">
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-500">
                       {pendingChange ? 'Downgrade readiness' : 'Active cleanup required'}
                     </p>
-                    <p className="mt-2 text-[13px] leading-6 text-zinc-200">
+                    <p className="mt-2 text-[13px] leading-6 text-gray-700">
                       {pendingChange
                         ? 'Your workspace will be automatically adjusted when the plan change takes effect.'
                         : 'Some features are limited because this workspace exceeds the current plan limits.'}
                     </p>
                   </div>
-                  <div className="inline-flex items-center rounded-full border border-white/[0.08] bg-black/20 px-3 py-1.5 text-[11px] font-medium text-zinc-200">
+                  <div className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] font-medium text-gray-700">
                     {pendingChange
                       ? `${visibleBillingIssues.length} issue${visibleBillingIssues.length === 1 ? '' : 's'}`
                       : `${viewerOverageIssues.length} blocker${viewerOverageIssues.length === 1 ? '' : 's'}`}
@@ -1565,7 +1565,7 @@ export function SettingsSection({
                     <a
                       key={buildIssueKey(issue)}
                       href={issue.cleanupHref}
-                      className="group flex items-start justify-between rounded-2xl border border-white/[0.06] bg-black/20 px-3.5 py-3 transition-colors hover:border-white/[0.12] hover:bg-white/[0.03]"
+                      className="group flex items-start justify-between rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-3 transition-colors hover:border-gray-300 hover:bg-gray-50"
                     >
                       <div className="pr-4">
                         <div className="flex items-center gap-2">
@@ -1573,11 +1573,11 @@ export function SettingsSection({
                             'inline-flex h-2 w-2 rounded-full',
                             issue.severity === 'advisory' ? 'bg-amber-300' : 'bg-red-300',
                           )} />
-                          <p className="text-[12px] font-medium text-zinc-100">{issue.title}</p>
+                          <p className="text-[12px] font-medium text-gray-900">{issue.title}</p>
                         </div>
-                        <p className="mt-1 text-[12px] leading-5 text-zinc-400">{issue.description}</p>
+                        <p className="mt-1 text-[12px] leading-5 text-gray-500">{issue.description}</p>
                       </div>
-                      <span className="shrink-0 text-[11px] font-medium text-zinc-400 transition-colors group-hover:text-white">
+                      <span className="shrink-0 text-[11px] font-medium text-gray-500 transition-colors group-hover:text-gray-900">
                         {issue.cleanupLabel}
                       </span>
                     </a>
@@ -1589,9 +1589,9 @@ export function SettingsSection({
 
           {/* Next-tier feature preview */}
           {tier === 'free' && (
-            <div className="border-b border-white/[0.06] px-5 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 mb-2">Unlock with Starter</p>
-              <ul className="space-y-1.5 text-[12px] text-zinc-400">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">Unlock with Starter</p>
+              <ul className="space-y-1.5 text-[12px] text-gray-500">
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Weekly automated monitoring</li>
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />25 prompt tracking slots</li>
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Brand section &amp; AI referral tracking</li>
@@ -1604,9 +1604,9 @@ export function SettingsSection({
             </div>
           )}
           {tier === 'starter' && (
-            <div className="border-b border-white/[0.06] px-5 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 mb-2">Unlock with Pro</p>
-              <ul className="space-y-1.5 text-[12px] text-zinc-400">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">Unlock with Pro</p>
+              <ul className="space-y-1.5 text-[12px] text-gray-500">
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Up to 3 domains</li>
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Competitor tracking (3 competitors)</li>
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Daily monitoring &amp; data export</li>
@@ -1619,9 +1619,9 @@ export function SettingsSection({
             </div>
           )}
           {tier === 'pro' && (
-            <div className="border-b border-white/[0.06] px-5 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 mb-2">Unlock with Growth</p>
-              <ul className="space-y-1.5 text-[12px] text-zinc-400">
+            <div className="border-b border-gray-200 px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">Unlock with Growth</p>
+              <ul className="space-y-1.5 text-[12px] text-gray-500">
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Up to 10 domains</li>
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Unlimited platforms, regions &amp; seats</li>
                 <li className="flex items-center gap-2"><Zap className="h-3 w-3 shrink-0 text-amber-400/60" />Full CSV/JSON export &amp; white-label</li>
@@ -1634,8 +1634,8 @@ export function SettingsSection({
             </div>
           )}
           {tier === 'growth' && (
-            <div className="border-b border-white/[0.06] px-5 py-4">
-              <p className="text-[12px] text-[#25c972]">You&apos;re on the Growth plan — full access to all features</p>
+            <div className="border-b border-gray-200 px-5 py-4">
+              <p className="text-[12px] text-emerald-600">You&apos;re on the Growth plan — full access to all features</p>
             </div>
           )}
 
@@ -1688,7 +1688,7 @@ export function SettingsSection({
                     type="button"
                     onClick={handleOpenBillingPortal}
                     disabled={portalLoading || reactivateLoading || billingActionsBlocked}
-                    className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
+                    className="text-[12px] font-medium text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50"
                   >
                     {portalLoading ? 'Opening Stripe...' : 'Billing & Invoices'}
                   </button>
@@ -1698,7 +1698,7 @@ export function SettingsSection({
                     type="button"
                     onClick={() => void handleCancelScheduledPlanChange()}
                     disabled={changePlanLoading || billingActionsBlocked}
-                    className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
+                    className="text-[12px] font-medium text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50"
                   >
                     {changePlanLoading ? 'Canceling...' : 'Cancel Scheduled Change'}
                   </button>
@@ -1712,7 +1712,7 @@ export function SettingsSection({
                     type="button"
                     onClick={() => setCancelPlanModalOpen(true)}
                     disabled={portalLoading || billingActionsBlocked}
-                    className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                    className="text-[12px] font-medium text-gray-500 transition-colors hover:text-red-500 disabled:opacity-50"
                   >
                     Cancel Plan
                   </button>
@@ -1721,15 +1721,15 @@ export function SettingsSection({
             )}
           </div>
           {(billingError || billingStatus.error || changePlanSuccess) && (
-            <div className="border-t border-white/[0.06] px-5 py-3">
-              {billingError && <p className="text-[12px] text-red-400">{billingError}</p>}
-              {!billingError && billingStatus.error && <p className="text-[12px] text-red-400">{billingStatus.error}</p>}
-              {!billingError && !billingStatus.error && changePlanSuccess && <p className="text-[12px] text-[#25c972]">{changePlanSuccess}</p>}
+            <div className="border-t border-gray-200 px-5 py-3">
+              {billingError && <p className="text-[12px] text-red-500">{billingError}</p>}
+              {!billingError && billingStatus.error && <p className="text-[12px] text-red-500">{billingStatus.error}</p>}
+              {!billingError && !billingStatus.error && changePlanSuccess && <p className="text-[12px] text-emerald-600">{changePlanSuccess}</p>}
             </div>
           )}
           {hasScheduledCancellation && !billingError && !billingStatus.error && (
-            <div className="border-t border-white/[0.06] px-5 py-3">
-              <p className="text-[12px] text-zinc-500">
+            <div className="border-t border-gray-200 px-5 py-3">
+              <p className="text-[12px] text-gray-500">
                 Keep Current Plan uses Stripe directly in-app. Stripe Billing is still available for payment methods and invoices.
               </p>
             </div>
@@ -1741,21 +1741,21 @@ export function SettingsSection({
         <SheetContent
           side="center"
           showClose={false}
-          className="max-h-[calc(100vh-2rem)] max-w-2xl border-white/[0.08] bg-[#0c0c0e] p-0 shadow-[0_32px_120px_rgba(0,0,0,0.55)]"
+          className="max-h-[calc(100vh-2rem)] max-w-2xl border-gray-200 bg-white p-0 shadow-[0_32px_120px_rgba(0,0,0,0.12)]"
         >
           <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.75rem]">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-5">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
               <div>
-                <SheetTitle className="text-[16px] font-semibold tracking-[-0.01em] text-white">
+                <SheetTitle className="text-[16px] font-semibold tracking-[-0.01em] text-gray-900">
                   Change plan
                 </SheetTitle>
-                <SheetDescription className="mt-1 text-[12px] text-zinc-500">
+                <SheetDescription className="mt-1 text-[12px] text-gray-500">
                   Choose a plan below. Simple upgrades continue in Stripe, while downgrades stay here so we can verify limits first.
                 </SheetDescription>
               </div>
               <SheetClose
-                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
                 aria-label="Close"
               >
                 <span className="text-lg leading-none">&times;</span>
@@ -1765,7 +1765,7 @@ export function SettingsSection({
             <div className="min-h-0 overflow-y-auto px-6 pb-6 pt-5">
               {/* Billing cycle toggle */}
               <div className="flex justify-center">
-                <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
+                <div className="inline-flex items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
                   <button
                     type="button"
                     onClick={() => {
@@ -1778,8 +1778,8 @@ export function SettingsSection({
                     className={cn(
                       'rounded-md px-4 py-1.5 text-[12px] font-medium transition-colors',
                       changePlanCycle === 'monthly'
-                        ? 'bg-white/[0.1] text-white'
-                        : 'text-zinc-500 hover:text-zinc-300'
+                        ? 'bg-gray-100 text-gray-900'
+                        : 'text-gray-500 hover:text-gray-700'
                     )}
                   >
                     Monthly
@@ -1796,12 +1796,12 @@ export function SettingsSection({
                     className={cn(
                       'rounded-md px-4 py-1.5 text-[12px] font-medium transition-colors',
                       changePlanCycle === 'annual'
-                        ? 'bg-white/[0.1] text-white'
-                        : 'text-zinc-500 hover:text-zinc-300'
+                        ? 'bg-gray-100 text-gray-900'
+                        : 'text-gray-500 hover:text-gray-700'
                     )}
                   >
                     Annual
-                    <span className="ml-1.5 rounded-full bg-[#25c972]/15 px-1.5 py-0.5 text-[9px] font-bold text-[#25c972]">
+                    <span className="ml-1.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600">
                       Save ~20%
                     </span>
                   </button>
@@ -1831,15 +1831,15 @@ export function SettingsSection({
                       className={cn(
                         'relative flex flex-col rounded-2xl border p-4 text-left transition-all',
                         isCurrent
-                          ? 'border-white/[0.12] bg-white/[0.04] cursor-default opacity-60'
+                          ? 'border-gray-300 bg-gray-50 cursor-default opacity-60'
                           : isSelected
                             ? 'border-[#25c972]/40 bg-[#25c972]/[0.08] ring-1 ring-[#25c972]/20 cursor-pointer'
-                            : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15] hover:bg-white/[0.04] cursor-pointer'
+                            : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-50 cursor-pointer'
                       )}
                     >
                       {/* Badge: Current or Selected */}
                       {isCurrent ? (
-                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/[0.12] bg-[#0c0c0e] px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-gray-500">
                           Your plan
                         </span>
                       ) : isSelected ? (
@@ -1848,34 +1848,34 @@ export function SettingsSection({
                         </span>
                       ) : null}
 
-                      <p className={cn('text-[13px] font-semibold', isCurrent ? 'text-zinc-400' : 'text-white')}>{cardPlan.name}</p>
+                      <p className={cn('text-[13px] font-semibold', isCurrent ? 'text-gray-500' : 'text-gray-900')}>{cardPlan.name}</p>
 
                       <div className="mt-2 flex items-baseline gap-0.5">
-                        <span className={cn('text-[22px] font-bold', isCurrent ? 'text-zinc-500' : 'text-white')}>${monthlyPrice}</span>
-                        <span className="text-[11px] text-zinc-500">/mo</span>
+                        <span className={cn('text-[22px] font-bold', isCurrent ? 'text-gray-500' : 'text-gray-900')}>${monthlyPrice}</span>
+                        <span className="text-[11px] text-gray-500">/mo</span>
                       </div>
                       {changePlanCycle === 'annual' && (
-                        <p className="mt-0.5 text-[10px] text-zinc-600">
+                        <p className="mt-0.5 text-[10px] text-gray-400">
                           {formatMoney(cardPlan.annualPrice * 100)}/yr
                         </p>
                       )}
 
                       <ul className="mt-3 flex-1 space-y-1.5">
                         {cardPlan.features.slice(0, 4).map((f) => (
-                          <li key={f} className={cn('flex items-start gap-1.5 text-[11px] leading-4', isCurrent ? 'text-zinc-600' : 'text-zinc-400')}>
-                            <Check className={cn('mt-0.5 h-3 w-3 shrink-0', isCurrent ? 'text-zinc-600' : 'text-[#25c972]/60')} />
+                          <li key={f} className={cn('flex items-start gap-1.5 text-[11px] leading-4', isCurrent ? 'text-gray-400' : 'text-gray-500')}>
+                            <Check className={cn('mt-0.5 h-3 w-3 shrink-0', isCurrent ? 'text-gray-400' : 'text-emerald-600/60')} />
                             {f}
                           </li>
                         ))}
                       </ul>
 
                       {!isCurrent && !isSelected && (
-                        <p className="mt-3 text-center text-[11px] font-medium text-zinc-500">
+                        <p className="mt-3 text-center text-[11px] font-medium text-gray-500">
                           Select
                         </p>
                       )}
                       {isSelected && (
-                        <p className="mt-3 text-center text-[11px] font-medium text-[#25c972]">
+                        <p className="mt-3 text-center text-[11px] font-medium text-emerald-600">
                           Selected
                         </p>
                       )}
@@ -1895,21 +1895,21 @@ export function SettingsSection({
                 return (
                   <div className={cn(
                     'mt-4 flex items-center justify-center gap-3 rounded-xl border px-4 py-3',
-                    isDown ? 'border-amber-400/15 bg-amber-400/[0.04]' : 'border-[#25c972]/15 bg-[#25c972]/[0.04]'
+                    isDown ? 'border-amber-400/15 bg-amber-400/[0.04]' : 'border-emerald-200 bg-emerald-50'
                   )}>
                     <div className="text-center">
-                      <p className="text-[10px] uppercase tracking-wider text-zinc-500">Current</p>
-                      <p className="text-[13px] font-semibold text-zinc-300">{billingPlanConfig.name}</p>
+                      <p className="text-[10px] uppercase tracking-wider text-gray-500">Current</p>
+                      <p className="text-[13px] font-semibold text-gray-700">{billingPlanConfig.name}</p>
                     </div>
-                    <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', isDown ? 'bg-amber-400/15' : 'bg-[#25c972]/15')}>
+                    <div className={cn('flex h-6 w-6 items-center justify-center rounded-full', isDown ? 'bg-amber-400/15' : 'bg-emerald-50')}>
                       {isDown
                         ? <ArrowDown className="h-3 w-3 text-amber-300" />
-                        : <ArrowUp className="h-3 w-3 text-[#25c972]" />
+                        : <ArrowUp className="h-3 w-3 text-emerald-600" />
                       }
                     </div>
                     <div className="text-center">
-                      <p className={cn('text-[10px] uppercase tracking-wider', isDown ? 'text-amber-400/70' : 'text-[#25c972]/70')}>{isDown ? 'Downgrade' : 'Upgrade'}</p>
-                      <p className="text-[13px] font-semibold text-white">{targetConfig.name} <span className="font-normal text-zinc-500">${targetMonthly}/mo</span></p>
+                      <p className={cn('text-[10px] uppercase tracking-wider', isDown ? 'text-amber-400/70' : 'text-emerald-600/70')}>{isDown ? 'Downgrade' : 'Upgrade'}</p>
+                      <p className="text-[13px] font-semibold text-gray-900">{targetConfig.name} <span className="font-normal text-gray-500">${targetMonthly}/mo</span></p>
                     </div>
                   </div>
                 );
@@ -1922,12 +1922,12 @@ export function SettingsSection({
                       <p className="text-[12px] font-medium text-amber-100">
                         {billingRepairing ? 'Reconnecting billing...' : 'Billing record needs attention'}
                       </p>
-                      <p className="mt-1 text-[12px] leading-5 text-zinc-300">
+                      <p className="mt-1 text-[12px] leading-5 text-gray-700">
                         {billingRepairing
-                          ? 'We’re reconnecting your Stripe record now. This modal will unlock automatically if the repair succeeds.'
+                          ? "We're reconnecting your Stripe record now. This modal will unlock automatically if the repair succeeds."
                           : billingRecoveryMessage ?? 'Billing changes are temporarily unavailable for this workspace.'}
                       </p>
-                      <p className="mt-1 text-[11px] leading-5 text-zinc-500">
+                      <p className="mt-1 text-[11px] leading-5 text-gray-500">
                         {billingConnectionState === 'unrecoverable'
                           ? 'Plan changes stay disabled until the Stripe record is reviewed.'
                           : 'We’ll retry the Stripe lookup before allowing this plan change.'}
@@ -1938,7 +1938,7 @@ export function SettingsSection({
                         type="button"
                         onClick={() => void handleReconnectBilling()}
                         disabled={billingRepairing}
-                        className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-amber-200/20 bg-black/20 px-3 py-2 text-[11px] font-medium text-amber-100 transition-colors hover:border-amber-200/30 hover:text-white disabled:opacity-50"
+                        className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-amber-200/20 bg-gray-50 px-3 py-2 text-[11px] font-medium text-amber-100 transition-colors hover:border-amber-200/30 hover:text-gray-900 disabled:opacity-50"
                       >
                         {billingRepairing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                         {billingRepairing ? 'Reconnecting...' : 'Retry'}
@@ -1952,15 +1952,15 @@ export function SettingsSection({
               {selectedTargetPlan && !changeTargetIsSamePlan && (
                 <div className="mt-3">
                   {previewLoading && !changePlanPreview ? (
-                    <div className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] py-8 text-[12px] text-zinc-500">
+                    <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-8 text-[12px] text-gray-500">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Checking readiness...
                     </div>
                   ) : changePlanPreview && (
-                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-[12px] font-medium text-zinc-400">
+                          <p className="text-[12px] font-medium text-gray-500">
                             {stripeHostedPlanChange
                               ? 'Stripe-hosted change'
                               : changePlanPreview.sameEntitlements
@@ -1969,11 +1969,11 @@ export function SettingsSection({
                                   ? 'Auto-adjust preview'
                                   : 'Guided limit check'}
                           </p>
-                          <p className="mt-1 text-[12px] leading-5 text-zinc-500">
+                          <p className="mt-1 text-[12px] leading-5 text-gray-500">
                             {changePlanPreview.change.reason}
                           </p>
                           {selectedTargetIsDowngrade && !changePlanPreview.sameEntitlements && (
-                            <p className="mt-1 text-[11px] leading-4 text-zinc-500">
+                            <p className="mt-1 text-[11px] leading-4 text-gray-500">
                               These items will be automatically adjusted when your plan changes. You can resolve them now if you prefer.
                             </p>
                           )}
@@ -1986,7 +1986,7 @@ export function SettingsSection({
                               ? selectedTargetIsDowngrade
                                 ? 'bg-sky-400/10 text-sky-300'
                                 : 'bg-amber-400/10 text-amber-300'
-                              : 'bg-[#25c972]/10 text-[#25c972]'
+                              : 'bg-emerald-50 text-emerald-600'
                         )}>
                           {stripeHostedPlanChange
                             ? 'Stripe'
@@ -2000,10 +2000,10 @@ export function SettingsSection({
 
                       {stripeHostedPlanChange ? (
                         <div className="mt-3 rounded-lg border border-sky-300/10 bg-sky-400/[0.05] px-3 py-3">
-                          <p className="text-[12px] leading-5 text-zinc-200">
+                          <p className="text-[12px] leading-5 text-gray-700">
                             Stripe will confirm the final billing details securely before applying this change.
                           </p>
-                          <p className="mt-1 text-[11px] leading-5 text-zinc-500">
+                          <p className="mt-1 text-[11px] leading-5 text-gray-500">
                             We&apos;ll bring you back here and refresh the workspace automatically after Stripe finishes.
                           </p>
                         </div>
@@ -2012,11 +2012,11 @@ export function SettingsSection({
                           {(changePlanPreview.metrics ?? []).length > 0 && (
                             <div className="mt-3 grid gap-2 sm:grid-cols-3">
                               {(changePlanPreview.metrics ?? []).map((metric) => (
-                                <div key={metric.category} className="rounded-lg border border-white/[0.05] bg-black/20 px-3 py-2">
-                                  <p className="text-[10px] uppercase tracking-wider text-zinc-600">{metric.label}</p>
+                                <div key={metric.category} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                                  <p className="text-[10px] uppercase tracking-wider text-gray-400">{metric.label}</p>
                                   <p className={cn(
                                     'mt-1 text-[13px] font-semibold',
-                                    metric.status === 'over_limit' ? 'text-amber-300' : 'text-white'
+                                    metric.status === 'over_limit' ? 'text-amber-300' : 'text-gray-900'
                                   )}>
                                     {metric.current} / {metric.limit ?? '∞'}
                                   </p>
@@ -2031,23 +2031,23 @@ export function SettingsSection({
                                 <a
                                   key={buildIssueKey(issue)}
                                   href={issue.cleanupHref}
-                                  className="group flex items-center justify-between rounded-lg border border-white/[0.05] bg-black/20 px-3 py-2 transition-colors hover:border-white/[0.1]"
+                                  className="group flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 transition-colors hover:border-gray-300"
                                 >
                                   <div className="flex items-center gap-2">
                                     <span className={cn(
                                       'inline-flex h-1.5 w-1.5 rounded-full',
                                       issue.severity === 'advisory' ? 'bg-amber-300' : 'bg-red-300',
                                     )} />
-                                    <span className="text-[11px] text-zinc-300">{issue.title}</span>
+                                    <span className="text-[11px] text-gray-700">{issue.title}</span>
                                   </div>
-                                  <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300">{issue.cleanupLabel}</span>
+                                  <span className="text-[10px] text-gray-500 group-hover:text-gray-700">{issue.cleanupLabel}</span>
                                 </a>
                               ))}
                             </div>
                           )}
 
                           {(changePlanPreview.issues ?? []).length === 0 && !changePlanPreview.sameEntitlements && (
-                            <p className="mt-3 flex items-center gap-2 text-[11px] text-[#25c972]/80">
+                            <p className="mt-3 flex items-center gap-2 text-[11px] text-emerald-600/80">
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               No blockers — ready for the guided change flow.
                             </p>
@@ -2060,7 +2060,7 @@ export function SettingsSection({
               )}
 
               {changePlanError && (
-                <p className="mt-3 text-[12px] text-red-400">{changePlanError}</p>
+                <p className="mt-3 text-[12px] text-red-500">{changePlanError}</p>
               )}
 
               {/* Footer actions */}
@@ -2071,7 +2071,7 @@ export function SettingsSection({
                       type="button"
                       onClick={() => void handleCancelScheduledPlanChange()}
                       disabled={changePlanLoading || stripePlanRedirectLoading || billingActionsBlocked}
-                      className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-white disabled:opacity-50"
+                      className="text-[12px] font-medium text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50"
                     >
                       Cancel scheduled change
                     </button>
@@ -2082,7 +2082,7 @@ export function SettingsSection({
                     type="button"
                     onClick={() => setChangePlanModalOpen(false)}
                     disabled={changePlanLoading || stripePlanRedirectLoading || billingRepairing}
-                    className="rounded-lg px-4 py-2 text-[12px] font-medium text-zinc-400 transition-colors hover:text-white disabled:opacity-50"
+                    className="rounded-lg px-4 py-2 text-[12px] font-medium text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -2117,7 +2117,7 @@ export function SettingsSection({
         <SheetContent
           side="center"
           showClose={false}
-          className="max-w-md border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(239,68,68,0.16),rgba(12,12,14,0.98)_42%),linear-gradient(180deg,rgba(12,12,14,0.98)_0%,rgba(8,8,10,1)_100%)] p-0 shadow-[0_32px_120px_rgba(0,0,0,0.55)]"
+          className="max-w-md border-gray-200 bg-white p-0 shadow-[0_32px_120px_rgba(0,0,0,0.12)]"
         >
           <div className="relative overflow-hidden rounded-[1.75rem]">
             <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-red-400/60 to-transparent" />
@@ -2130,27 +2130,27 @@ export function SettingsSection({
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-red-300/80">Billing Change</p>
-                    <SheetTitle className="mt-1 text-[1.15rem] font-semibold tracking-[-0.02em] text-white">
+                    <SheetTitle className="mt-1 text-[1.15rem] font-semibold tracking-[-0.02em] text-gray-900">
                       Cancel your plan?
                     </SheetTitle>
                   </div>
                 </div>
 
                 <SheetClose
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition-colors hover:border-white/20 hover:text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-900"
                   aria-label="Close cancel plan dialog"
                 >
                   <span className="text-lg leading-none">×</span>
                 </SheetClose>
               </div>
 
-              <SheetDescription className="mt-5 text-[13px] leading-6 text-zinc-300">
+              <SheetDescription className="mt-5 text-[13px] leading-6 text-gray-700">
                 Your subscription will be managed in Stripe Billing. You&rsquo;ll keep access to your current features until the end of this billing period.
               </SheetDescription>
 
-              <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-                <p className="text-[12px] font-medium text-zinc-100">What happens next</p>
-                <ul className="mt-3 space-y-2 text-[12px] leading-5 text-zinc-400">
+              <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-[12px] font-medium text-gray-900">What happens next</p>
+                <ul className="mt-3 space-y-2 text-[12px] leading-5 text-gray-500">
                   <li className="flex items-start gap-2">
                     <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-red-300/80" />
                     You&apos;ll be redirected to Stripe&apos;s secure billing portal.
@@ -2171,7 +2171,7 @@ export function SettingsSection({
                   type="button"
                   onClick={() => setCancelPlanModalOpen(false)}
                   disabled={portalLoading}
-                  className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-[12px] font-medium text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+                  className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-[12px] font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
                 >
                   Keep Plan
                 </button>
@@ -2198,8 +2198,8 @@ export function SettingsSection({
       <>
       {/* ─── Team Management ──────────────────────────────────────── */}
       <section id="team" className="scroll-mt-6">
-        <h2 className="text-[15px] font-semibold text-white">Team</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">
+        <h2 className="text-[15px] font-semibold text-gray-900">Team</h2>
+        <p className="mt-1 text-[12px] text-gray-500">
           {hasMultiSeat
             ? 'Invite team members to share tracked domains and AI visibility data.'
             : 'Upgrade to Pro or Growth to invite team members.'}
@@ -2209,8 +2209,8 @@ export function SettingsSection({
           {!hasMultiSeat ? (
             /* ── Locked state ──────────────────────────────────── */
             <div className="px-5 py-6 text-center">
-              <Lock className="mx-auto h-5 w-5 text-zinc-600" />
-              <p className="mt-2 text-[13px] text-zinc-400">
+              <Lock className="mx-auto h-5 w-5 text-gray-400" />
+              <p className="mt-2 text-[13px] text-gray-500">
                 Team management is available on Pro and Growth plans.
               </p>
               <button
@@ -2224,7 +2224,7 @@ export function SettingsSection({
           ) : !teamData.team ? (
             /* ── No team yet — create one ──────────────────────── */
             <div className="px-5 py-5">
-              <p className="text-[13px] text-zinc-300">Create a team to start inviting members.</p>
+              <p className="text-[13px] text-gray-700">Create a team to start inviting members.</p>
               <div className="mt-3 flex items-center gap-2">
                 <input
                   type="text"
@@ -2232,7 +2232,7 @@ export function SettingsSection({
                   onChange={(e) => setTeamNameInput(e.target.value)}
                   placeholder="Team name"
                   maxLength={50}
-                  className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[13px] text-white placeholder:text-zinc-600 focus:border-[var(--color-primary)] focus:outline-none"
+                  className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-900 placeholder:text-gray-400 focus:border-[var(--color-primary)] focus:outline-none"
                   onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateTeam(); }}
                 />
                 <button
@@ -2245,7 +2245,7 @@ export function SettingsSection({
                   {teamCreating ? 'Creating...' : 'Create Team'}
                 </button>
               </div>
-              {teamError && <p className="mt-2 text-[12px] text-red-400">{teamError}</p>}
+              {teamError && <p className="mt-2 text-[12px] text-red-500">{teamError}</p>}
             </div>
           ) : teamData.role === 'owner' ? (
             /* ── Owner view ────────────────────────────────────── */
@@ -2265,13 +2265,13 @@ export function SettingsSection({
               />
 
               {seatPriorityIssues.length > 0 && (
-                <div className="border-b border-white/[0.06] px-5 py-4">
+                <div className="border-b border-gray-200 px-5 py-4">
                   <div className="rounded-2xl border border-amber-300/15 bg-amber-300/8 p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100/80">Seat priority</p>
-                    <p className="mt-2 text-[13px] leading-6 text-zinc-100">
+                    <p className="mt-2 text-[13px] leading-6 text-gray-900">
                       This scheduled downgrade is tighter than the current seat usage. Pending invites are revoked first, then lower-priority members are suspended when the plan change takes effect.
                     </p>
-                    <p className="mt-1 text-[12px] leading-5 text-zinc-400">
+                    <p className="mt-1 text-[12px] leading-5 text-gray-500">
                       Use the priority selectors below to decide which members keep full access first.
                     </p>
                   </div>
@@ -2279,32 +2279,32 @@ export function SettingsSection({
               )}
 
               {/* Members list */}
-              <div className="border-b border-white/[0.06] px-5 py-4">
-                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Members</p>
+              <div className="border-b border-gray-200 px-5 py-4">
+                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">Members</p>
                 <div className="space-y-2">
                   {teamData.members.map((member) => (
-                    <div key={member.user_id} className="flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2">
+                    <div key={member.user_id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
                       <div className="flex items-center gap-3">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[13px] text-zinc-200">{member.email || member.user_id}</span>
+                            <span className="text-[13px] text-gray-700">{member.email || member.user_id}</span>
                             <span className={cn(
                               'rounded-full px-2 py-0.5 text-[10px] font-medium',
                               member.role === 'owner'
                                 ? 'bg-[#6c63ff]/20 text-[#6c63ff]'
-                                : 'bg-white/[0.06] text-zinc-500'
+                                : 'bg-gray-100 text-gray-500'
                             )}>
                               {member.role}
                             </span>
                           </div>
                           {member.role !== 'owner' && (
                             <div className="mt-1 flex items-center gap-2">
-                              <span className="text-[11px] text-zinc-500">Priority</span>
+                              <span className="text-[11px] text-gray-500">Priority</span>
                               <select
                                 value={member.plan_access_rank ?? 1}
                                 onChange={(event) => void handleUpdateMemberPriority(member.user_id, Number(event.target.value))}
                                 disabled={memberPrioritySaving === member.user_id}
-                                className="rounded-lg border border-white/[0.08] bg-black/30 px-2.5 py-1 text-[11px] text-zinc-200 focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-50"
+                                className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] text-gray-700 focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-50"
                               >
                                 {seatPriorityMembers.map((_, index) => (
                                   <option key={index + 1} value={index + 1}>
@@ -2313,7 +2313,7 @@ export function SettingsSection({
                                 ))}
                               </select>
                               {memberPrioritySaving === member.user_id && (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" />
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" />
                               )}
                             </div>
                           )}
@@ -2325,7 +2325,7 @@ export function SettingsSection({
                             type="button"
                             onClick={() => void handleRemoveMember(member.user_id)}
                             disabled={memberRemoving === member.user_id}
-                            className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                            className="text-[11px] font-medium text-gray-500 transition-colors hover:text-red-500 disabled:opacity-50"
                           >
                             <UserMinus className="h-3.5 w-3.5" />
                           </button>
@@ -2337,15 +2337,15 @@ export function SettingsSection({
               </div>
 
               {/* Invite form */}
-              <div className="border-b border-white/[0.06] px-5 py-4">
-                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Invite member</p>
+              <div className="border-b border-gray-200 px-5 py-4">
+                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">Invite member</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="colleague@company.com"
-                    className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[13px] text-white placeholder:text-zinc-600 focus:border-[var(--color-primary)] focus:outline-none"
+                    className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-900 placeholder:text-gray-400 focus:border-[var(--color-primary)] focus:outline-none"
                     onKeyDown={(e) => { if (e.key === 'Enter') void handleSendInvite(); }}
                   />
                   <button
@@ -2358,21 +2358,21 @@ export function SettingsSection({
                     {inviteSending ? 'Sending...' : 'Send Invite'}
                   </button>
                 </div>
-                {inviteError && <p className="mt-2 text-[12px] text-red-400">{inviteError}</p>}
-                {inviteSuccess && <p className="mt-2 text-[12px] text-[#25c972]">Invitation sent!</p>}
+                {inviteError && <p className="mt-2 text-[12px] text-red-500">{inviteError}</p>}
+                {inviteSuccess && <p className="mt-2 text-[12px] text-emerald-600">Invitation sent!</p>}
 
                 {/* Pending invitations */}
                 {teamData.invitations.length > 0 && (
                   <div className="mt-3 space-y-1.5">
-                    <p className="text-[11px] font-medium text-zinc-600">Pending invitations</p>
+                    <p className="text-[11px] font-medium text-gray-400">Pending invitations</p>
                     {teamData.invitations.map((inv) => (
-                      <div key={inv.id} className="flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2">
-                        <span className="text-[12px] text-zinc-400">{inv.email}</span>
+                      <div key={inv.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                        <span className="text-[12px] text-gray-500">{inv.email}</span>
                         <button
                           type="button"
                           onClick={() => void handleRevokeInvitation(inv.id)}
                           disabled={invitationRevoking === inv.id}
-                          className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                          className="text-[11px] font-medium text-gray-500 transition-colors hover:text-red-500 disabled:opacity-50"
                         >
                           {invitationRevoking === inv.id ? 'Revoking...' : 'Revoke'}
                         </button>
@@ -2388,14 +2388,14 @@ export function SettingsSection({
                   type="button"
                   onClick={handleDissolveTeam}
                   disabled={teamActionLoading}
-                  className="inline-flex items-center gap-2 text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 text-[12px] font-medium text-gray-500 transition-colors hover:text-red-500 disabled:opacity-50"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   {teamActionLoading ? 'Dissolving...' : 'Dissolve Team'}
                 </button>
               </div>
               {teamError && (
-                <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+                <div className="border-t border-gray-200 px-5 py-3 text-[12px] text-red-500">
                   {teamError}
                 </div>
               )}
@@ -2407,17 +2407,17 @@ export function SettingsSection({
               <FieldRow label="Your role" value="Member" />
 
               {/* Members list (read-only) */}
-              <div className="border-b border-white/[0.06] px-5 py-4">
-                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Members</p>
+              <div className="border-b border-gray-200 px-5 py-4">
+                <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">Members</p>
                 <div className="space-y-2">
                   {teamData.members.map((member) => (
-                    <div key={member.user_id} className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-3 py-2">
-                      <span className="text-[13px] text-zinc-200">{member.email || member.user_id}</span>
+                    <div key={member.user_id} className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                      <span className="text-[13px] text-gray-700">{member.email || member.user_id}</span>
                       <span className={cn(
                         'rounded-full px-2 py-0.5 text-[10px] font-medium',
                         member.role === 'owner'
                           ? 'bg-[#6c63ff]/20 text-[#6c63ff]'
-                          : 'bg-white/[0.06] text-zinc-500'
+                          : 'bg-gray-100 text-gray-500'
                       )}>
                         {member.role}
                       </span>
@@ -2432,14 +2432,14 @@ export function SettingsSection({
                   type="button"
                   onClick={handleLeaveTeam}
                   disabled={teamActionLoading}
-                  className="inline-flex items-center gap-2 text-[12px] font-medium text-zinc-500 transition-colors hover:text-red-400 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 text-[12px] font-medium text-gray-500 transition-colors hover:text-red-500 disabled:opacity-50"
                 >
                   <UserMinus className="h-3.5 w-3.5" />
                   {teamActionLoading ? 'Leaving...' : 'Leave Team'}
                 </button>
               </div>
               {teamError && (
-                <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+                <div className="border-t border-gray-200 px-5 py-3 text-[12px] text-red-500">
                   {teamError}
                 </div>
               )}
@@ -2456,8 +2456,8 @@ export function SettingsSection({
       <>
       {/* ─── Monitoring & Alerts ─────────────────────────────────── */}
       <section id="monitoring" className="scroll-mt-6">
-        <h2 className="text-[15px] font-semibold text-white">Monitoring</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">
+        <h2 className="text-[15px] font-semibold text-gray-900">Monitoring</h2>
+        <p className="mt-1 text-[12px] text-gray-500">
           Automated scans and email alerts for {domain}.
         </p>
 
@@ -2470,10 +2470,10 @@ export function SettingsSection({
                 <span
                   className={cn(
                     'inline-block h-2 w-2 rounded-full',
-                    monitoringConnected ? 'bg-[#25c972]' : 'bg-zinc-600'
+                    monitoringConnected ? 'bg-emerald-600' : 'bg-gray-400'
                   )}
                 />
-                <span className="text-[12px] text-zinc-400">
+                <span className="text-[12px] text-gray-500">
                   {monitoringConnected ? 'Active' : 'Inactive'}
                 </span>
                 {monitoringConnected ? (
@@ -2481,7 +2481,7 @@ export function SettingsSection({
                     type="button"
                     onClick={onDisableMonitoring}
                     disabled={monitoringLoading}
-                    className="rounded-lg bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+                    className="rounded-lg bg-gray-100 px-3 py-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
                   >
                     {monitoringLoading ? 'Disabling...' : 'Disable'}
                   </button>
@@ -2504,7 +2504,7 @@ export function SettingsSection({
             description="Email me when AI engines are crawling my site but not sending visitors yet."
             action={
               <>
-                <span className="text-[12px] text-zinc-400">
+                <span className="text-[12px] text-gray-500">
                   {opportunityAlertState.opportunityAlertsEnabled ? 'On' : 'Off'}
                 </span>
                 <ToggleSwitch
@@ -2516,17 +2516,17 @@ export function SettingsSection({
             }
           >
             {!monitoringConnected ? (
-              <p className="text-[12px] text-zinc-600">
+              <p className="text-[12px] text-gray-400">
                 Enable automated scans for this domain to turn opportunity alerts on.
               </p>
             ) : opportunityAlertError ? (
-              <p className="text-[12px] text-red-400">{opportunityAlertError}</p>
+              <p className="text-[12px] text-red-500">{opportunityAlertError}</p>
             ) : opportunityAlertState.lastOpportunityAlertAt ? (
-              <p className="text-[12px] text-zinc-600">
+              <p className="text-[12px] text-gray-400">
                 Last opportunity email sent {formatRelativeTime(opportunityAlertState.lastOpportunityAlertAt)}.
               </p>
             ) : (
-              <p className="text-[12px] text-zinc-600">
+              <p className="text-[12px] text-gray-400">
                 Alerts are sent to your login email when crawler attention is high and referrals are still low.
               </p>
             )}
@@ -2536,8 +2536,8 @@ export function SettingsSection({
             label="Alert email"
             description="Alerts are sent to your login email."
             action={
-              <span className="flex items-center gap-2 text-[13px] text-zinc-300">
-                <Mail className="h-3.5 w-3.5 text-zinc-500" />
+              <span className="flex items-center gap-2 text-[13px] text-gray-700">
+                <Mail className="h-3.5 w-3.5 text-gray-500" />
                 {displayEmail || '—'}
               </span>
             }
@@ -2553,25 +2553,25 @@ export function SettingsSection({
       <>
       {/* ─── AI Platform Selection ──────────────────────────────── */}
       <section id="platforms" className="scroll-mt-6">
-        <h2 className="text-[15px] font-semibold text-white">AI Platforms</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">
+        <h2 className="text-[15px] font-semibold text-gray-900">AI Platforms</h2>
+        <p className="mt-1 text-[12px] text-gray-500">
           Choose which AI engines to track for {domain}. Your {planConfig.name} plan includes up to {maxPlatforms} platform{maxPlatforms !== 1 ? 's' : ''}.
         </p>
 
         <Card className="mt-4">
           {platformsLoading ? (
-            <div className="px-5 py-4 text-[13px] text-zinc-500">Loading platforms...</div>
+            <div className="px-5 py-4 text-[13px] text-gray-500">Loading platforms...</div>
           ) : (
-            <div className="divide-y divide-white/[0.06]">
+            <div className="divide-y divide-gray-200">
               {AI_PLATFORMS.map((platform) => {
                 const isSelected = selectedPlatforms.includes(platform);
                 const isDisabled = !isSelected && selectedPlatforms.length >= maxPlatforms;
                 return (
                   <div key={platform} className="flex items-center justify-between px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-[13px] font-medium text-zinc-200">{PLATFORM_LABELS[platform]}</span>
+                      <span className="text-[13px] font-medium text-gray-700">{PLATFORM_LABELS[platform]}</span>
                       {isDisabled && (
-                        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-500">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
                           Upgrade to add
                         </span>
                       )}
@@ -2587,16 +2587,16 @@ export function SettingsSection({
             </div>
           )}
           {platformsError && (
-            <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+            <div className="border-t border-gray-200 px-5 py-3 text-[12px] text-red-500">
               {platformsError}
             </div>
           )}
           {selectedPlatforms.length >= maxPlatforms && tier !== 'growth' && (
-            <div className="border-t border-white/[0.06] px-5 py-3">
+            <div className="border-t border-gray-200 px-5 py-3">
               <button
                 type="button"
                 onClick={() => handleUnlockComplete(tier === 'free' ? 'starter_monthly' : tier === 'starter' ? 'pro_monthly' : 'growth_monthly')}
-                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
+                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-gray-900"
               >
                 Upgrade for more platforms &rarr;
               </button>
@@ -2607,8 +2607,8 @@ export function SettingsSection({
 
       {/* ─── Region Targeting ──────────────────────────────────── */}
       <section id="regions" className="scroll-mt-6">
-        <h2 className="text-[15px] font-semibold text-white">Region Targeting</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">
+        <h2 className="text-[15px] font-semibold text-gray-900">Region Targeting</h2>
+        <p className="mt-1 text-[12px] text-gray-500">
           Choose regions for AI mention testing. Your {planConfig.name} plan includes {planConfig.regions === -1 ? 'unlimited' : planConfig.regions} region{planConfig.regions !== 1 ? 's' : ''}.
           {planConfig.regions === 1 && (
             <> Upgrade to Pro for multi-region testing.</>
@@ -2617,9 +2617,9 @@ export function SettingsSection({
 
         <Card className="mt-4">
           {regionsLoading ? (
-            <div className="px-5 py-4 text-[13px] text-zinc-500">Loading regions...</div>
+            <div className="px-5 py-4 text-[13px] text-gray-500">Loading regions...</div>
           ) : (
-            <div className="divide-y divide-white/[0.06]">
+            <div className="divide-y divide-gray-200">
               {REGIONS.map((region) => {
                 const isSelected = selectedRegions.includes(region.id);
                 const isDisabled = !isSelected && selectedRegions.length >= maxRegions;
@@ -2628,11 +2628,11 @@ export function SettingsSection({
                     <div className="flex items-center gap-3">
                       <span className="text-base">{regionFlag(region.flag)}</span>
                       <div>
-                        <span className="text-[13px] font-medium text-zinc-200">{region.label}</span>
-                        <span className="ml-2 text-[11px] text-zinc-500">{region.language}</span>
+                        <span className="text-[13px] font-medium text-gray-700">{region.label}</span>
+                        <span className="ml-2 text-[11px] text-gray-500">{region.language}</span>
                       </div>
                       {isDisabled && (
-                        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-500">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
                           Upgrade to add
                         </span>
                       )}
@@ -2648,16 +2648,16 @@ export function SettingsSection({
             </div>
           )}
           {regionsError && (
-            <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+            <div className="border-t border-gray-200 px-5 py-3 text-[12px] text-red-500">
               {regionsError}
             </div>
           )}
           {selectedRegions.length >= maxRegions && tier !== 'growth' && (
-            <div className="border-t border-white/[0.06] px-5 py-3">
+            <div className="border-t border-gray-200 px-5 py-3">
               <button
                 type="button"
                 onClick={() => handleUnlockComplete(tier === 'free' ? 'starter_monthly' : tier === 'starter' ? 'pro_monthly' : 'growth_monthly')}
-                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
+                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-gray-900"
               >
                 Upgrade for more regions &rarr;
               </button>
@@ -2673,8 +2673,8 @@ export function SettingsSection({
       {activeTab === 'monitoring' && (
       <>
       <section id="tracking" className="scroll-mt-6">
-        <h2 className="text-[15px] font-semibold text-white">AI Bot Tracking</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">
+        <h2 className="text-[15px] font-semibold text-gray-900">AI Bot Tracking</h2>
+        <p className="mt-1 text-[12px] text-gray-500">
           Server-side middleware that detects AI crawler visits and reports them to your dashboard.
         </p>
 
@@ -2710,17 +2710,17 @@ export function SettingsSection({
           />
 
           {/* Runtime toggle + code block */}
-          <div className="border-b border-white/[0.06] px-5 py-4">
+          <div className="border-b border-gray-200 px-5 py-4">
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/[0.06] bg-white/[0.02] p-0.5">
+              <div className="inline-flex items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
                 <button
                   type="button"
                   onClick={() => setTrackingRuntime('next')}
                   className={cn(
                     'rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors',
                     trackingRuntime === 'next'
-                      ? 'bg-white/[0.1] text-white'
-                      : 'text-zinc-500 hover:text-zinc-300'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
                   )}
                 >
                   Next.js
@@ -2731,8 +2731,8 @@ export function SettingsSection({
                   className={cn(
                     'rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors',
                     trackingRuntime === 'express'
-                      ? 'bg-white/[0.1] text-white'
-                      : 'text-zinc-500 hover:text-zinc-300'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
                   )}
                 >
                   Express
@@ -2744,17 +2744,17 @@ export function SettingsSection({
                   type="button"
                   onClick={handleCopySnippet}
                   disabled={!trackingKey.siteKey || trackingCopying}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 transition-colors hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Copy className="h-3 w-3" />
                   {trackingCopied ? 'Copied' : 'Copy snippet'}
                 </button>
-                <span className="text-zinc-700">|</span>
+                <span className="text-gray-300">|</span>
                 <button
                   type="button"
                   onClick={handleCopyTrackingPrompt}
                   disabled={!trackingKey.siteKey || trackingPromptCopying}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 transition-colors hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Copy className="h-3 w-3" />
                   {trackingPromptCopied ? 'Copied' : 'Copy to LLM'}
@@ -2762,14 +2762,14 @@ export function SettingsSection({
               </div>
             </div>
 
-            <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.06] bg-[#09090b]">
-              <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-2">
-                <p className="text-[11px] font-medium text-zinc-500">
+            <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
+                <p className="text-[11px] font-medium text-gray-500">
                   {trackingRuntime === 'next' ? 'middleware.js' : 'server.js'}
                 </p>
-                <span className="text-[10px] text-zinc-600">server-side</span>
+                <span className="text-[10px] text-gray-400">server-side</span>
               </div>
-              <pre className="max-h-[380px] overflow-auto px-4 py-3 text-[12px] leading-6 text-zinc-400">
+              <pre className="max-h-[380px] overflow-auto px-4 py-3 text-[12px] leading-6 text-gray-500">
                 <code>
                   {trackingKeyLoading
                     ? '// Loading tracking key...'
@@ -2781,19 +2781,19 @@ export function SettingsSection({
             </div>
 
             {trackingError && (
-              <p className="mt-2 text-[12px] text-red-400">{trackingError}</p>
+              <p className="mt-2 text-[12px] text-red-500">{trackingError}</p>
             )}
           </div>
 
           {/* How it works — minimal */}
           <div className="px-5 py-4">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">How it works</p>
-            <ol className="mt-2.5 space-y-1.5 text-[12px] leading-5 text-zinc-500">
-              <li>1. Checks <code className="text-zinc-400">User-Agent</code> for AI bots and <code className="text-zinc-400">Referer</code> for AI engine click-throughs.</li>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">How it works</p>
+            <ol className="mt-2.5 space-y-1.5 text-[12px] leading-5 text-gray-500">
+              <li>1. Checks <code className="text-gray-500">User-Agent</code> for AI bots and <code className="text-gray-500">Referer</code> for AI engine click-throughs.</li>
               <li>2. Posts to airadr with your site key — domain is resolved server-side.</li>
               <li>3. Bot visits appear in AI Crawler Traffic; human referrals appear in AI Referral Traffic.</li>
             </ol>
-            <p className="mt-2 text-[11px] text-zinc-600">
+            <p className="mt-2 text-[11px] text-gray-400">
               Regenerating the key invalidates the previous snippet.
             </p>
           </div>
@@ -2807,8 +2807,8 @@ export function SettingsSection({
       {activeTab === 'general' && (
       <>
       <section>
-        <h2 className="text-[15px] font-semibold text-white">Account</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">Your account details.</p>
+        <h2 className="text-[15px] font-semibold text-gray-900">Account</h2>
+        <p className="mt-1 text-[12px] text-gray-500">Your account details.</p>
 
         <Card className="mt-4">
           <FieldRow label="Email" value={displayEmail || '—'} />
@@ -2816,8 +2816,8 @@ export function SettingsSection({
           <FieldRow
             label="Monitoring status"
             value={
-              <span className={cn('flex items-center gap-2', monitoringConnected ? 'text-[#25c972]' : 'text-zinc-500')}>
-                <span className={cn('inline-block h-1.5 w-1.5 rounded-full', monitoringConnected ? 'bg-[#25c972]' : 'bg-zinc-600')} />
+              <span className={cn('flex items-center gap-2', monitoringConnected ? 'text-emerald-600' : 'text-gray-500')}>
+                <span className={cn('inline-block h-1.5 w-1.5 rounded-full', monitoringConnected ? 'bg-emerald-600' : 'bg-gray-400')} />
                 {monitoringConnected ? 'Active' : 'Inactive'}
               </span>
             }

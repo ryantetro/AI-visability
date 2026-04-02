@@ -43,10 +43,10 @@ export function AnimatedStat({ value, suffix = '', label }: AnimatedStatProps) {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center justify-center text-center"
         >
-            <p className="flex items-center justify-center text-3xl font-semibold tracking-tight text-white drop-shadow-sm">
+            <p className="flex items-center justify-center text-3xl font-bold tabular-nums tracking-tight text-gray-900">
                 {displayValue}{suffix}
             </p>
-            <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+            <p className="mt-2 text-center text-[10px] font-semibold uppercase leading-snug tracking-[0.18em] text-gray-600">
                 {label}
             </p>
         </motion.div>

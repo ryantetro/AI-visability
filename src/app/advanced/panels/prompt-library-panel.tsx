@@ -220,7 +220,7 @@ export function PromptLibraryPanel({
             type="button"
             onClick={handleSuggestPrompts}
             disabled={suggestLoading || !domain}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/10 px-3 py-2 text-[11px] font-semibold text-[#d8b4fe] transition-colors hover:bg-[#a855f7]/16 disabled:opacity-45 disabled:pointer-events-none"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-[11px] font-semibold text-purple-700 transition-colors hover:bg-purple-100 disabled:opacity-45 disabled:pointer-events-none"
           >
             <Sparkles className="h-3 w-3" />
             {suggestLoading ? 'Suggesting…' : 'Suggest prompts'}
@@ -247,22 +247,22 @@ export function PromptLibraryPanel({
           };
           const next = tier ? nextTierLimits[tier] : null;
           return (
-            <div className="mt-4 rounded-lg border border-white/8 bg-white/[0.02] px-3.5 py-2.5">
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5">
               <div className="flex items-center justify-between text-[11px]">
-                <span className={cn('font-medium', isAtLimit ? 'text-red-400' : isNearLimit ? 'text-amber-400' : 'text-zinc-400')}>
+                <span className={cn('font-medium', isAtLimit ? 'text-red-600' : isNearLimit ? 'text-amber-600' : 'text-gray-500')}>
                   {count} / {maxPrompts} prompts used
                 </span>
                 {isNearLimit && !isAtLimit && next && (
-                  <span className="text-amber-400/80">Running low — upgrade for {next.limit} prompts</span>
+                  <span className="text-amber-600">Running low — upgrade for {next.limit} prompts</span>
                 )}
                 {isAtLimit && next && onOpenUnlock && (
-                  <button type="button" onClick={onOpenUnlock} className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-medium">
+                  <button type="button" onClick={onOpenUnlock} className="inline-flex items-center gap-1 text-red-600 hover:text-red-500 font-medium">
                     Limit reached — upgrade to {next.name}
                     <Sparkles className="h-3 w-3" />
                   </button>
                 )}
               </div>
-              <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+              <div className="mt-1.5 h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
                 <div
                   className={cn('h-full rounded-full transition-all duration-500', isAtLimit ? 'bg-red-500' : isNearLimit ? 'bg-amber-500' : 'bg-[#a855f7]')}
                   style={{ width: `${pct}%` }}
@@ -274,23 +274,23 @@ export function PromptLibraryPanel({
       )}
 
       {suggestError && (
-        <p className={cn('mt-3 text-[11px]', suggestions && suggestions.length > 0 ? 'text-amber-400/90' : 'text-red-400')}>
+        <p className={cn('mt-3 text-[11px]', suggestions && suggestions.length > 0 ? 'text-amber-600' : 'text-red-500')}>
           {suggestError}
         </p>
       )}
 
       {backgroundRunQueued && results.length === 0 && (
-        <p className="mt-3 text-[11px] text-[#d8b4fe]">
+        <p className="mt-3 text-[11px] text-purple-600">
           Running initial prompt tests across your enabled AI engines. This panel will refresh automatically when results land.
         </p>
       )}
 
       {suggestions != null && suggestions.length > 0 && (
-        <div className="mt-4 rounded-xl border border-[#a855f7]/25 bg-[#a855f7]/[0.06] p-4">
+        <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold text-[#e9d5ff]">Suggested prompts</p>
-              <p className="mt-1 text-[10px] text-zinc-500">
+              <p className="text-[11px] font-semibold text-purple-700">Suggested prompts</p>
+              <p className="mt-1 text-[10px] text-gray-500">
                 {suggestSource === 'llm'
                   ? 'From your latest scan using AI.'
                   : 'From your latest scan (rule-based). Add an OpenAI key for richer suggestions.'}
@@ -300,7 +300,7 @@ export function PromptLibraryPanel({
               <button
                 type="button"
                 onClick={() => { setSuggestions(null); setSuggestSource(null); setSuggestError(null); }}
-                className="rounded-lg border border-white/12 px-3 py-1.5 text-[10px] font-medium text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-[10px] font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700"
               >
                 Dismiss
               </button>
@@ -315,7 +315,7 @@ export function PromptLibraryPanel({
             </div>
           </div>
           {atPromptLimit && (
-            <p className="mt-2 text-[10px] text-amber-400/90">Prompt limit reached — delete a prompt or upgrade to add these.</p>
+            <p className="mt-2 text-[10px] text-amber-600">Prompt limit reached — delete a prompt or upgrade to add these.</p>
           )}
           <ul className="mt-3 max-h-[220px] space-y-2 overflow-y-auto">
             {suggestions.map((s) => {
@@ -324,15 +324,15 @@ export function PromptLibraryPanel({
               return (
                 <li
                   key={rowKey}
-                  className="flex items-start gap-2 rounded-lg border border-white/8 bg-black/20 px-3 py-2"
+                  className="flex items-start gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2"
                 >
-                  <p className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">{s.text}</p>
-                  <span className="shrink-0 text-[9px] uppercase tracking-wide text-zinc-500">{s.category}</span>
+                  <p className="min-w-0 flex-1 text-[12px] leading-snug text-gray-800">{s.text}</p>
+                  <span className="shrink-0 text-[9px] uppercase tracking-wide text-gray-500">{s.category}</span>
                   <button
                     type="button"
                     onClick={() => handleAddSuggested(s.text, s.category)}
                     disabled={atPromptLimit || busy}
-                    className="shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-white/[0.06] disabled:opacity-40"
+                    className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-[10px] font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-40"
                   >
                     {busy ? '…' : 'Add'}
                   </button>
@@ -343,61 +343,61 @@ export function PromptLibraryPanel({
         </div>
       )}
 
-      <div className="mt-5 flex gap-1 border-b border-white/8 pb-px">
+      <div className="mt-5 flex gap-1 border-b border-gray-200 pb-px">
         {PROMPT_CATEGORIES.map((cat) => (
-          <button key={cat.id} type="button" onClick={() => setActiveTab(cat.id)} className={cn('px-3 py-2 text-[11px] font-medium transition-colors border-b-2 -mb-px', activeTab === cat.id ? 'border-[#a855f7] text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300')}>
+          <button key={cat.id} type="button" onClick={() => setActiveTab(cat.id)} className={cn('px-3 py-2 text-[11px] font-medium transition-colors border-b-2 -mb-px', activeTab === cat.id ? 'border-purple-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700')}>
             {cat.label}
-            {(categoryCounts[cat.id] ?? 0) > 0 && <span className="ml-1.5 text-[9px] text-zinc-600">{categoryCounts[cat.id]}</span>}
+            {(categoryCounts[cat.id] ?? 0) > 0 && <span className="ml-1.5 text-[9px] text-gray-400">{categoryCounts[cat.id]}</span>}
           </button>
         ))}
       </div>
 
       <div className="mt-4 flex gap-2">
-        <select value={newCategory} onChange={(e) => setNewCategory(e.target.value as PromptCategory)} className="shrink-0 rounded-lg border border-white/10 bg-[#1b1b1c] px-2 py-2.5 text-[11px] text-zinc-300 focus:outline-none">
+        <select value={newCategory} onChange={(e) => setNewCategory(e.target.value as PromptCategory)} className="shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-2.5 text-[11px] text-gray-700 focus:outline-none">
           <option value="brand">Brand</option>
           <option value="competitor">Competitor</option>
           <option value="industry">Industry</option>
           <option value="custom">Custom</option>
         </select>
-        <input type="text" value={newPrompt} onChange={(e) => { setNewPrompt(e.target.value); setAddError(null); }} onKeyDown={(e) => e.key === 'Enter' && handleAddPrompt()} placeholder="e.g. What are the best AI visibility tools?" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#1b1b1c] px-3 py-2.5 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#a855f7]/40" />
+        <input type="text" value={newPrompt} onChange={(e) => { setNewPrompt(e.target.value); setAddError(null); }} onKeyDown={(e) => e.key === 'Enter' && handleAddPrompt()} placeholder="e.g. What are the best AI visibility tools?" className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-[13px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-purple-300" />
         <button type="button" onClick={handleAddPrompt} disabled={addingPrompt} className="shrink-0 rounded-lg bg-[#d6d6d6] px-4 py-2.5 text-[13px] font-medium text-black transition-colors hover:bg-white disabled:opacity-50">
           <Plus className="inline h-3.5 w-3.5 mr-1" />Add
         </button>
       </div>
-      {addError && <p className="mt-1.5 text-[11px] text-red-400">{addError}</p>}
+      {addError && <p className="mt-1.5 text-[11px] text-red-500">{addError}</p>}
 
       {promptStats.length > 0 && (
         <div className="mt-4 space-y-1.5">
           {promptStats.map((p) => (
-            <div key={p.id} className="rounded-lg border border-white/5 bg-white/[0.015] px-3 py-2.5">
+            <div key={p.id} className="rounded-lg border border-gray-100 bg-gray-50/50 px-3 py-2.5">
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => handleToggle(p.id, p.active)} className={cn('h-4 w-7 shrink-0 rounded-full transition-colors', p.active ? 'bg-[#25c972]' : 'bg-zinc-600')}>
+                <button type="button" onClick={() => handleToggle(p.id, p.active)} className={cn('h-4 w-7 shrink-0 rounded-full transition-colors', p.active ? 'bg-[#25c972]' : 'bg-gray-300')}>
                   <span className={cn('block h-3 w-3 rounded-full bg-white transition-transform', p.active ? 'translate-x-3.5' : 'translate-x-0.5')} />
                 </button>
                 <div className="min-w-0 flex-1">
                   {editingId === p.id ? (
                     <div className="flex gap-1.5">
-                      <input type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(p.id); if (e.key === 'Escape') setEditingId(null); }} autoFocus className="min-w-0 flex-1 rounded border border-white/15 bg-[#1b1b1c] px-2 py-1 text-[12px] text-zinc-100 focus:outline-none" />
-                      <button type="button" onClick={() => handleSaveEdit(p.id)} className="text-[10px] text-[#25c972] hover:underline">Save</button>
-                      <button type="button" onClick={() => setEditingId(null)} className="text-[10px] text-zinc-500 hover:underline">Cancel</button>
+                      <input type="text" value={editText} onChange={(e) => setEditText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(p.id); if (e.key === 'Escape') setEditingId(null); }} autoFocus className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[12px] text-gray-900 focus:outline-none" />
+                      <button type="button" onClick={() => handleSaveEdit(p.id)} className="text-[10px] text-emerald-600 hover:underline">Save</button>
+                      <button type="button" onClick={() => setEditingId(null)} className="text-[10px] text-gray-500 hover:underline">Cancel</button>
                     </div>
                   ) : (
-                    <p className={cn('text-[12px] truncate cursor-pointer hover:text-white transition-colors', p.active ? 'text-zinc-200' : 'text-zinc-500')} onClick={() => handleStartEdit(p.id, p.promptText)} title="Click to edit">{p.promptText}</p>
+                    <p className={cn('text-[12px] truncate cursor-pointer hover:text-gray-900 transition-colors', p.active ? 'text-gray-800' : 'text-gray-400')} onClick={() => handleStartEdit(p.id, p.promptText)} title="Click to edit">{p.promptText}</p>
                   )}
                   <div className="mt-0.5 flex items-center gap-2">
-                    <select value={p.category} onChange={(e) => handleCategoryChange(p.id, e.target.value)} className="rounded border-none bg-transparent px-0 py-0 text-[9px] uppercase tracking-wider text-zinc-600 focus:outline-none cursor-pointer hover:text-zinc-400">
+                    <select value={p.category} onChange={(e) => handleCategoryChange(p.id, e.target.value)} className="rounded border-none bg-transparent px-0 py-0 text-[9px] uppercase tracking-wider text-gray-400 focus:outline-none cursor-pointer hover:text-gray-600">
                       <option value="brand">Brand</option>
                       <option value="competitor">Competitor</option>
                       <option value="industry">Industry</option>
                       <option value="custom">Custom</option>
                     </select>
-                    {p.totalResults > 0 && <span className="text-[10px] text-zinc-600">{p.mentionRate}% of {p.totalResults} checks</span>}
+                    {p.totalResults > 0 && <span className="text-[10px] text-gray-400">{p.mentionRate}% of {p.totalResults} checks</span>}
                   </div>
                 </div>
                 {p.mentionRate !== null && (
                   <span className={cn('shrink-0 text-[11px] font-semibold tabular-nums', p.mentionRate >= 60 ? 'text-[#25c972]' : p.mentionRate >= 30 ? 'text-[#ffbb00]' : 'text-[#ff5252]')}>{p.mentionRate}%</span>
                 )}
-                <button type="button" onClick={() => handleDelete(p.id)} className="shrink-0 text-zinc-600 transition-colors hover:text-red-400"><X className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => handleDelete(p.id)} className="shrink-0 text-gray-400 transition-colors hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
               </div>
             </div>
           ))}
@@ -406,7 +406,7 @@ export function PromptLibraryPanel({
 
       {results.length > 0 && (
         <div className="mt-5">
-          <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Mention rate by engine</p>
+          <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Mention rate by engine</p>
           <div className="flex flex-wrap gap-2">
             {AI_ENGINES.map((engine) => {
               const engineResults = results.filter((r) => r.engine === engine);
@@ -414,10 +414,10 @@ export function PromptLibraryPanel({
               const mentioned = engineResults.filter((r) => r.mentioned).length;
               const rate = Math.round((mentioned / engineResults.length) * 100);
               return (
-                <div key={engine} className="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-center">
-                  <p className="text-[10px] text-zinc-500">{getAIEngineLabel(engine)}</p>
+                <div key={engine} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center">
+                  <p className="text-[10px] text-gray-500">{getAIEngineLabel(engine)}</p>
                   <p className={cn('text-sm font-bold tabular-nums', rate >= 60 ? 'text-[#25c972]' : rate >= 30 ? 'text-[#ffbb00]' : 'text-[#ff5252]')}>{rate}%</p>
-                  <p className="text-[9px] text-zinc-600">{engineResults.length} checks</p>
+                  <p className="text-[9px] text-gray-400">{engineResults.length} checks</p>
                 </div>
               );
             })}
@@ -426,15 +426,15 @@ export function PromptLibraryPanel({
       )}
 
       {prompts.length === 0 && (
-        <div className="mt-5 rounded-xl border border-white/8 bg-[linear-gradient(180deg,rgba(168,85,247,0.06)_0%,rgba(168,85,247,0.01)_100%)] p-5 text-center">
-          <Sparkles className="mx-auto h-6 w-6 text-[#a855f7]/60" />
-          <h4 className="mt-3 text-sm font-semibold text-white">Track how AI engines mention your brand</h4>
-          <p className="mx-auto mt-2 max-w-[400px] text-[12px] leading-5 text-zinc-400">
+        <div className="mt-5 rounded-xl border border-purple-200 bg-purple-50 p-5 text-center">
+          <Sparkles className="mx-auto h-6 w-6 text-purple-400" />
+          <h4 className="mt-3 text-sm font-semibold text-gray-900">Track how AI engines mention your brand</h4>
+          <p className="mx-auto mt-2 max-w-[400px] text-[12px] leading-5 text-gray-500">
             Add prompts to monitor so we can check ChatGPT, Perplexity, Gemini, and more for mentions of your brand.
           </p>
           {maxPrompts != null && tier && (
-            <p className="mt-3 text-[11px] text-zinc-500">
-              You can track up to <span className="font-medium text-zinc-300">{maxPrompts}</span> prompts on your <span className="font-medium text-zinc-300">{tier.charAt(0).toUpperCase() + tier.slice(1)}</span> plan
+            <p className="mt-3 text-[11px] text-gray-500">
+              You can track up to <span className="font-medium text-gray-700">{maxPrompts}</span> prompts on your <span className="font-medium text-gray-700">{tier.charAt(0).toUpperCase() + tier.slice(1)}</span> plan
             </p>
           )}
           {tier && tier !== 'growth' && (() => {
@@ -445,7 +445,7 @@ export function PromptLibraryPanel({
             };
             const next = nextLimits[tier];
             return next ? (
-              <p className="mt-1.5 text-[11px] text-zinc-600">
+              <p className="mt-1.5 text-[11px] text-gray-400">
                 Need more? Upgrade to track up to {next.limit} prompts
               </p>
             ) : null;

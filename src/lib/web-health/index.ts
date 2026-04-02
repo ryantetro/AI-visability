@@ -29,7 +29,7 @@ export async function runWebHealthEnrichment(data: CrawlData): Promise<WebHealth
   const qualityChecks = createQualityChecks(data.homepage);
   const securityChecks = createSecurityChecks(data);
   const pillars = [
-    buildPillar('performance', 'Performance', performanceChecks),
+    buildPillar('performance', 'Site Speed', performanceChecks),
     buildPillar('quality', 'Website Quality', qualityChecks),
     buildPillar('security', 'Trust & Security', securityChecks),
   ];
@@ -56,7 +56,7 @@ export function createUnavailableWebHealth(error: string): WebHealthSummary {
     status: 'unavailable',
     percentage: null,
     pillars: [
-      emptyPillar('performance', 'Performance'),
+      emptyPillar('performance', 'Site Speed'),
       emptyPillar('quality', 'Website Quality'),
       emptyPillar('security', 'Trust & Security'),
     ],

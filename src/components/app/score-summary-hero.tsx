@@ -51,31 +51,33 @@ export function ScoreSummaryHero({
   return (
     <section className={cn('px-2 py-6 sm:py-8', className)}>
       <div className="flex flex-col items-center text-center">
-        <div className="flex flex-col items-center gap-1.5">
-          <span className="inline-flex items-center gap-2 text-zinc-400">
-            <Zap className="h-4 w-4 text-amber-400/90" />
+        {/* Domain header */}
+        <div className="flex flex-col items-center gap-1">
+          <span className="inline-flex items-center gap-1.5 text-gray-500">
+            <Globe2 className="h-3.5 w-3.5 text-gray-400" />
             {url ? (
               <a
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                className="font-medium text-white hover:text-zinc-200"
+                className="text-[13px] font-medium text-gray-700 hover:text-gray-900 hover:underline"
               >
                 {domain}
               </a>
             ) : (
-              <span className="font-medium text-white">{domain}</span>
+              <span className="text-[13px] font-medium text-gray-700">{domain}</span>
             )}
           </span>
           {dateLabel ? (
-            <span className="text-[12px] text-zinc-500">{dateLabel}</span>
+            <span className="text-[11px] text-gray-400">{dateLabel}</span>
           ) : null}
         </div>
 
-        <div className="mt-8 flex justify-center">
+        {/* Main score ring */}
+        <div className="mt-6 flex justify-center">
           <ScoreRing
             score={overall.score}
-            size={188}
+            size={180}
             emphasis="hero"
             color={overall.color}
             label={overall.label ?? 'Overall Score'}
@@ -85,42 +87,43 @@ export function ScoreSummaryHero({
         </div>
 
         {/* Score band legend */}
-        <div className="mt-4 flex items-center justify-center gap-4 text-[10px] font-medium">
+        <div className="mt-3 flex items-center justify-center gap-4 text-[10px] font-medium text-gray-500">
           <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#ff5252]" />0–59 Needs Work</span>
           <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#ff8a1e]" />60–79 Getting There</span>
           <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#25c972]" />80–100 Strong</span>
         </div>
 
+        {/* Supporting score rings */}
         <div className={cn(
-          'mt-8 grid w-full gap-4',
+          'mt-6 grid w-full gap-3',
           supporting.length <= 3
-            ? 'max-w-[560px] grid-cols-3'
-            : 'max-w-[680px] grid-cols-2 sm:grid-cols-4'
+            ? 'max-w-[520px] grid-cols-3'
+            : 'max-w-[620px] grid-cols-2 sm:grid-cols-4'
         )}>
           {supporting.map((item) => (
             <div key={item.label} className="flex flex-col items-center">
               <ScoreRing
                 score={item.score}
-                size={100}
+                size={88}
                 emphasis="compact"
                 color={item.color}
                 label={item.label}
                 caption={item.caption}
               />
               {SCORE_TOOLTIPS[item.label] && (
-                <InfoTooltip text={SCORE_TOOLTIPS[item.label]} className="mt-1" />
+                <InfoTooltip text={SCORE_TOOLTIPS[item.label]} className="mt-1.5" />
               )}
             </div>
           ))}
         </div>
 
         {note ? (
-          <p className="mt-6 max-w-[42rem] text-[13px] leading-6 text-zinc-500">
+          <p className="mt-5 max-w-[42rem] text-[13px] leading-6 text-gray-500">
             {note}
           </p>
         ) : null}
 
-        {actions ? <div className="mt-6 flex flex-wrap justify-center gap-2">{actions}</div> : null}
+        {actions ? <div className="mt-5 flex flex-wrap justify-center gap-2">{actions}</div> : null}
       </div>
     </section>
   );

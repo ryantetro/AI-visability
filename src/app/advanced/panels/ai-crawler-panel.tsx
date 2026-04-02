@@ -201,7 +201,7 @@ export function AICrawlerPanel({
         <div className="flex items-center justify-center py-16">
           <div className="flex flex-col items-center gap-3">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-400" />
-            <p className="text-xs text-zinc-500">Loading traffic data...</p>
+            <p className="text-xs text-gray-500">Loading traffic data...</p>
           </div>
         </div>
       </DashboardPanel>
@@ -217,40 +217,40 @@ export function AICrawlerPanel({
           description="Crawler visits: when AI bots (e.g. ChatGPT, Perplexity) load pages on your site."
         />
         <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_320px]">
-          <div className="rounded-[1.4rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.015)_100%)] p-5">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className={cn(
                 'inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]',
                 trackingReady
-                  ? 'border border-zinc-600/40 bg-white/[0.04] text-zinc-400'
-                  : 'border border-amber-500/25 bg-amber-500/10 text-amber-300'
+                  ? 'border border-gray-200 bg-gray-50 text-gray-500'
+                  : 'border border-amber-200 bg-amber-50 text-amber-700'
               )}>
-                {trackingReady ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Code2 className="h-3.5 w-3.5" />}
+                {trackingReady ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Code2 className="h-3.5 w-3.5" />}
                 {trackingReady ? 'Snippet saved · waiting for crawler visits' : 'Tracking not set up'}
               </span>
             </div>
 
-            <h3 className="mt-4 text-lg font-semibold text-white">
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">
               {!trackingReady
                 ? 'Connect your site to see crawler traffic'
                 : trackingLastUsedAt
                   ? `No crawler visits in the last ${days} days`
                   : 'Waiting for your first signal'}
             </h3>
-            <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-zinc-400">
+            <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed text-gray-500">
               {!trackingReady ? (
                 'Create a site key in Settings, add the middleware snippet to your app, and deploy. This chart only shows data after crawlers request your pages.'
               ) : trackingLastUsedAt ? (
                 <>
                   Last contact from your site:{' '}
-                  <span className="font-medium text-zinc-300">
+                  <span className="font-medium text-gray-700">
                     {formatRelativeTime(new Date(trackingLastUsedAt).getTime())}
                   </span>
                   . Crawlers may be quiet for stretches. Try a longer range (90d) or check again after bots revisit your domain.
                 </>
               ) : (
                 <>
-                  You’re set up on our side. We’re waiting for your live site to send its first event (a bot crawl or a visitor from an AI product). Until then this chart stays empty. If it’s been more than a day, confirm the snippet is on the <span className="text-zinc-300">same domain</span> as this report and that production is deployed.
+                  You're set up on our side. We're waiting for your live site to send its first event (a bot crawl or a visitor from an AI product). Until then this chart stays empty. If it's been more than a day, confirm the snippet is on the <span className="text-gray-700">same domain</span> as this report and that production is deployed.
                 </>
               )}
             </p>
@@ -266,8 +266,8 @@ export function AICrawlerPanel({
             </div>
           </div>
 
-          <div className="rounded-[1.4rem] border border-white/8 bg-[#0b0b0d] p-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">At a glance</p>
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">At a glance</p>
             <div className="mt-4 space-y-3">
               {[
                 trackingReady
@@ -278,19 +278,19 @@ export function AICrawlerPanel({
                   ? 'No graph yet = no crawler hits recorded for this period (or no signal from your site yet).'
                   : 'After setup, data appears when crawlers visit.',
               ].map((step, index) => (
-                <div key={step} className="flex gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[11px] font-semibold text-zinc-300">
+                <div key={step} className="flex gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-700">
                     {index + 1}
                   </span>
-                  <p className="text-[12px] leading-5 text-zinc-400">{step}</p>
+                  <p className="text-[12px] leading-5 text-gray-600">{step}</p>
                 </div>
               ))}
             </div>
             {tier === 'starter' && (
-              <p className="mt-4 text-[11px] text-zinc-600">Your Starter plan includes basic crawler totals. Upgrade to Pro for full timeline and trend analysis.</p>
+              <p className="mt-4 text-[11px] text-gray-500">Your Starter plan includes basic crawler totals. Upgrade to Pro for full timeline and trend analysis.</p>
             )}
             {tier === 'pro' && (
-              <p className="mt-4 text-[11px] text-zinc-600">Upgrade to Growth to export crawler data as CSV.</p>
+              <p className="mt-4 text-[11px] text-gray-500">Upgrade to Growth to export crawler data as CSV.</p>
             )}
           </div>
         </div>
@@ -355,8 +355,8 @@ export function AICrawlerPanel({
                 className={cn(
                   'px-2.5 py-1 text-[10px] font-medium rounded transition-colors',
                   days === d
-                    ? 'bg-white/10 text-white'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'bg-gray-200 text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
                 )}
               >
                 {d}d
@@ -389,18 +389,18 @@ export function AICrawlerPanel({
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="rgba(255,255,255,0.04)"
+                  stroke="rgba(0,0,0,0.06)"
                   vertical={false}
                 />
                 <XAxis
                   dataKey="label"
-                  axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                  axisLine={{ stroke: 'rgba(0,0,0,0.08)' }}
                   tickLine={false}
                   interval={tickInterval}
-                  tick={{ fontSize: 10, fill: '#52525b' }}
+                  tick={{ fontSize: 10, fill: '#6b7280' }}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: '#3f3f46' }}
+                  tick={{ fontSize: 10, fill: '#6b7280' }}
                   axisLine={false}
                   tickLine={false}
                   allowDecimals={false}
@@ -408,7 +408,7 @@ export function AICrawlerPanel({
                 />
                 <Tooltip
                   content={<CrawlerChartTooltip />}
-                  cursor={{ stroke: 'rgba(255,255,255,0.06)' }}
+                  cursor={{ stroke: 'rgba(0,0,0,0.08)' }}
                   wrapperStyle={{ pointerEvents: 'none' }}
                 />
                 {chartProviders.map(provider => (
@@ -420,17 +420,16 @@ export function AICrawlerPanel({
                     strokeWidth={2}
                     dot={{
                       r: 3,
-                      fill: '#0a0a0c',
+                      fill: '#ffffff',
                       stroke: ENGINE_COLORS[provider] ?? '#71717a',
                       strokeWidth: 2,
                     }}
                     activeDot={{
                       r: 5,
                       fill: ENGINE_COLORS[provider] ?? '#71717a',
-                      stroke: '#0a0a0c',
+                      stroke: '#ffffff',
                       strokeWidth: 2,
                     }}
-                    style={{ filter: `drop-shadow(0 0 4px ${ENGINE_COLORS[provider] ?? '#71717a'}44)` }}
                     connectNulls
                   />
                 ))}
@@ -443,7 +442,7 @@ export function AICrawlerPanel({
             {chartProviders.map(provider => (
               <div key={provider} className="flex items-center gap-2">
                 <EngineIcon engine={provider} className="size-4" style={{ color: ENGINE_COLORS[provider] ?? '#71717a' }} />
-                <span className="text-[11px] font-medium text-zinc-400">
+                <span className="text-[11px] font-medium text-gray-600">
                   {PROVIDER_LABELS[provider] ?? provider}
                 </span>
               </div>
@@ -452,8 +451,8 @@ export function AICrawlerPanel({
         </div>
 
         {/* Top Providers leaderboard sidebar */}
-        <div className="hidden lg:flex w-[220px] shrink-0 flex-col border-l border-white/[0.06] pl-6 ml-6">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+        <div className="hidden lg:flex w-[220px] shrink-0 flex-col border-l border-gray-200 pl-6 ml-6">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
             Top Providers
           </p>
           <div className="mt-5 space-y-5">
@@ -461,22 +460,22 @@ export function AICrawlerPanel({
               const pct = totalAllVisits > 0 ? Math.round((s.visits / totalAllVisits) * 100) : 0;
               return (
                 <div key={s.provider} className="flex items-start gap-3">
-                  <span className="mt-0.5 text-[13px] font-bold tabular-nums text-zinc-600">
+                  <span className="mt-0.5 text-[13px] font-bold tabular-nums text-gray-400">
                     {i + 1}
                   </span>
                   <EngineIcon engine={s.provider} className="mt-0.5 size-5 shrink-0" style={{ color: ENGINE_COLORS[s.provider] ?? '#71717a' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-zinc-200">
+                    <p className="text-[12px] font-semibold text-gray-800">
                       {PROVIDER_LABELS[s.provider] ?? s.provider}
                     </p>
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-[15px] font-bold tabular-nums text-white">
+                      <span className="text-[15px] font-bold tabular-nums text-gray-900">
                         {s.visits}
                       </span>
-                      <span className="text-[10px] text-zinc-500">visits</span>
+                      <span className="text-[10px] text-gray-500">visits</span>
                     </div>
                     <div className="mt-1.5 flex items-center gap-2">
-                      <div className="h-[3px] flex-1 rounded-full bg-white/[0.06] overflow-hidden">
+                      <div className="h-[3px] flex-1 rounded-full bg-gray-200 overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{
@@ -485,7 +484,7 @@ export function AICrawlerPanel({
                           }}
                         />
                       </div>
-                      <span className="text-[10px] tabular-nums text-zinc-500">{pct}%</span>
+                      <span className="text-[10px] tabular-nums text-gray-500">{pct}%</span>
                     </div>
                     <TrendBadge trend={s.trend} />
                   </div>
@@ -504,7 +503,7 @@ export function AICrawlerPanel({
 function TrendBadge({ trend }: { trend: number }) {
   if (trend === 0) {
     return (
-      <div className="mt-1.5 flex items-center gap-1 text-zinc-500">
+      <div className="mt-1.5 flex items-center gap-1 text-gray-400">
         <Minus className="h-3 w-3" />
         <span className="text-[10px] font-medium">0%</span>
       </div>
@@ -515,7 +514,7 @@ function TrendBadge({ trend }: { trend: number }) {
   return (
     <div className={cn(
       'mt-1.5 flex items-center gap-1',
-      isPositive ? 'text-emerald-400' : 'text-red-400',
+      isPositive ? 'text-emerald-600' : 'text-red-500',
     )}>
       {isPositive
         ? <TrendingUp className="h-3 w-3" />
@@ -542,18 +541,18 @@ function CrawlerChartTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="pointer-events-none select-none rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 shadow-lg">
-      <p className="text-[11px] font-medium text-zinc-400 mb-1.5">{label}</p>
+    <div className="pointer-events-none select-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 shadow-lg">
+      <p className="text-[11px] font-medium text-gray-500 mb-1.5">{label}</p>
       {payload
         .filter(p => p.value > 0)
         .sort((a, b) => b.value - a.value)
         .map(p => (
           <div key={p.dataKey} className="flex items-center gap-2 py-0.5">
             <EngineIcon engine={p.dataKey} className="size-3.5" style={{ color: ENGINE_COLORS[p.dataKey] ?? '#71717a' }} />
-            <span className="text-[11px] text-zinc-300">
+            <span className="text-[11px] text-gray-700">
               {PROVIDER_LABELS[p.dataKey] ?? p.dataKey}
             </span>
-            <span className="ml-auto text-[11px] font-semibold tabular-nums text-white">
+            <span className="ml-auto text-[11px] font-semibold tabular-nums text-gray-900">
               {p.value}
             </span>
           </div>

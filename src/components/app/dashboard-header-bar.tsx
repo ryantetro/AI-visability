@@ -109,46 +109,46 @@ export function DashboardHeaderBar() {
       {/* Left — page title (with spacing for mobile hamburger) */}
       <div className="flex items-center gap-3">
         <div className="w-10 md:hidden" /> {/* spacer for hamburger button */}
-        <h1 className="text-lg font-semibold text-white">{title}</h1>
+        <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
       </div>
 
       {/* Right — user profile */}
       <div className="flex items-center gap-3">
         {loading ? (
-          <div className="h-8 w-8 rounded-full bg-white/[0.04]" />
+          <div className="h-8 w-8 rounded-full bg-gray-200" />
         ) : user ? (
           <div className="relative" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setDropdownOpen((o) => !o)}
-              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition-colors hover:bg-white/[0.04]"
+              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition-colors hover:bg-gray-100"
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#356df4] to-[#25c972] text-[11px] font-semibold text-white">
                 {initials}
               </span>
-              <span className="hidden text-[13px] font-medium text-zinc-200 sm:block">{user.name}</span>
+              <span className="hidden text-[13px] font-medium text-gray-700 sm:block">{user.name}</span>
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a] shadow-2xl">
-                <div className="border-b border-white/[0.06] px-5 py-3.5">
-                  <p className="truncate text-[13px] text-zinc-400">{user.email}</p>
+              <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+                <div className="border-b border-gray-100 px-5 py-3.5">
+                  <p className="truncate text-[13px] text-gray-500">{user.email}</p>
                 </div>
-                <div className="border-b border-white/[0.06] px-5 py-3">
-                  <p className="text-[12px] font-medium text-zinc-500">{planLabel}</p>
+                <div className="border-b border-gray-100 px-5 py-3">
+                  <p className="text-[12px] font-medium text-gray-600">{planLabel}</p>
                 </div>
                 {checkoutError && (
-                  <div className="border-b border-white/[0.06] px-5 py-2.5">
-                    <p className="text-[12px] text-red-400">{checkoutError}</p>
+                  <div className="border-b border-gray-100 px-5 py-2.5">
+                    <p className="text-[12px] text-red-600">{checkoutError}</p>
                   </div>
                 )}
                 {tier === 'free' && (
-                  <div className="border-b border-white/[0.06] py-1.5">
+                  <div className="border-b border-gray-100 py-1.5">
                     <button
                       type="button"
                       disabled={checkoutLoading !== null}
                       onClick={() => void handleUpgrade('starter_monthly')}
-                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-gray-900 transition-colors hover:bg-gray-50 disabled:opacity-50"
                     >
                       {checkoutLoading === 'starter_monthly' ? (
                         <Loader2 className="h-4 w-4 animate-spin text-[#25c972]" />
@@ -161,7 +161,7 @@ export function DashboardHeaderBar() {
                       type="button"
                       disabled={checkoutLoading !== null}
                       onClick={() => void handleUpgrade('pro_monthly')}
-                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-gray-900 transition-colors hover:bg-gray-50 disabled:opacity-50"
                     >
                       {checkoutLoading === 'pro_monthly' ? (
                         <Loader2 className="h-4 w-4 animate-spin text-[#356df4]" />
@@ -173,12 +173,12 @@ export function DashboardHeaderBar() {
                   </div>
                 )}
                 {tier === 'starter' && (
-                  <div className="border-b border-white/[0.06] py-1.5">
+                  <div className="border-b border-gray-100 py-1.5">
                     <button
                       type="button"
                       disabled={checkoutLoading !== null}
                       onClick={() => void handleUpgrade('pro_monthly')}
-                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-gray-900 transition-colors hover:bg-gray-50 disabled:opacity-50"
                     >
                       {checkoutLoading === 'pro_monthly' ? (
                         <Loader2 className="h-4 w-4 animate-spin text-[#356df4]" />
@@ -190,12 +190,12 @@ export function DashboardHeaderBar() {
                   </div>
                 )}
                 {tier === 'pro' && (
-                  <div className="border-b border-white/[0.06] py-1.5">
+                  <div className="border-b border-gray-100 py-1.5">
                     <button
                       type="button"
                       disabled={checkoutLoading !== null}
                       onClick={() => void handleUpgrade('growth_monthly')}
-                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-white transition-colors hover:bg-white/[0.04] disabled:opacity-50"
+                      className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-gray-900 transition-colors hover:bg-gray-50 disabled:opacity-50"
                     >
                       {checkoutLoading === 'growth_monthly' ? (
                         <Loader2 className="h-4 w-4 animate-spin text-[#a855f7]" />
@@ -213,7 +213,7 @@ export function DashboardHeaderBar() {
                       setDropdownOpen(false);
                       void logout();
                     }}
-                    className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-white"
+                    className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
                   >
                     <LogOut className="h-4 w-4" />
                     Logout
@@ -225,7 +225,7 @@ export function DashboardHeaderBar() {
         ) : (
           <Link
             href={buildLoginHref(getCurrentAppPath('/dashboard'))}
-            className="inline-flex items-center justify-center rounded-full border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-white/[0.04]"
+            className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-1.5 text-[12px] font-semibold text-gray-800 transition-colors hover:bg-gray-100"
           >
             Sign in
           </Link>

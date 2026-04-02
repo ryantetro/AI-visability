@@ -17,14 +17,14 @@ const Circle = forwardRef<
             <div
                 ref={ref}
                 className={cn(
-                    "z-10 flex size-12 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[var(--surface-card)] p-2.5 shadow-sm",
+                    "z-10 flex size-12 items-center justify-center rounded-full border border-gray-200 bg-white p-2.5 shadow-sm",
                     className,
                 )}
             >
                 {children}
             </div>
             {label && (
-                <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] hidden sm:block">
+                <span className="hidden text-[10px] font-bold uppercase tracking-wider text-gray-700 sm:block">
                     {label}
                 </span>
             )}
@@ -75,7 +75,7 @@ export function AIBeamVisual() {
                         >
                             <Globe className="size-7" />
                         </Circle>
-                        <span className="mt-3 text-xs font-semibold text-white tracking-wide uppercase">
+                        <span className="mt-3 text-xs font-bold uppercase tracking-wide text-gray-800">
                             Your Website
                         </span>
                     </div>
@@ -87,7 +87,7 @@ export function AIBeamVisual() {
 
                 {/* Row 3 */}
                 <div className="flex flex-row items-center justify-center">
-                    <Circle ref={grokRef} label="Grok" className="text-[#f5f5f5]">
+                    <Circle ref={grokRef} label="Grok" className="text-neutral-700">
                         <GrokIcon />
                     </Circle>
                 </div>

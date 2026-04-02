@@ -6,7 +6,7 @@
     font-size="40"
     letter-spacing="-1.4"
   >
-    <tspan fill="#E6F1FB" font-weight="100">ai</tspan>
-    <tspan dx="-3.6" fill="#85B7EB" font-weight="700">radr</tspan>
+    <tspan fill="#6B7280" font-weight="300">ai</tspan>
+    <tspan dx="-3.6" fill="#111827" font-weight="700">radr</tspan>
   </text>
 </svg>

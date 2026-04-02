@@ -126,10 +126,10 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
           title="AI-Optimized Page Generator"
           description="Generate structured content pages designed to maximize your AI visibility."
         />
-        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] py-12">
-          <Lock className="h-8 w-8 text-zinc-600" />
-          <p className="mt-3 text-sm font-medium text-zinc-400">Upgrade to Pro to unlock content generation</p>
-          <p className="mt-1 text-[12px] text-zinc-600">Create AI-optimized pages with FAQ schema, structured data, and citation-friendly formats.</p>
+        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-12">
+          <Lock className="h-8 w-8 text-gray-400" />
+          <p className="mt-3 text-sm font-medium text-gray-500">Upgrade to Pro to unlock content generation</p>
+          <p className="mt-1 text-[12px] text-gray-400">Create AI-optimized pages with FAQ schema, structured data, and citation-friendly formats.</p>
         </div>
       </DashboardPanel>
     );
@@ -147,7 +147,7 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
 
       {/* Usage meter */}
       <div className="mt-4 flex items-center gap-3">
-        <div className="h-1.5 flex-1 rounded-full bg-white/[0.06]">
+        <div className="h-1.5 flex-1 rounded-full bg-gray-100">
           <div
             className="h-full rounded-full transition-all"
             style={{
@@ -156,17 +156,17 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
             }}
           />
         </div>
-        <span className={cn('text-[11px] font-medium tabular-nums', atLimit ? 'text-[#ff5252]' : 'text-zinc-400')}>
+        <span className={cn('text-[11px] font-medium tabular-nums', atLimit ? 'text-[#ff5252]' : 'text-gray-500')}>
           {usage.used} / {usage.limit > 0 ? usage.limit : maxContentPages} pages this month
         </span>
       </div>
 
       {/* Generator form */}
-      <div className="mt-5 rounded-xl border border-white/8 bg-white/[0.02] p-5">
+      <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-5">
         <div className="space-y-4">
           {/* Topic */}
           <div>
-            <label htmlFor="cg-topic" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+            <label htmlFor="cg-topic" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-500">
               Topic <span className="text-[#ff5252]">*</span>
             </label>
             <input
@@ -176,14 +176,14 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
               onChange={e => setTopic(e.target.value)}
               placeholder="e.g. Best practices for local SEO in 2025"
               maxLength={200}
-              className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#a855f7]/50"
+              className="mt-1.5 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:border-[#a855f7]/50"
             />
           </div>
 
           {/* Brand + Industry row */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="cg-brand" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+              <label htmlFor="cg-brand" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-500">
                 Brand Name
               </label>
               <input
@@ -192,11 +192,11 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
                 value={brand}
                 onChange={e => setBrand(e.target.value)}
                 placeholder={domain}
-                className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#a855f7]/50"
+                className="mt-1.5 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:border-[#a855f7]/50"
               />
             </div>
             <div>
-              <label htmlFor="cg-industry" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+              <label htmlFor="cg-industry" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-500">
                 Industry
               </label>
               <input
@@ -205,7 +205,7 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
                 value={industry}
                 onChange={e => setIndustry(e.target.value)}
                 placeholder="e.g. SaaS, E-commerce, Healthcare"
-                className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#a855f7]/50"
+                className="mt-1.5 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:border-[#a855f7]/50"
               />
             </div>
           </div>
@@ -213,7 +213,7 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
           {/* Keywords + Tone row */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="cg-keywords" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+              <label htmlFor="cg-keywords" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-500">
                 Target Keywords
               </label>
               <input
@@ -222,18 +222,18 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
                 value={keywords}
                 onChange={e => setKeywords(e.target.value)}
                 placeholder="comma-separated keywords"
-                className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-[#a855f7]/50"
+                className="mt-1.5 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:border-[#a855f7]/50"
               />
             </div>
             <div>
-              <label htmlFor="cg-tone" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+              <label htmlFor="cg-tone" className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-500">
                 Tone
               </label>
               <select
                 id="cg-tone"
                 value={tone}
                 onChange={e => setTone(e.target.value as typeof tone)}
-                className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none transition-colors focus:border-[#a855f7]/50"
+                className="mt-1.5 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-[#a855f7]/50"
               >
                 <option value="professional">Professional</option>
                 <option value="conversational">Conversational</option>
@@ -276,16 +276,16 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#a855f7]">Generated</p>
-              <h3 className="mt-1 text-lg font-semibold text-white">{result.title}</h3>
-              <p className="mt-1 text-[12px] text-zinc-500">
+              <h3 className="mt-1 text-lg font-semibold text-gray-900">{result.title}</h3>
+              <p className="mt-1 text-[12px] text-gray-500">
                 {result.wordCount.toLocaleString()} words &middot; /{result.slug}
               </p>
             </div>
           </div>
 
           {/* Preview */}
-          <div className="mt-4 max-h-[400px] overflow-y-auto rounded-lg border border-white/8 bg-black/30 p-4">
-            <pre className="whitespace-pre-wrap text-[12px] leading-relaxed text-zinc-300 font-sans">
+          <div className="mt-4 max-h-[400px] overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <pre className="whitespace-pre-wrap text-[12px] leading-relaxed text-gray-700 font-sans">
               {result.markdown}
             </pre>
           </div>
@@ -295,7 +295,7 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
             <button
               type="button"
               onClick={() => handleCopy(result.markdown, 'markdown')}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.08]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
             >
               <Copy className="h-3.5 w-3.5" />
               {copied === 'markdown' ? 'Copied!' : 'Copy Markdown'}
@@ -303,7 +303,7 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
             <button
               type="button"
               onClick={() => handleCopy(result.htmlHead, 'head')}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.08]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
             >
               <Copy className="h-3.5 w-3.5" />
               {copied === 'head' ? 'Copied!' : 'Copy HTML Head'}
@@ -311,7 +311,7 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
             <button
               type="button"
               onClick={() => handleCopy(result.faqSchema, 'faq')}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.08]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
             >
               <Copy className="h-3.5 w-3.5" />
               {copied === 'faq' ? 'Copied!' : 'Copy FAQ Schema'}
@@ -319,7 +319,7 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
             <button
               type="button"
               onClick={() => handleDownload(`${result.slug}.md`, result.markdown)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-200 transition-colors hover:bg-white/[0.08]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
             >
               <Download className="h-3.5 w-3.5" />
               Download .md
@@ -335,17 +335,17 @@ export function ContentGeneratorPanel({ domain }: { domain: string }) {
         </div>
       ) : history.length > 0 ? (
         <div className="mt-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">Recent Pages</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-500">Recent Pages</p>
           <div className="mt-3 space-y-2">
             {history.map(page => (
               <div
                 key={page.id}
-                className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.015] px-3 py-2.5 transition-colors hover:border-white/10 hover:bg-white/[0.03]"
+                className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 transition-colors hover:border-gray-300 hover:bg-gray-50"
               >
-                <FileText className="h-4 w-4 shrink-0 text-zinc-500" />
+                <FileText className="h-4 w-4 shrink-0 text-gray-500" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12px] font-medium text-zinc-200">{page.title}</p>
-                  <p className="text-[10px] text-zinc-600">
+                  <p className="truncate text-[12px] font-medium text-gray-700">{page.title}</p>
+                  <p className="text-[10px] text-gray-400">
                     {page.word_count.toLocaleString()} words &middot; {new Date(page.created_at).toLocaleDateString()}
                   </p>
                 </div>

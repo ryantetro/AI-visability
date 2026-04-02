@@ -69,3 +69,15 @@ No new env vars. The AI traffic baseline for missed visitor estimates is hardcod
 - Missing mention data: missed traffic card hidden, formula weights adjust
 - No engine data: engine breakdown section hidden entirely
 - Fewer than 4 fixes: locked fixes teaser hidden
+
+## Updated Score Formula (April 2026)
+
+Workspace / scan-time overall (no mentions), in `src/lib/scorer/index.ts`:
+
+```
+overall = (aiVisibility * 1.0 + siteSpeed * 0.8 + trustSecurity * 0.8) / 2.6
+```
+
+Speed and trust pillars are weighted at **0.8** each (up from 0.5) so performance and security fixes move the score more and create urgency. Fallback when only aggregate web health exists: `(aiVisibility * 1.0 + webHealth * 0.6) / 1.6`.
+
+Web health pillar labels: **Site Speed** (was “Performance”), **Website Quality**, **Trust & Security** (`src/lib/web-health/index.ts`).

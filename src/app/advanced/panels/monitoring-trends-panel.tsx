@@ -61,7 +61,7 @@ function ScoreTrendXAxisTick({
       <g transform={`translate(${nx},${ny})`}>
         <text
           textAnchor="middle"
-          fill="#d4d4d8"
+          fill="#374151"
           fontSize={11}
           fontWeight={600}
           dy={10}
@@ -71,7 +71,7 @@ function ScoreTrendXAxisTick({
         </text>
         <text
           textAnchor="middle"
-          fill="#71717a"
+          fill="#6b7280"
           fontSize={10}
           fontWeight={500}
           letterSpacing="0.02em"
@@ -88,7 +88,7 @@ function ScoreTrendXAxisTick({
     <g transform={`translate(${nx},${ny})`}>
       <text
         textAnchor="middle"
-        fill="#d4d4d8"
+        fill="#374151"
         fontSize={11}
         fontWeight={600}
         letterSpacing="0.01em"
@@ -116,7 +116,7 @@ function ScoreTrendYAxisTick({
     <g transform={`translate(${Number(x)},${Number(y)})`}>
       <text
         textAnchor="end"
-        fill="#71717a"
+        fill="#6b7280"
         fontSize={10}
         fontWeight={500}
         dx={-6}
@@ -144,15 +144,15 @@ function ScoreTrendTooltip({
   const value = payload[0]?.value;
   if (typeof value !== 'number') return null;
   return (
-    <div className="rounded-xl border border-white/[0.12] bg-zinc-950/95 px-3.5 py-2.5 shadow-2xl shadow-black/40 backdrop-blur-md">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">When</p>
-      <p className="mt-1 text-[13px] font-medium leading-snug text-zinc-100 tabular-nums">
+    <div className="rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 shadow-lg">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">When</p>
+      <p className="mt-1 text-[13px] font-medium leading-snug text-gray-900 tabular-nums">
         {row?.fullDate ?? '—'}
       </p>
-      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Score</p>
+      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">Score</p>
       <p className="mt-0.5 flex items-baseline gap-1">
         <span className="text-xl font-bold tabular-nums tracking-tight text-[#25c972]">{Math.round(value)}</span>
-        <span className="text-[13px] font-medium tabular-nums text-zinc-500">/ 100</span>
+        <span className="text-[13px] font-medium tabular-nums text-gray-500">/ 100</span>
       </p>
     </div>
   );
@@ -231,13 +231,13 @@ export function MonitoringTrendsPanel({
       : (chartData[chartData.length - 1].timestamp - chartData[0].timestamp) / 86_400_000;
 
   return (
-    <DashboardPanel id="monitoring" className="scroll-mt-6 p-5">
+    <DashboardPanel id="monitoring" className="scroll-mt-6 p-4">
       <SectionTitle eyebrow="Monitoring" title="Score Trends" description="Track how your AI visibility score changes over time." />
 
-      <div className="mt-5">
+      <div className="mt-3">
         {chartData.length >= 2 ? (
-          <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
-            <ResponsiveContainer width="100%" height={252}>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-2.5">
+            <ResponsiveContainer width="100%" height={180}>
               <LineChart
                 data={chartData}
                 margin={{ left: 6, right: 10, top: 20, bottom: 6 }}
@@ -255,7 +255,7 @@ export function MonitoringTrendsPanel({
                 </defs>
                 <CartesianGrid
                   strokeDasharray="4 6"
-                  stroke="rgba(255,255,255,0.06)"
+                  stroke="rgba(0,0,0,0.08)"
                   vertical={false}
                 />
                 <XAxis
@@ -283,7 +283,7 @@ export function MonitoringTrendsPanel({
                     position: 'insideLeft',
                     offset: 10,
                     style: {
-                      fill: '#71717a',
+                      fill: '#6b7280',
                       fontSize: 9,
                       fontWeight: 600,
                       letterSpacing: '0.12em',
@@ -294,7 +294,7 @@ export function MonitoringTrendsPanel({
                 />
                 <Tooltip
                   content={<ScoreTrendTooltip />}
-                  cursor={{ stroke: 'rgba(255,255,255,0.12)', strokeWidth: 1 }}
+                  cursor={{ stroke: 'rgba(0,0,0,0.12)', strokeWidth: 1 }}
                   wrapperStyle={{ outline: 'none' }}
                 />
                 <Area
@@ -308,7 +308,7 @@ export function MonitoringTrendsPanel({
                   <ReferenceLine
                     key={row.timestamp}
                     x={row.timestamp}
-                    stroke="rgba(255,255,255,0.07)"
+                    stroke="rgba(0,0,0,0.06)"
                     strokeDasharray="3 6"
                     strokeWidth={1}
                   />
@@ -320,28 +320,28 @@ export function MonitoringTrendsPanel({
                   strokeWidth={2.5}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  dot={{ fill: '#3ee89b', stroke: '#09090b', strokeWidth: 2, r: 4 }}
+                  dot={{ fill: '#3ee89b', stroke: '#ffffff', strokeWidth: 2, r: 4 }}
                   activeDot={{ r: 7, fill: '#3ee89b', stroke: '#fff', strokeWidth: 2 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
         ) : chartData.length === 1 ? (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-6 py-8 text-center">
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-6 py-8 text-center">
             <p className={cn('text-3xl font-bold', scoreColor(chartData[0].score))}>
               {Math.round(chartData[0].score)}
             </p>
-            <p className="text-[13px] text-zinc-400">Single data point on {formatShortDate(getScanTimestamp(lastScan!))}</p>
-            <p className="text-[12px] text-zinc-500">Run more scans to track trends over time.</p>
+            <p className="text-[13px] text-gray-600">Single data point on {formatShortDate(getScanTimestamp(lastScan!))}</p>
+            <p className="text-[12px] text-gray-500">Run more scans to track trends over time.</p>
           </div>
         ) : (
-          <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-white/8 bg-white/[0.02] px-6 py-8 text-center text-[13px] text-zinc-500">
+          <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-6 py-8 text-center text-[13px] text-gray-500">
             No score history yet. Run a scan to start tracking.
           </div>
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-4 text-[12px] text-zinc-400">
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-gray-600">
         <span>Last scanned: {displayedLastScannedAt ? formatRelativeTime(displayedLastScannedAt) : '--'}</span>
         {scoreDelta !== null && (
           <span className={scoreDelta >= 0 ? 'text-[#25c972]' : 'text-[#ff5252]'}>
@@ -349,7 +349,7 @@ export function MonitoringTrendsPanel({
           </span>
         )}
         <span className="flex items-center gap-1.5">
-          <span className={cn('inline-block h-2 w-2 rounded-full', monitoringConnected ? 'bg-[#25c972]' : 'bg-zinc-600')} />
+          <span className={cn('inline-block h-2 w-2 rounded-full', monitoringConnected ? 'bg-[#25c972]' : 'bg-gray-400')} />
           Monitoring: {monitoringConnected ? 'Active' : 'Inactive'}
         </span>
       </div>

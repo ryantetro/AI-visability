@@ -2,17 +2,18 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Copy, Check, Zap } from 'lucide-react';
-import { DashboardPanel } from '@/components/app/dashboard-primitives';
+import { ChevronRight, Copy, Check, Zap, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PrioritizedFix } from '@/types/score';
 
 interface QuickWinsSectionProps {
   fixes: PrioritizedFix[];
+  compact?: boolean;
+  limit?: number;
 }
 
-export function QuickWinsSection({ fixes }: QuickWinsSectionProps) {
-  const topFixes = fixes.slice(0, 3);
+export function QuickWinsSection({ fixes, compact, limit = 5 }: QuickWinsSectionProps) {
+  const topFixes = fixes.slice(0, limit);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   if (topFixes.length === 0) return null;
@@ -23,77 +24,89 @@ export function QuickWinsSection({ fixes }: QuickWinsSectionProps) {
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
+  const totalLift = topFixes.reduce((sum, f) => sum + f.estimatedLift, 0);
+
   return (
-    <DashboardPanel className="p-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-[#ffbb00]" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Quick Wins</p>
+    <div id="fixes-section" className={cn('rounded-2xl border border-gray-200 bg-white shadow-sm', compact ? 'p-4' : 'p-6')}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className={cn('flex shrink-0 items-center justify-center rounded-lg bg-amber-100', compact ? 'h-6 w-6' : 'h-7 w-7')}>
+            <Zap className={cn('text-amber-600', compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
           </div>
-          <p className="mt-1 text-[13px] text-zinc-500">Highest-impact fixes you can do today</p>
+          <div>
+            <h2 className={cn('font-bold text-gray-900', compact ? 'text-[13px]' : 'text-base')}>Quick Wins</h2>
+            <p className="text-[10px] text-gray-500">
+              Up to <span className="font-semibold text-green-700">+{totalLift} pts</span> lift
+            </p>
+          </div>
         </div>
         <Link
           href="/report"
-          className="mt-1 flex items-center gap-1 text-[11px] font-medium text-zinc-400 transition-colors hover:text-white"
+          className="flex items-center gap-0.5 text-[11px] font-semibold text-gray-700 hover:text-gray-900"
         >
-          View all {fixes.length} fixes <ChevronRight className="h-3 w-3" />
+          All {fixes.length} <ChevronRight className="h-3 w-3" />
         </Link>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className={cn(compact ? 'mt-3 space-y-1.5' : 'mt-4 space-y-2')}>
         {topFixes.map((fix, i) => (
           <div
             key={fix.checkId}
-            className="group flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.015] px-3 py-3 transition-colors hover:border-white/10 hover:bg-white/[0.03]"
+            className={cn(
+              'group flex items-start gap-2.5 rounded-xl border border-gray-100 bg-gray-50/50 transition-colors hover:border-gray-200 hover:bg-gray-50',
+              compact ? 'px-3 py-2' : 'px-4 py-3'
+            )}
           >
             <span className={cn(
-              'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
-              i === 0 ? 'bg-[#ffbb00]/15 text-[#ffbb00]' : 'bg-white/[0.06] text-zinc-400'
+              'mt-0.5 flex shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+              compact ? 'h-5 w-5' : 'h-6 w-6',
+              i === 0 ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-700'
             )}>
               {i + 1}
             </span>
 
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-[12px] font-medium text-zinc-200">{fix.label}</p>
+              <div className="flex items-center gap-1.5">
+                <p className={cn('font-medium text-gray-800', compact ? 'text-[12px]' : 'text-sm')}>{fix.label}</p>
                 <span className={cn(
-                  'shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase',
-                  fix.category === 'ai'
-                    ? 'bg-[#a855f7]/15 text-[#a855f7]'
-                    : 'bg-[#3b82f6]/15 text-[#3b82f6]'
+                  'shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase',
+                  fix.category === 'ai' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
                 )}>
                   {fix.category === 'ai' ? 'AI' : 'Web'}
                 </span>
               </div>
+              {!compact && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-600">{fix.instruction}</p>}
             </div>
 
-            <span className="shrink-0 text-[11px] font-semibold text-[#25c972]">
-              +{fix.estimatedLift} pts
-            </span>
-
-            <span className={cn(
-              'shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold',
-              fix.effortBand === 'quick'
-                ? 'bg-[#25c972]/10 text-[#25c972]'
-                : fix.effortBand === 'medium'
-                  ? 'bg-[#ffbb00]/10 text-[#ffbb00]'
-                  : 'bg-[#ff8a1e]/10 text-[#ff8a1e]'
-            )}>
-              {fix.effortBand.charAt(0).toUpperCase() + fix.effortBand.slice(1)}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => handleCopy(fix, i)}
-              className="shrink-0 rounded p-1 text-zinc-600 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100"
-              aria-label="Copy fix"
-            >
-              {copiedIdx === i ? <Check className="h-3.5 w-3.5 text-[#25c972]" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-green-600">+{fix.estimatedLift}</span>
+              <button
+                type="button"
+                onClick={() => handleCopy(fix, i)}
+                className="shrink-0 rounded p-1 text-gray-400 opacity-0 transition-all hover:text-gray-800 group-hover:opacity-100"
+                aria-label="Copy fix instructions"
+              >
+                {copiedIdx === i ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+              </button>
+            </div>
           </div>
         ))}
       </div>
-    </DashboardPanel>
+
+      {!compact && (
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Want these fixes done for you?</p>
+            <p className="text-xs text-gray-600">Our experts implement optimizations within 48 hours</p>
+          </div>
+          <Link
+            href="/report#fix-my-site"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
+          >
+            Fix My Site <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }

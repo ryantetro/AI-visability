@@ -10,7 +10,7 @@ type AisoLogoProps = {
 export function AisoLogo({ className, strokeWidth = 2.5 }: AisoLogoProps) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
+      <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={strokeWidth} />
       <path d="M16 3 A13 13 0 0 1 27.3 18.5" fill="none" stroke="#356df4" strokeWidth={strokeWidth} strokeLinecap="round" />
       <path d="M27.3 18.5 A13 13 0 0 1 4.7 18.5" fill="none" stroke="#25c972" strokeWidth={strokeWidth} strokeLinecap="round" />
       <path d="M4.7 18.5 A13 13 0 0 1 16 3" fill="none" stroke="#16b7ca" strokeWidth={strokeWidth} strokeLinecap="round" />

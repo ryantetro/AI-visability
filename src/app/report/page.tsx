@@ -29,18 +29,18 @@ function ReportContent({ ctx }: { ctx: WorkspaceContext }) {
         onOpenUnlock={ctx.onOpenUnlock}
       />
       {!trackingInstalled && (
-        <div className="mt-6 rounded-[1.35rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(12,13,14,0.98)_0%,rgba(8,8,9,0.99)_100%)] p-5">
+        <div className="mt-6 rounded-[1.35rem] border border-purple-100 bg-purple-50/60 p-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a855f7]/10">
-              <Code2 className="h-5 w-5 text-[#a855f7]" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100">
+              <Code2 className="h-4.5 w-4.5 h-[18px] w-[18px] text-purple-600" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-semibold text-white">Want to see which AI bots visit your site?</p>
-              <p className="mt-0.5 text-[12px] text-zinc-500">Install the tracking script to monitor AI crawler traffic in real time.</p>
+              <p className="text-[13px] font-semibold text-gray-900">Want to see which AI bots visit your site?</p>
+              <p className="mt-0.5 text-[12px] text-gray-500">Install the tracking script to monitor AI crawler traffic in real time.</p>
             </div>
             <Link
               href="/settings#tracking"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white/[0.08] px-4 py-2 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-white/[0.12]"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-[12px] font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
             >
               Go to Settings
               <ArrowRight className="h-3.5 w-3.5" />
