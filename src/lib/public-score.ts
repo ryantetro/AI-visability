@@ -5,6 +5,7 @@ import type { ScanJob } from '@/types/scan';
 import { getDomain } from '@/lib/url-utils';
 import { normalizeMentionSummary } from '@/lib/ai-mentions/summary';
 import { getBandInfo } from '@/lib/scorer';
+import { computePublicOverallScore } from '@/lib/scoring-weights';
 
 export interface PublicEngineResult {
   engine: AIEngine;
@@ -111,23 +112,12 @@ export function buildPublicScoreSummaryFromScan(scan: PublicScoreScanLike | null
   const trustScore = trustPillarData?.percentage ?? null;
   const mScore = mentionSummary?.overallScore ?? null;
 
-  let weightedSum = scoreResult.scores.aiVisibility * 1.0;
-  let weightSum = 1.0;
-
-  if (perfScore !== null) {
-    weightedSum += perfScore * 0.5;
-    weightSum += 0.5;
-  }
-  if (trustScore !== null) {
-    weightedSum += trustScore * 0.5;
-    weightSum += 0.5;
-  }
-  if (mScore !== null) {
-    weightedSum += mScore * 1.0;
-    weightSum += 1.0;
-  }
-
-  const newOverall = Math.round(weightedSum / weightSum);
+  const newOverall = computePublicOverallScore(
+    scoreResult.scores.aiVisibility,
+    perfScore,
+    trustScore,
+    mScore,
+  );
   const newBandInfo = getBandInfo(newOverall);
 
   // Compute mention rate from engine data

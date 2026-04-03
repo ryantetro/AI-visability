@@ -7,6 +7,7 @@ import { runTopicalAuthorityChecks } from './checks/topical-authority';
 import { runEntityClarityChecks } from './checks/entity-clarity';
 import { runAiRegistrationChecks } from './checks/ai-registration';
 import { prioritizeFixes } from './priority';
+import { computeOverallFromPillars } from '@/lib/scoring-weights';
 
 const dimensionLabels: Record<DimensionKey, string> = {
   'file-presence': 'File Presence',
@@ -68,16 +69,12 @@ export function scoreCrawlData(data: CrawlData, webHealth?: WebHealthSummary): S
   const perfScore = perfPillar?.percentage ?? null;
   const trustScore = trustPillar?.percentage ?? null;
 
-  let overall: number | null;
-  if (perfScore !== null && trustScore !== null) {
-    // AI Visibility (1.0) + Performance (0.5) + Trust (0.5) = weight sum 2.0
-    overall = Math.round((aiVisibility * 1.0 + perfScore * 0.5 + trustScore * 0.5) / 2.0);
-  } else if (webHealthPercentage !== null) {
-    // Fallback: use aggregate web health at half weight
-    overall = Math.round((aiVisibility * 1.0 + webHealthPercentage * 0.5) / 1.5);
-  } else {
-    overall = null;
-  }
+  const overall = computeOverallFromPillars(
+    aiVisibility,
+    perfScore,
+    trustScore,
+    webHealthPercentage,
+  );
 
   const overallBandInfo = getBandInfo(overall ?? aiVisibility);
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Copy, ArrowUpRight, RefreshCw, Share2, Check, Zap, FileCode, Search, Shield, Gauge } from 'lucide-react';
 import { ScoreSummaryHero } from '@/components/app/score-summary-hero';
+import { MentionWhyScoreCallout } from '@/components/app/mention-why-score-callout';
 import { YwsBreakdownSection } from '@/components/ui/yws-breakdown-section';
 import type { CheckItem, VerdictQuality } from '@/components/ui/yws-breakdown-section';
 import { getCheckFixContent } from '@/lib/analysis-fix-content';
@@ -273,6 +274,14 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
               <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3 text-sm text-red-200">
                 AI Mentions did not complete cleanly for this scan, so this section is unavailable for reliable scoring.
               </div>
+            )}
+            {!hasPaid && !mentionsPending && !mentionsUnavailable && (
+              <MentionWhyScoreCallout
+                mentions={mentions}
+                degraded={mentionsDegraded}
+                showUnlockCta
+                onUnlock={onOpenUnlock}
+              />
             )}
             <YwsBreakdownSection
               title="AI Mentions"

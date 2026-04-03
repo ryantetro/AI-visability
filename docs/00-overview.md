@@ -31,6 +31,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [25-favicon-opengraph.md](./25-favicon-opengraph.md) | Default favicon, Apple icon, and Open Graph image | `src/app/icon.svg`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx` |
 | [26-landing-marketing-sections.md](./26-landing-marketing-sections.md) | Home landing marketing bands + Framer Motion | `src/components/marketing/`, `src/app/page.tsx` |
 | [27-dashboard-redesign.md](./27-dashboard-redesign.md) | Dashboard 5-zone redesign — KPI header, action center, prompt table, platform chips | `src/app/advanced/dashboard/dashboard-section.tsx`, `src/app/advanced/dashboard/score-header.tsx` |
+| [30-dashboard-conversion-ux.md](./30-dashboard-conversion-ux.md) | Next steps strip, mention “why this score”, workspace URLs, shared scoring weights | `src/lib/scoring-weights.ts`, `src/lib/workspace-nav.ts`, `src/lib/mention-insights.ts`, `src/app/advanced/dashboard/next-steps-strip.tsx` |
 | [28-analytics-page.md](./28-analytics-page.md) | Full-page analytics dashboard — KPI row, crawler/referral charts, score trends, prompt analytics | `src/app/analytics/page.tsx`, `src/app/advanced/analytics/analytics-section.tsx` |
 | [29-brand-improve-redesign.md](./29-brand-improve-redesign.md) | Brand Improve tab — 4-zone layout (KPIs, action center, filterable fixes, collapsible prompt library) | `src/app/advanced/brand/improve-section.tsx`, `use-content-gaps.ts` |
 

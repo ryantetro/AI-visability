@@ -7,6 +7,7 @@ import { OnboardingChecklist } from '@/components/app/onboarding-checklist';
 import { OpportunityAlertBanner } from './opportunity-alert-banner';
 import { ScoreHeader } from './score-header';
 import { ActionCenter } from './action-center';
+import { NextStepsStrip } from './next-steps-strip';
 import { PromptRankingsTable } from './prompt-rankings-table';
 import { PlatformSnapshot } from './platform-snapshot';
 import { MonitoringTrendsPanel } from '../panels/monitoring-trends-panel';
@@ -134,17 +135,19 @@ export function DashboardSection({
         reauditing={reauditing}
       />
 
+      <NextStepsStrip reportId={report.id} />
+
       {/* ── Zone 2: Action Center ── */}
       <ActionCenter
         fixes={fixes}
         monitoringConnected={monitoringConnected}
         trackingReady={trackingReady}
-        tier={tier}
         maxCompetitors={maxCompetitors}
+        reportId={report.id}
       />
 
       {/* ── Zone 3: Prompt Rankings Table ── */}
-      <PromptRankingsTable mentionResults={mentionResults} />
+      <PromptRankingsTable mentionResults={mentionResults} reportId={report.id} />
 
       {/* ── Zone 4: Platform Snapshot ── */}
       <PlatformSnapshot platformCards={platformCards} />

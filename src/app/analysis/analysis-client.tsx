@@ -59,6 +59,7 @@ import { RangeBar } from '@/components/ui/range-bar';
 import { Sheet, SheetClose, SheetContent } from '@/components/ui/sheet';
 
 import { ScoreSummaryHero } from '@/components/app/score-summary-hero';
+import { MentionWhyScoreCallout } from '@/components/app/mention-why-score-callout';
 import { UrlInput } from '@/components/ui/url-input';
 import { YwsBreakdownSection, type CheckItem } from '@/components/ui/yws-breakdown-section';
 import { EngineMentionCard } from '@/components/ui/engine-mention-card';
@@ -1723,6 +1724,14 @@ export function AnalysisPageContent() {
                 const mentionPass = engines.filter((e) => mentionData.engineStatus[e]?.status === 'complete' && mentionData.engineBreakdown[e]?.mentioned > 0).length;
                 const mentionFail = engines.filter((e) => mentionData.engineStatus[e]?.status === 'complete' && mentionData.engineBreakdown[e]?.mentioned === 0 && mentionData.engineBreakdown[e]?.total > 0).length;
                 return (
+                  <div>
+                  {!canPreviewGatedChecks && (
+                    <MentionWhyScoreCallout
+                      mentions={mentionData}
+                      showUnlockCta
+                      onUnlock={() => setUnlockModalOpen(true)}
+                    />
+                  )}
                   <YwsBreakdownSection
                     title="AI Mentions"
                     score={mentionData.overallScore}
@@ -1757,7 +1766,7 @@ export function AnalysisPageContent() {
                       },
                       {
                         label: 'Prompt Results',
-                        checks: mentionData.promptsUsed.map((prompt) => {
+                        checks: (mentionData.promptsUsed ?? []).map((prompt) => {
                           const promptResults = mentionData.results.filter((r) => r.prompt.id === prompt.id);
                           const mentionedCount = promptResults.filter((r) => r.mentioned).length;
                           const enginePct = promptResults.length > 0
@@ -1770,10 +1779,10 @@ export function AnalysisPageContent() {
                           };
                         }),
                       },
-                      ...(mentionData.competitorsMentioned.length > 0
+                      ...((mentionData.competitorsMentioned ?? []).length > 0
                         ? [{
                             label: 'Top Competitors',
-                            checks: mentionData.competitorsMentioned.slice(0, 5).map((c) => ({
+                            checks: (mentionData.competitorsMentioned ?? []).slice(0, 5).map((c) => ({
                               label: c.name,
                               detail: `Mentioned ${c.count} times across AI engines`,
                               verdict: 'unknown' as const,
@@ -1785,6 +1794,7 @@ export function AnalysisPageContent() {
                     showClickHint={false}
                     hasPaid={canPreviewGatedChecks}
                   />
+                  </div>
                 );
               })()}
 

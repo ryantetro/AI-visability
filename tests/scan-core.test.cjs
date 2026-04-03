@@ -917,6 +917,7 @@ test('report route includes web-health summary and copy-to-LLM payloads', async 
     crawlData,
     scoreResult: scoreCrawlData(crawlData, webHealth),
     email: 'owner@example.com',
+    paid: true,
   });
 
   const response = await reportRoute.GET(
@@ -1152,14 +1153,15 @@ test('domain verification can start, confirm, and publish a leaderboard entry', 
 
 test('leaderboard filtering keeps the best score within the selected time window', async () => {
   const oldHighScore = scoreCrawlData(createCrawlData());
+  // Leaderboard uses buildPublicScoreSummaryFromScan (recomputed overall); align stored AI visibility with intended display score.
   oldHighScore.percentage = 95;
   oldHighScore.scores.overall = 95;
-  oldHighScore.scores.aiVisibility = 92;
+  oldHighScore.scores.aiVisibility = 95;
 
   const recentExampleScore = scoreCrawlData(createCrawlData());
   recentExampleScore.percentage = 81;
   recentExampleScore.scores.overall = 81;
-  recentExampleScore.scores.aiVisibility = 79;
+  recentExampleScore.scores.aiVisibility = 81;
 
   const recentChallengerScore = scoreCrawlData(
     createCrawlData({
@@ -1169,7 +1171,7 @@ test('leaderboard filtering keeps the best score within the selected time window
   );
   recentChallengerScore.percentage = 88;
   recentChallengerScore.scores.overall = 88;
-  recentChallengerScore.scores.aiVisibility = 84;
+  recentChallengerScore.scores.aiVisibility = 88;
 
   await saveCompletedScan('example-old-high', {
     completedAt: Date.now() - 40 * DAY_MS,

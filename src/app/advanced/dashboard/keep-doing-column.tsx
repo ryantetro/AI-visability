@@ -10,14 +10,20 @@ import {
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { PrioritizedFix } from '@/types/score';
+import {
+  brandServicesHref,
+  dashboardMonitoringHref,
+  dashboardTrackingHref,
+  reportHref,
+  withReportQuery,
+} from '@/lib/workspace-nav';
 
 interface KeepDoingColumnProps {
   monitoringConnected: boolean;
   trackingReady: boolean;
   hasStructuredDataFixes: boolean;
-  tier: string;
   maxCompetitors: number;
+  reportId?: string | null;
 }
 
 interface ActionItem {
@@ -34,9 +40,14 @@ export function KeepDoingColumn({
   monitoringConnected,
   trackingReady,
   hasStructuredDataFixes,
-  tier,
   maxCompetitors,
+  reportId,
 }: KeepDoingColumnProps) {
+  const servicesHref = brandServicesHref(reportId);
+  const reportLink = reportHref(reportId);
+  const dashMonitor = dashboardMonitoringHref(reportId);
+  const dashTrack = dashboardTrackingHref(reportId);
+  const competitorsLink = withReportQuery('/competitors', reportId);
   const items: ActionItem[] = [];
 
   // 1. Always shown, visually prominent
@@ -46,7 +57,7 @@ export function KeepDoingColumn({
     iconColor: '#ffbb00',
     label: 'Get AI-optimized articles',
     description: 'Content designed to boost your AI engine rankings',
-    href: '/fix-my-site',
+    href: servicesHref,
     highlight: true,
   });
 
@@ -58,7 +69,7 @@ export function KeepDoingColumn({
       iconColor: '#25c972',
       label: 'Monitor rankings weekly',
       description: 'Track how AI engines rank your brand over time',
-      href: '/dashboard#monitoring',
+      href: dashMonitor,
     });
   }
 
@@ -70,7 +81,7 @@ export function KeepDoingColumn({
       iconColor: '#3b82f6',
       label: 'Add structured data',
       description: 'Help AI engines understand your business identity',
-      href: '/report',
+      href: reportLink,
     });
   }
 
@@ -82,7 +93,7 @@ export function KeepDoingColumn({
       iconColor: '#a855f7',
       label: 'Install AI bot tracking',
       description: 'See which AI crawlers visit your site',
-      href: '/dashboard#tracking',
+      href: dashTrack,
     });
   }
 
@@ -94,7 +105,7 @@ export function KeepDoingColumn({
       iconColor: '#ff8a1e',
       label: 'Track your competitors',
       description: 'Compare AI visibility scores side-by-side',
-      href: '/competitors',
+      href: competitorsLink,
     });
   }
 

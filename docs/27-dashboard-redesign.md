@@ -52,7 +52,7 @@ All data comes from existing props passed to `DashboardSection` — no new API c
 - Links to `/report` for full fix list
 
 **Keep Doing (right column):**
-1. "Get AI-optimized articles" → `/fix-my-site` (always shown, highlighted)
+1. "Get AI-optimized articles" → `/brand?tab=services` with `?report=` when active (always shown, highlighted)
 2. "Monitor rankings weekly" → `#monitoring` (if monitoring not connected)
 3. "Add structured data" → `/report` (if structured-data fixes exist)
 4. "Install AI bot tracking" → `#tracking` (if tracking not installed)
@@ -66,7 +66,7 @@ Groups `mentionResults` by prompt text, aggregates across engines. Each row show
 - Best rank position
 - Mention rate percentage with color-coded bar
 
-Sorted by mention rate descending, top 8 shown. Footer CTA links to `/fix-my-site`.
+Sorted by mention rate descending, top 8 shown. Footer CTA links to `/brand?tab=services` (with `?report=`). Low-rate rows show “Boost with targeted content”.
 
 ### Zone 5: Below-Fold Collapsible
 

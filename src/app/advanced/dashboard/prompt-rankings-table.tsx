@@ -6,10 +6,14 @@ import { cn } from '@/lib/utils';
 import { ChatGPTIcon, PerplexityIcon, GeminiIcon, ClaudeIcon, GrokIcon } from '@/components/ui/ai-icons';
 import { AI_ENGINE_META } from '@/lib/ai-engines';
 import { EmptyStateCard } from './empty-state-card';
+import { brandHref, brandServicesHref } from '@/lib/workspace-nav';
 import type { MentionResult, AIEngine } from '@/types/ai-mentions';
+
+const LOW_MENTION_THRESHOLD = 50;
 
 interface PromptRankingsTableProps {
   mentionResults: MentionResult[];
+  reportId?: string | null;
 }
 
 interface AggregatedPrompt {
@@ -31,7 +35,9 @@ const ENGINE_ICONS: Record<AIEngine, React.ComponentType<{ className?: string }>
 
 const ENGINE_ORDER: AIEngine[] = ['chatgpt', 'perplexity', 'gemini', 'claude', 'grok'];
 
-export function PromptRankingsTable({ mentionResults }: PromptRankingsTableProps) {
+export function PromptRankingsTable({ mentionResults, reportId }: PromptRankingsTableProps) {
+  const brandLink = brandHref(reportId);
+  const servicesLink = brandServicesHref(reportId);
   // Group results by prompt text, aggregate across engines
   const promptMap = new Map<string, AggregatedPrompt>();
 
@@ -90,7 +96,7 @@ export function PromptRankingsTable({ mentionResults }: PromptRankingsTableProps
             title="No prompts tracked yet"
             description="Run a scan to see which AI prompts mention your business across ChatGPT, Perplexity, Gemini, and Claude."
             ctaLabel="View Brand & Prompts"
-            ctaHref="/brand"
+            ctaHref={brandLink}
             ghostRows={3}
           />
         </div>
@@ -103,7 +109,7 @@ export function PromptRankingsTable({ mentionResults }: PromptRankingsTableProps
       <div className="flex items-start justify-between gap-3">
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Prompt Rankings</p>
         <Link
-          href="/brand"
+          href={brandLink}
           className="flex items-center gap-1 text-[11px] font-medium text-zinc-400 transition-colors hover:text-white"
         >
           View all <ChevronRight className="h-3 w-3" />
@@ -138,8 +144,18 @@ export function PromptRankingsTable({ mentionResults }: PromptRankingsTableProps
                 key={prompt.text}
                 className="border-b border-white/[0.04] transition-colors hover:bg-white/[0.02]"
               >
-                <td className="max-w-[200px] truncate py-2.5 pr-3 text-[12px] text-zinc-200 sm:max-w-[300px]">
-                  {prompt.text}
+                <td className="max-w-[200px] py-2.5 pr-3 sm:max-w-[300px]">
+                  <p className="truncate text-[12px] text-zinc-200" title={prompt.text}>
+                    {prompt.text}
+                  </p>
+                  {prompt.mentionRate < LOW_MENTION_THRESHOLD && (
+                    <Link
+                      href={servicesLink}
+                      className="mt-1 inline-flex text-[10px] font-medium text-[#ffbb00]/90 hover:text-[#ffbb00]"
+                    >
+                      Boost with targeted content →
+                    </Link>
+                  )}
                 </td>
                 <td className="py-2.5 text-center">
                   <div className="inline-flex items-center gap-1">
@@ -188,12 +204,12 @@ export function PromptRankingsTable({ mentionResults }: PromptRankingsTableProps
       </div>
 
       {/* Footer CTA */}
-      <div className="mt-4 flex items-center justify-between rounded-lg border border-[#ffbb00]/10 bg-[#ffbb00]/[0.03] px-4 py-3">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#ffbb00]/10 bg-[#ffbb00]/[0.03] px-4 py-3">
         <p className="text-[12px] text-zinc-400">
-          Want to rank higher?
+          Weak prompts? Order AI-optimized articles to win those searches.
         </p>
         <Link
-          href="/fix-my-site"
+          href={servicesLink}
           className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#ffbb00] transition-colors hover:text-[#ffd666]"
         >
           <Sparkles className="h-3 w-3" />

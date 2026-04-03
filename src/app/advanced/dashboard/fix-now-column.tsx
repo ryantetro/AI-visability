@@ -5,13 +5,15 @@ import Link from 'next/link';
 import { ChevronRight, Copy, Check, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { reportHref } from '@/lib/workspace-nav';
 import type { PrioritizedFix } from '@/types/score';
 
 interface FixNowColumnProps {
   fixes: PrioritizedFix[];
+  reportId?: string | null;
 }
 
-export function FixNowColumn({ fixes }: FixNowColumnProps) {
+export function FixNowColumn({ fixes, reportId }: FixNowColumnProps) {
   const { steps, allComplete, dismissed } = useOnboarding();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const showOnboarding = !allComplete && !dismissed;
@@ -108,7 +110,7 @@ export function FixNowColumn({ fixes }: FixNowColumnProps) {
 
       {!showOnboarding && fixes.length > 3 && (
         <Link
-          href="/report"
+          href={reportHref(reportId)}
           className="mt-3 flex items-center gap-1 text-[11px] font-medium text-zinc-400 transition-colors hover:text-white"
         >
           View all {fixes.length} fixes <ChevronRight className="h-3 w-3" />
