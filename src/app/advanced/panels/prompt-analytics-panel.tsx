@@ -28,6 +28,38 @@ interface WeekChartRow {
   [engine: string]: string | number;
 }
 
+interface CacheEntry {
+  trends: TrendPoint[];
+  backgroundRunQueued: boolean;
+  cachedAt: number;
+}
+
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function getCacheKey(domain: string) {
+  return `prompt_analytics_trends:${domain}`;
+}
+
+function readCache(domain: string): CacheEntry | null {
+  try {
+    const raw = localStorage.getItem(getCacheKey(domain));
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as CacheEntry;
+    if (Date.now() - entry.cachedAt > CACHE_TTL_MS) return null;
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(domain: string, entry: CacheEntry) {
+  try {
+    localStorage.setItem(getCacheKey(domain), JSON.stringify(entry));
+  } catch {
+    /* localStorage unavailable */
+  }
+}
+
 export function PromptAnalyticsPanel({ domain }: { domain: string }) {
   const { tier } = usePlan();
   const [trends, setTrends] = useState<TrendPoint[]>([]);
@@ -48,8 +80,22 @@ export function PromptAnalyticsPanel({ domain }: { domain: string }) {
       refreshTimerRef.current = null;
     }
 
-    const load = async () => {
-      setLoading(true);
+    // Hydrate from cache immediately — no spinner if we have fresh data
+    const cached = readCache(domain);
+    if (cached) {
+      setTrends(cached.trends);
+      setBackgroundRunQueued(cached.backgroundRunQueued);
+      setLoading(false);
+      // Still refresh silently in the background so data stays up-to-date
+      void load(true);
+      return () => {
+        cancelled = true;
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      };
+    }
+
+    async function load(silent = false) {
+      if (!silent) setLoading(true);
       try {
         const res = await fetch(`/api/prompts/trends?domain=${encodeURIComponent(domain)}`);
         if (!res.ok) return;
@@ -62,6 +108,7 @@ export function PromptAnalyticsPanel({ domain }: { domain: string }) {
 
         setTrends(nextTrends);
         setBackgroundRunQueued(queued);
+        writeCache(domain, { trends: nextTrends, backgroundRunQueued: queued, cachedAt: Date.now() });
 
         if (nextTrends.length > 0) {
           autoRefreshAttemptsRef.current = 0;
@@ -84,7 +131,7 @@ export function PromptAnalyticsPanel({ domain }: { domain: string }) {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    };
+    }
 
     void load();
     return () => {

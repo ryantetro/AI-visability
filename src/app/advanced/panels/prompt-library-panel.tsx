@@ -9,6 +9,30 @@ import { PROMPT_CATEGORIES } from '../lib/constants';
 import type { PromptCategory, PromptMonitoringData } from '../lib/types';
 import { AI_ENGINES, getAIEngineLabel } from '@/lib/ai-engines';
 
+// ── Local cache — 2 min TTL (prompt library is user-mutable so keep it short) ──
+const CACHE_TTL_MS = 2 * 60 * 1000;
+
+function getCacheKey(domain: string) { return `prompt_library:${domain}`; }
+
+function readCache(domain: string): PromptMonitoringData | null {
+  try {
+    const raw = localStorage.getItem(getCacheKey(domain));
+    if (!raw) return null;
+    const { data, cachedAt } = JSON.parse(raw) as { data: PromptMonitoringData; cachedAt: number };
+    if (Date.now() - cachedAt > CACHE_TTL_MS) return null;
+    return data;
+  } catch { return null; }
+}
+
+function writeCache(domain: string, data: PromptMonitoringData) {
+  try { localStorage.setItem(getCacheKey(domain), JSON.stringify({ data, cachedAt: Date.now() })); }
+  catch { /* localStorage unavailable */ }
+}
+
+function invalidateCache(domain: string) {
+  try { localStorage.removeItem(getCacheKey(domain)); } catch { /* ignore */ }
+}
+
 export function PromptLibraryPanel({
   domain,
   tier,
@@ -20,8 +44,8 @@ export function PromptLibraryPanel({
   maxPrompts?: number;
   onOpenUnlock?: () => void;
 }) {
-  const [data, setData] = useState<PromptMonitoringData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<PromptMonitoringData | null>(() => readCache(domain));
+  const [loading, setLoading] = useState(() => readCache(domain) === null);
   const [newPrompt, setNewPrompt] = useState('');
   const [newCategory, setNewCategory] = useState<PromptCategory>('custom');
   const [addingPrompt, setAddingPrompt] = useState(false);
@@ -41,7 +65,8 @@ export function PromptLibraryPanel({
 
   const normalizeSuggestionKey = (text: string) => text.trim().toLowerCase().replace(/\s+/g, ' ');
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/prompts?domain=${encodeURIComponent(domain)}`);
       if (res.ok) {
@@ -51,6 +76,7 @@ export function PromptLibraryPanel({
 
         setData(payload);
         setBackgroundRunQueued(queued);
+        writeCache(domain, payload);
 
         if (nextResults.length > 0) {
           autoRefreshAttemptsRef.current = 0;
@@ -61,23 +87,23 @@ export function PromptLibraryPanel({
         } else if (queued && autoRefreshAttemptsRef.current < 3) {
           const delay = autoRefreshAttemptsRef.current === 0 ? 3000 : 6000;
           autoRefreshAttemptsRef.current += 1;
-          if (refreshTimerRef.current) {
-            clearTimeout(refreshTimerRef.current);
-          }
-          refreshTimerRef.current = setTimeout(() => {
-            void fetchData();
-          }, delay);
+          if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+          refreshTimerRef.current = setTimeout(() => { void fetchData(); }, delay);
         }
       }
     } catch { /* silently fail */ } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => {
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
+  useEffect(() => {
+    const cached = readCache(domain);
+    if (cached) {
+      // Already hydrated in useState init — just do a silent background refresh
+      void fetchData(true);
+    } else {
+      void fetchData();
     }
-  }, []);
+    return () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); };
+  }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddPrompt = async () => {
     if (!newPrompt.trim() || newPrompt.trim().length < 5) { setAddError('Prompt must be at least 5 characters.'); return; }
@@ -85,27 +111,28 @@ export function PromptLibraryPanel({
     try {
       const cat = newCategory === 'all' ? 'custom' : newCategory;
       const res = await fetch('/api/prompts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, promptText: newPrompt.trim(), category: cat }) });
-      if (res.ok) { setNewPrompt(''); await fetchData(); } else { const err = await res.json(); setAddError(err.error || 'Failed to add prompt.'); }
+      if (res.ok) { setNewPrompt(''); invalidateCache(domain); await fetchData(); }
+      else { const err = await res.json(); setAddError(err.error || 'Failed to add prompt.'); }
     } catch { setAddError('Network error.'); } finally { setAddingPrompt(false); }
   };
 
   const handleToggle = async (id: string, active: boolean) => {
-    try { await fetch(`/api/prompts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active: !active }) }); await fetchData(); } catch { /* silently fail */ }
+    try { await fetch(`/api/prompts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active: !active }) }); invalidateCache(domain); await fetchData(); } catch { /* silently fail */ }
   };
 
   const handleDelete = async (id: string) => {
-    try { await fetch(`/api/prompts/${id}`, { method: 'DELETE' }); await fetchData(); } catch { /* silently fail */ }
+    try { await fetch(`/api/prompts/${id}`, { method: 'DELETE' }); invalidateCache(domain); await fetchData(); } catch { /* silently fail */ }
   };
 
   const handleStartEdit = (id: string, text: string) => { setEditingId(id); setEditText(text); };
 
   const handleSaveEdit = async (id: string) => {
     if (!editText.trim() || editText.trim().length < 5) return;
-    try { await fetch(`/api/prompts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ promptText: editText.trim() }) }); setEditingId(null); await fetchData(); } catch { /* silently fail */ }
+    try { await fetch(`/api/prompts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ promptText: editText.trim() }) }); setEditingId(null); invalidateCache(domain); await fetchData(); } catch { /* silently fail */ }
   };
 
   const handleCategoryChange = async (id: string, category: string) => {
-    try { await fetch(`/api/prompts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category }) }); await fetchData(); } catch { /* silently fail */ }
+    try { await fetch(`/api/prompts/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category }) }); invalidateCache(domain); await fetchData(); } catch { /* silently fail */ }
   };
 
   const handleSuggestPrompts = async () => {
@@ -186,9 +213,11 @@ export function PromptLibraryPanel({
       }
       setSuggestions([]);
       setSuggestSource(null);
+      invalidateCache(domain);
       await fetchData();
     } catch {
       setSuggestError('Network error.');
+      invalidateCache(domain);
       await fetchData();
     } finally {
       setAddingAllSuggested(false);

@@ -30,6 +30,9 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [24-prompt-library-suggest.md](./24-prompt-library-suggest.md) | Prompt Library — AI/heuristic suggested prompts from latest scan | `src/app/api/prompts/suggest/route.ts`, `src/app/advanced/panels/prompt-library-panel.tsx` |
 | [25-favicon-opengraph.md](./25-favicon-opengraph.md) | Default favicon, Apple icon, and Open Graph image | `src/app/icon.svg`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx` |
 | [26-landing-marketing-sections.md](./26-landing-marketing-sections.md) | Home landing marketing bands + Framer Motion | `src/components/marketing/`, `src/app/page.tsx` |
+| [27-dashboard-redesign.md](./27-dashboard-redesign.md) | Dashboard 5-zone redesign — KPI header, action center, prompt table, platform chips | `src/app/advanced/dashboard/dashboard-section.tsx`, `src/app/advanced/dashboard/score-header.tsx` |
+| [28-analytics-page.md](./28-analytics-page.md) | Full-page analytics dashboard — KPI row, crawler/referral charts, score trends, prompt analytics | `src/app/analytics/page.tsx`, `src/app/advanced/analytics/analytics-section.tsx` |
+| [29-brand-improve-redesign.md](./29-brand-improve-redesign.md) | Brand Improve tab — 4-zone layout (KPIs, action center, filterable fixes, collapsible prompt library) | `src/app/advanced/brand/improve-section.tsx`, `use-content-gaps.ts` |
 
 ## Architecture Principles
 

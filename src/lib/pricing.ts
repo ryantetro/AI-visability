@@ -154,6 +154,7 @@ export const NAV_GATES: Record<string, PlanTier> = {
   brand: 'starter',
   competitors: 'pro',
   history: 'starter',
+  analytics: 'starter',
   leaderboard: 'free',
   settings: 'starter',
   export: 'pro',

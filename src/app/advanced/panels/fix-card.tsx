@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { ChevronDown, Copy } from 'lucide-react';
-import { MiniInfoTile } from '@/components/app/dashboard-primitives';
 import { cn } from '@/lib/utils';
 import type { GeneratedFile } from '../lib/types';
 import type { PrioritizedFix } from '@/types/score';
@@ -78,31 +77,46 @@ export function FixCard({
 
       {/* Body — collapsed by default */}
       {open && (
-        <div className="px-4 pb-4 pt-0 space-y-3">
-          <p className="text-sm leading-6 text-zinc-400 pl-9">{fix.detail}</p>
+        <div className="border-t border-white/[0.06] bg-gradient-to-b from-white/[0.025] to-transparent">
+          <div className="space-y-0 px-4 pb-5 pt-4 pl-10 sm:pl-11">
+            {/* Summary — reads as context, not a second card */}
+            <p className="text-[13px] font-medium leading-relaxed text-zinc-400">{fix.detail}</p>
 
-          <div className="rounded-xl border border-white/8 bg-black/20 px-3 py-3 ml-9">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">How to fix it</p>
-            <p className="mt-2 text-[13px] leading-6 text-zinc-300">{fix.instruction}</p>
-            {(fix.actualValue || fix.expectedValue) && (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {fix.actualValue ? <MiniInfoTile title="Current value" body={fix.actualValue} /> : null}
-                {fix.expectedValue ? <MiniInfoTile title="Expected value" body={fix.expectedValue} /> : null}
+            {/* Single instruction surface: one ring, no nested card stack */}
+            <div className="mt-5 rounded-xl ring-1 ring-inset ring-white/[0.08] bg-white/[0.02] px-4 py-4 sm:px-5 sm:py-[18px]">
+              <div className="flex items-center gap-2">
+                <span className="h-px flex-1 max-w-8 bg-gradient-to-r from-transparent to-white/15" aria-hidden />
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  How to fix it
+                </span>
+                <span className="h-px flex-1 bg-gradient-to-l from-transparent to-white/15" aria-hidden />
               </div>
-            )}
-          </div>
+              <p className="mt-3.5 text-[14px] font-medium leading-relaxed text-zinc-100">{fix.instruction}</p>
 
-          <div className="ml-9">
+              {(fix.actualValue || fix.expectedValue) && (
+                <div className="mt-5 grid gap-px overflow-hidden rounded-lg bg-white/[0.1] sm:grid-cols-2">
+                  {fix.actualValue ? (
+                    <FixValueCell label="Current" variant="current" text={fix.actualValue} />
+                  ) : null}
+                  {fix.expectedValue ? (
+                    <FixValueCell label="Target" variant="target" text={fix.expectedValue} />
+                  ) : null}
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={onCopyPrompt}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors',
-                copied ? 'bg-blue-500/15 text-blue-200' : 'bg-[var(--color-primary)] text-white hover:opacity-90'
+                'mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-[13px] font-medium transition-all sm:w-auto sm:justify-start',
+                copied
+                  ? 'border-[#25c972]/25 bg-[#25c972]/10 text-[#86efac]'
+                  : 'border-white/12 bg-white/[0.06] text-zinc-100 shadow-[0_1px_0_rgba(255,255,255,0.04)] hover:border-white/18 hover:bg-white/[0.09] active:scale-[0.99]',
               )}
             >
-              <Copy className="h-3.5 w-3.5" />
-              {copied ? 'Prompt copied' : file ? `Copy ${file.filename} prompt` : 'Copy fix prompt'}
+              <Copy className="h-3.5 w-3.5 opacity-80" />
+              {copied ? 'Copied to clipboard' : file ? `Copy ${file.filename} prompt` : 'Copy fix prompt'}
             </button>
           </div>
         </div>
@@ -118,6 +132,37 @@ function MetricDot({ label, value }: { label: string; value: number | null }) {
     <div className="flex items-center gap-1.5">
       <span className={cn('h-2 w-2 rounded-full', metricDotColor(value))} />
       <span className="text-[10px] text-zinc-500">{label}</span>
+    </div>
+  );
+}
+
+function FixValueCell({
+  label,
+  variant,
+  text,
+}: {
+  label: string;
+  variant: 'current' | 'target';
+  text: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'min-h-[4.5rem] space-y-2 p-4',
+        variant === 'current'
+          ? 'bg-[#09090b]/95'
+          : 'bg-[#0c0c0f]/95',
+      )}
+    >
+      <span
+        className={cn(
+          'inline-flex text-[10px] font-semibold uppercase tracking-[0.16em]',
+          variant === 'current' ? 'text-amber-400/90' : 'text-emerald-400/90',
+        )}
+      >
+        {label}
+      </span>
+      <p className="text-[12px] leading-relaxed text-zinc-400">{text}</p>
     </div>
   );
 }

@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { AnimatePresence, motion } from 'framer-motion';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
+  BarChart3,
   Check,
+  ChevronRight,
   Clock3,
   CreditCard,
   FileText,
@@ -36,6 +39,18 @@ type SidebarItem = {
   matchFn: (pathname: string, section: string | null) => boolean;
 };
 
+const BRAND_TABS = [
+  { id: 'presence',  label: 'AI Presence' },
+  { id: 'improve',   label: 'Improve' },
+  { id: 'citations', label: 'Citations' },
+  { id: 'files',     label: 'Files' },
+  { id: 'traffic',   label: 'Traffic' },
+  { id: 'content',   label: 'Content' },
+  { id: 'services',  label: 'Services' },
+] as const;
+
+type BrandTabId = typeof BRAND_TABS[number]['id'];
+
 const NAV_ITEMS: SidebarItem[] = [
   {
     key: 'dashboard',
@@ -52,13 +67,6 @@ const NAV_ITEMS: SidebarItem[] = [
     matchFn: (p) => p === '/report',
   },
   {
-    key: 'brand',
-    label: 'Brand',
-    href: '/brand',
-    icon: Heart,
-    matchFn: (p) => p === '/brand',
-  },
-  {
     key: 'competitors',
     label: 'Competitors',
     href: '/competitors',
@@ -71,6 +79,13 @@ const NAV_ITEMS: SidebarItem[] = [
     href: '/history',
     icon: Clock3,
     matchFn: (p) => p.startsWith('/history'),
+  },
+  {
+    key: 'analytics',
+    label: 'Analytics',
+    href: '/analytics',
+    icon: BarChart3,
+    matchFn: (p) => p === '/analytics',
   },
   {
     key: 'leaderboard',
@@ -154,6 +169,151 @@ function NavItem({
       <Icon className={cn('h-[18px] w-[18px] shrink-0', active ? 'text-white' : 'text-zinc-500')} />
       <span>{item.label}</span>
     </Link>
+  );
+}
+
+function buildBrandTabHref(tabId: string, reportId: string | null): string {
+  const params = new URLSearchParams();
+  if (reportId) params.set('report', reportId);
+  if (tabId !== 'presence') params.set('tab', tabId);
+  const qs = params.toString();
+  return qs ? `/brand?${qs}` : '/brand';
+}
+
+function BrandNavItem({
+  isOnBrand,
+  activeTab,
+  reportParam,
+  locked,
+  onClick,
+}: {
+  isOnBrand: boolean;
+  activeTab: BrandTabId | null;
+  reportParam: string | null;
+  locked?: boolean;
+  onClick?: () => void;
+}) {
+  // Start expanded if we're on brand; auto-expand when navigating to brand
+  const [expanded, setExpanded] = useState(() => isOnBrand);
+  useEffect(() => {
+    if (isOnBrand) setExpanded(true);
+  }, [isOnBrand]);
+
+  const brandHref = buildNavHref('/brand', reportParam);
+
+  if (locked) {
+    return (
+      <Link
+        href="/brand"
+        onClick={onClick}
+        className={cn(
+          'relative flex items-center gap-3 rounded-lg px-4 text-[13px] font-medium transition-colors',
+          'h-[var(--sidebar-item-height)]',
+          'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-400'
+        )}
+      >
+        <Heart className="h-[18px] w-[18px] shrink-0 text-zinc-600" />
+        <span className="flex-1">Brand</span>
+        <Lock className="h-3 w-3 shrink-0 text-zinc-600" />
+      </Link>
+    );
+  }
+
+  return (
+    <div>
+      {/* Brand parent row — left side navigates, right chevron toggles */}
+      <div
+        className={cn(
+          'relative flex items-center rounded-lg transition-colors',
+          'h-[var(--sidebar-item-height)]',
+          isOnBrand
+            ? 'bg-white/[0.08] text-white'
+            : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200',
+        )}
+      >
+        {isOnBrand && (
+          <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--sidebar-accent)]" />
+        )}
+        <Link
+          href={brandHref}
+          onClick={onClick}
+          className="flex flex-1 items-center gap-3 px-4 text-[13px] font-medium h-full min-w-0"
+        >
+          <Heart className={cn('h-[18px] w-[18px] shrink-0', isOnBrand ? 'text-white' : 'text-zinc-500')} />
+          <span>Brand</span>
+        </Link>
+        {/* Chevron — animates with Framer Motion */}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex h-full items-center pr-3 pl-2 text-zinc-600 hover:text-zinc-300 transition-colors"
+          aria-label={expanded ? 'Collapse brand menu' : 'Expand brand menu'}
+        >
+          <motion.div
+            animate={{ rotate: expanded ? 90 : 0 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </motion.div>
+        </button>
+      </div>
+
+      {/* Sub-items — Framer Motion for true height animation */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="brand-subnav"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{
+              height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+              opacity: { duration: 0.18, ease: 'easeOut' },
+            }}
+            style={{ overflow: 'hidden' }}
+          >
+            {/* Left border track + indented items */}
+            <div className="relative ml-[30px] mt-1 pb-1.5">
+              <div className="absolute left-0 top-0 bottom-0 w-px bg-white/[0.07]" />
+              <div className="space-y-px">
+                {BRAND_TABS.map((tab, i) => {
+                  const isActive = isOnBrand && (activeTab === tab.id || (!activeTab && tab.id === 'presence'));
+                  return (
+                    <motion.div
+                      key={tab.id}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.15, delay: i * 0.03, ease: 'easeOut' }}
+                    >
+                      <Link
+                        href={buildBrandTabHref(tab.id, reportParam)}
+                        onClick={onClick}
+                        className={cn(
+                          'relative flex items-center pl-4 pr-2 py-[6px] rounded-md text-[12.5px] transition-colors',
+                          isActive
+                            ? 'font-semibold text-white'
+                            : 'font-medium text-zinc-500 hover:text-zinc-200',
+                        )}
+                      >
+                        {/* Tick mark on the left rail */}
+                        {isActive && (
+                          <motion.span
+                            layoutId="brand-active-tick"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 h-[14px] w-px bg-[var(--sidebar-accent)]"
+                            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                          />
+                        )}
+                        {tab.label}
+                      </Link>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -286,7 +446,7 @@ function SidebarDomainList({ onCloseMobile }: { onCloseMobile?: () => void }) {
         Domains
       </p>
 
-      <div className="max-h-[240px] space-y-0.5 overflow-y-auto">
+      <div className="space-y-0.5">
         {monitoredSites.map((site) => renderDomainButton(site))}
       </div>
 
@@ -393,8 +553,11 @@ export function DashboardSidebar() {
   const searchParams = useSearchParams();
   const section = searchParams.get('section');
   const reportParam = searchParams.get('report');
+  const tabParam = searchParams.get('tab') as BrandTabId | null;
   const [mobileOpen, setMobileOpen] = useState(false);
   const { tier, loading: planLoading } = usePlan();
+
+  const isOnBrand = pathname === '/brand';
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -411,8 +574,8 @@ export function DashboardSidebar() {
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
-      {/* Logo */}
-      <div className="flex h-14 items-center gap-2.5 px-5">
+      {/* ── Fixed header: logo ──────────────────────────────────── */}
+      <div className="shrink-0 flex h-14 items-center gap-2.5 px-5">
         <Link href="/" className="flex items-center gap-2.5" onClick={closeMobile}>
           <AisoBrand
             logoClassName="h-7 w-7"
@@ -422,68 +585,98 @@ export function DashboardSidebar() {
         </Link>
       </div>
 
-      {/* Domain Selector — only show when context is available */}
-      {hasDomainContext && (
-        <>
-          <div className="mx-3 border-t border-white/[0.06]" />
-          <div className="py-2.5">
-            <SidebarDomainList onCloseMobile={closeMobile} />
-          </div>
-        </>
-      )}
+      {/* ── Scrollable middle: domains + nav ────────────────────── */}
+      <div
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto',
+          // slim, barely-visible scrollbar
+          '[&::-webkit-scrollbar]:w-[3px]',
+          '[&::-webkit-scrollbar-track]:bg-transparent',
+          '[&::-webkit-scrollbar-thumb]:rounded-full',
+          '[&::-webkit-scrollbar-thumb]:bg-white/[0.08]',
+          '[&::-webkit-scrollbar-thumb:hover]:bg-white/[0.15]',
+        )}
+      >
+        {/* Domain Selector */}
+        {hasDomainContext && (
+          <>
+            <div className="mx-3 border-t border-white/[0.06]" />
+            <div className="py-2.5">
+              <SidebarDomainList onCloseMobile={closeMobile} />
+            </div>
+          </>
+        )}
 
-      {hasDomainContext && <SidebarOnboardingProgress />}
+        {hasDomainContext && <SidebarOnboardingProgress />}
 
-      {/* Separator */}
-      <div className="mx-3 border-t border-white/[0.06]" />
+        {/* Nav separator */}
+        <div className="mx-3 border-t border-white/[0.06]" />
 
-      {/* Nav items */}
-      <nav className="mt-2 flex-1 space-y-0.5 px-3">
-        {NAV_ITEMS.map((item) => {
-          const requiredTier = NAV_GATES[item.key] ?? 'free';
-          const isLocked = !planLoading && !canAccess(tier, requiredTier);
-          const href = WORKSPACE_KEYS.has(item.key)
-            ? buildNavHref(item.href, reportParam)
-            : item.href;
-          return (
-            <NavItem
-              key={item.key}
-              item={{ ...item, href }}
-              active={item.matchFn(pathname, section)}
-              locked={isLocked}
-              onClick={closeMobile}
-            />
-          );
-        })}
+        {/* Main nav */}
+        <nav className="mt-2 space-y-0.5 px-3 pb-2">
+          {NAV_ITEMS.slice(0, 2).map((item) => {
+            const requiredTier = NAV_GATES[item.key] ?? 'free';
+            const isLocked = !planLoading && !canAccess(tier, requiredTier);
+            const href = WORKSPACE_KEYS.has(item.key)
+              ? buildNavHref(item.href, reportParam)
+              : item.href;
+            return (
+              <NavItem
+                key={item.key}
+                item={{ ...item, href }}
+                active={item.matchFn(pathname, section)}
+                locked={isLocked}
+                onClick={closeMobile}
+              />
+            );
+          })}
 
-        {/* Separator */}
-        <div className="!my-3 border-t border-white/[0.06]" />
+          {/* Brand — expandable with sub-tabs */}
+          <BrandNavItem
+            isOnBrand={isOnBrand}
+            activeTab={tabParam}
+            reportParam={reportParam}
+            locked={!planLoading && !canAccess(tier, NAV_GATES.brand ?? 'free')}
+            onClick={closeMobile}
+          />
 
+          {NAV_ITEMS.slice(2).map((item) => {
+            const requiredTier = NAV_GATES[item.key] ?? 'free';
+            const isLocked = !planLoading && !canAccess(tier, requiredTier);
+            const href = WORKSPACE_KEYS.has(item.key)
+              ? buildNavHref(item.href, reportParam)
+              : item.href;
+            return (
+              <NavItem
+                key={item.key}
+                item={{ ...item, href }}
+                active={item.matchFn(pathname, section)}
+                locked={isLocked}
+                onClick={closeMobile}
+              />
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* ── Fixed footer: settings + pricing ────────────────────── */}
+      <div className="shrink-0">
+        <div className="mx-3 border-t border-white/[0.06]" />
+        <nav className="space-y-0.5 px-3 py-2">
           <NavItem
             item={{ ...SETTINGS_ITEM, href: buildNavHref(SETTINGS_ITEM.href, reportParam) }}
             active={SETTINGS_ITEM.matchFn(pathname, section)}
             locked={!planLoading && !canAccess(tier, NAV_GATES.settings ?? 'free')}
             onClick={closeMobile}
           />
-
-        {/* Pricing link — visible for free users */}
-        {isFree && (
-          <NavItem
-            item={PRICING_ITEM}
-            active={PRICING_ITEM.matchFn(pathname, section)}
-            onClick={closeMobile}
-          />
-        )}
-      </nav>
-
-      {/* Bottom logo */}
-      <div className="px-5 pb-5">
-        <AisoBrand
-          className="opacity-40"
-          logoClassName="h-5 w-5"
-          textClassName="text-[11px]"
-          wordmarkVariant="dark"
-        />
+          {isFree && (
+            <NavItem
+              item={PRICING_ITEM}
+              active={PRICING_ITEM.matchFn(pathname, section)}
+              onClick={closeMobile}
+            />
+          )}
+        </nav>
       </div>
     </div>
   );
