@@ -7,6 +7,7 @@ const {
   addPendingDomainToManualDomains,
   detectAppShellSection,
   reconcileHiddenDomains,
+  workspaceRouteNeedsFiles,
 } = require('../src/lib/workspace-ui.ts');
 
 test('detectAppShellSection keeps workspace routes highlighted under Dashboard', () => {
@@ -16,6 +17,17 @@ test('detectAppShellSection keeps workspace routes highlighted under Dashboard',
   assert.equal(detectAppShellSection('/competitors'), 'dashboard');
   assert.equal(detectAppShellSection('/settings'), 'dashboard');
   assert.equal(detectAppShellSection('/advanced'), 'dashboard');
+});
+
+test('workspaceRouteNeedsFiles only blocks on report-heavy routes', () => {
+  assert.equal(workspaceRouteNeedsFiles('/dashboard', null), false);
+  assert.equal(workspaceRouteNeedsFiles('/settings', null), false);
+  assert.equal(workspaceRouteNeedsFiles('/analytics', null), false);
+  assert.equal(workspaceRouteNeedsFiles('/report', null), true);
+  assert.equal(workspaceRouteNeedsFiles('/brand', null), true);
+  assert.equal(workspaceRouteNeedsFiles('/advanced', 'dashboard'), false);
+  assert.equal(workspaceRouteNeedsFiles('/advanced', 'report'), true);
+  assert.equal(workspaceRouteNeedsFiles('/advanced', 'brand'), true);
 });
 
 test('reconcileHiddenDomains preserves user-hidden scan domains when tracked domains sync from DB', () => {

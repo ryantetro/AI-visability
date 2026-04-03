@@ -134,6 +134,17 @@ export function getLatestPaidScanByDomain(scans: RecentScanData[], domain: strin
   );
 }
 
+export function getLatestMonitorableScanByDomain(
+  scans: RecentScanData[],
+  domain: string,
+  hasPaidAccess: boolean
+) {
+  const latestPaidScan = getLatestPaidScanByDomain(scans, domain);
+  if (latestPaidScan) return latestPaidScan;
+  if (!hasPaidAccess) return null;
+  return getLatestScanByDomain(scans, domain);
+}
+
 export function buildCursorPrompt(
   file: GeneratedFile,
   domain: string,

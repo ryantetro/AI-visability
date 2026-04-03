@@ -11,6 +11,7 @@ const assert = require('node:assert/strict');
 const {
   getLatestScanByDomain,
   getLatestPaidScanByDomain,
+  getLatestMonitorableScanByDomain,
 } = require('../src/app/advanced/lib/utils.ts');
 
 function makeScan(id, url, createdAt, hasPaid = false, extra = {}) {
@@ -35,6 +36,24 @@ test('Fix 1: getLatestPaidScanByDomain only returns paid scans', () => {
 
   const latestPaid = getLatestPaidScanByDomain(scans, 'example.com');
   assert.equal(latestPaid.id, 'old-paid', 'Should return the paid scan only');
+});
+
+test('Fix 1: paid workspaces can enable monitoring from the latest scan even without a paid scan flag', () => {
+  const scans = [
+    makeScan('legacy-free', 'https://example.com/', 2000, false),
+  ];
+
+  const latestMonitorable = getLatestMonitorableScanByDomain(scans, 'example.com', true);
+  assert.equal(latestMonitorable?.id, 'legacy-free', 'Monitoring should attach to the latest scan for paid workspaces');
+});
+
+test('Fix 1: free workspaces still require a paid scan to enable monitoring', () => {
+  const scans = [
+    makeScan('legacy-free', 'https://example.com/', 2000, false),
+  ];
+
+  const latestMonitorable = getLatestMonitorableScanByDomain(scans, 'example.com', false);
+  assert.equal(latestMonitorable, null, 'Free workspaces should not treat unpaid scans as monitorable');
 });
 
 test('Fix 1: new fallback order prefers latestScan over latestPaidScan', () => {

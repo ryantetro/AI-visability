@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ensureProtocol, getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
 import { invalidateBillingStatus } from '@/hooks/use-billing-status';
@@ -18,10 +18,12 @@ import {
   normalizeDomainInput,
   getLatestScanByDomain,
   getLatestPaidScanByDomain,
+  getLatestMonitorableScanByDomain,
 } from '@/app/advanced/lib/utils';
 import {
   addPendingDomainToManualDomains,
   reconcileHiddenDomains,
+  workspaceRouteNeedsFiles,
 } from '@/lib/workspace-ui';
 
 import type { DashboardReportData, FilesData, RecentScanData, SiteSummary, ApiErrorPayload } from '@/app/advanced/lib/types';
@@ -94,6 +96,7 @@ export function DomainContextProvider({
   reportId: string | null;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialReportId = reportId ?? '';
@@ -103,6 +106,7 @@ export function DomainContextProvider({
   const storageScope = authUser?.id ?? authUser?.email ?? null;
   const prefilledDomain = normalizeDomainInput(searchParams.get('prefillDomain') ?? '');
   const shouldAutoStartPrefilledScan = searchParams.get('autoStart') === '1' && Boolean(prefilledDomain);
+  const shouldLoadFilesForSection = workspaceRouteNeedsFiles(pathname ?? '', searchParams.get('section'));
 
   const [recentScans, setRecentScans] = useState<RecentScanData[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
@@ -455,8 +459,40 @@ export function DomainContextProvider({
     if (cachedReport) {
       setReport(cachedReport);
       setFiles(cachedFiles ?? null);
-      setWorkspaceLoading(false);
-      return;
+      if (!shouldLoadFilesForSection || cachedFiles) {
+        setWorkspaceLoading(false);
+        return;
+      }
+
+      setWorkspaceLoading(true);
+      setLoadError('');
+      setActionError('');
+
+      let active = true;
+      (async () => {
+        try {
+          const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`);
+          if (!filesRes.ok) {
+            if (filesRes.status === 403) {
+              if (active) setFiles(null);
+              return;
+            }
+            const payload = (await filesRes.json().catch(() => ({}))) as ApiErrorPayload;
+            throw new Error(payload.error || 'Failed to load files');
+          }
+
+          const filesPayload = (await filesRes.json()) as FilesData;
+          if (!active) return;
+          setFiles(filesPayload);
+          setFilesCache((prev) => ({ ...prev, [activeWorkspaceReportId]: filesPayload }));
+        } catch (err) {
+          if (active) setLoadError(err instanceof Error ? err.message : 'Failed to load workspace');
+        } finally {
+          if (active) setWorkspaceLoading(false);
+        }
+      })();
+
+      return () => { active = false; };
     }
 
     setWorkspaceLoading(true);
@@ -479,8 +515,20 @@ export function DomainContextProvider({
         setReportCache((prev) => ({ ...prev, [activeWorkspaceReportId]: reportPayload }));
         void refreshScanEntry(activeWorkspaceReportId);
 
+        if (!shouldLoadFilesForSection) {
+          return;
+        }
+
         const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`);
-        if (!filesRes.ok) { if (filesRes.status === 403) { setFiles(null); return; } const p = (await filesRes.json().catch(() => ({}))) as ApiErrorPayload; throw new Error(p.error || 'Failed to load files'); }
+        if (!filesRes.ok) {
+          if (filesRes.status === 403) {
+            setFiles(null);
+            return;
+          }
+          const p = (await filesRes.json().catch(() => ({}))) as ApiErrorPayload;
+          throw new Error(p.error || 'Failed to load files');
+        }
+
         const filesPayload = (await filesRes.json()) as FilesData;
         if (!active) return;
         setFiles(filesPayload);
@@ -488,7 +536,7 @@ export function DomainContextProvider({
       } catch (err) { if (active) setLoadError(err instanceof Error ? err.message : 'Failed to load workspace'); } finally { if (active) setWorkspaceLoading(false); }
     })();
     return () => { active = false; };
-  }, [activeWorkspaceReportId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceReportId, shouldLoadFilesForSection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shouldPollLoadedReport =
     Boolean(
@@ -532,6 +580,11 @@ export function DomainContextProvider({
         setReportCache((prev) => ({ ...prev, [activeWorkspaceReportId]: reportPayload }));
         setLoadError('');
         void refreshScanEntry(activeWorkspaceReportId);
+
+        if (!shouldLoadFilesForSection) {
+          return;
+        }
+
         const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`);
         if (filesRes.ok) {
           const filesPayload = (await filesRes.json()) as FilesData;
@@ -543,8 +596,8 @@ export function DomainContextProvider({
       }
     }, loadError === 'Scan not complete' ? 3500 : 2500);
     return () => clearInterval(interval);
-  }, [loadError, activeWorkspaceReportId, refreshScanEntry, shouldPollLoadedReport]);
-
+  }, [loadError, activeWorkspaceReportId, refreshScanEntry, shouldLoadFilesForSection, shouldPollLoadedReport]);
+ 
   // Use plan tier for paid access instead of scan-level flags
   const hasPaidAccess = debugPaidPreview || planIsPaid || paidOverride || Boolean(report?.hasPaid) || recentScans.some((s) => s.hasPaid);
   const normalizedDomain = normalizeDomainInput(addDomainInput);
@@ -795,10 +848,15 @@ export function DomainContextProvider({
   }, [files?.url, report?.url, expandedSite, router, storageScope]);
 
   const handleEnableMonitoring = useCallback(async () => {
-    if (!expandedSite?.latestPaidScan?.id) return;
+    if (!expandedSite?.domain) return;
+    const monitoringScan = getLatestMonitorableScanByDomain(recentScans, expandedSite.domain, hasPaidAccess);
+    if (!monitoringScan?.id) {
+      setActionError('Run a scan for this domain before enabling monitoring.');
+      return;
+    }
     setMonitoringLoading(true); setActionError('');
-    try { const res = await fetch('/api/monitoring', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scanId: expandedSite.latestPaidScan.id, alertThreshold: 5 }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to enable monitoring'); setMonitoringConnected((c) => ({ ...c, [expandedSite.domain]: true })); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to enable monitoring'); } finally { setMonitoringLoading(false); }
-  }, [expandedSite]);
+    try { const res = await fetch('/api/monitoring', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scanId: monitoringScan.id, alertThreshold: 5 }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to enable monitoring'); setMonitoringConnected((c) => ({ ...c, [expandedSite.domain]: true })); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to enable monitoring'); } finally { setMonitoringLoading(false); }
+  }, [expandedSite, hasPaidAccess, recentScans]);
 
   const handleDisableMonitoring = useCallback(async () => {
     if (!expandedSite?.domain) return;

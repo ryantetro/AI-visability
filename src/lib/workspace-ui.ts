@@ -7,6 +7,13 @@ export function detectAppShellSection(pathname: string): AppShellSection {
   return 'dashboard';
 }
 
+export function workspaceRouteNeedsFiles(pathname: string, advancedSection: string | null): boolean {
+  if (pathname.startsWith('/report')) return true;
+  if (pathname.startsWith('/brand')) return true;
+  if (!pathname.startsWith('/advanced')) return false;
+  return advancedSection === 'report' || advancedSection === 'brand';
+}
+
 export function reconcileHiddenDomains(hiddenDomains: string[], trackedDomains: string[]): string[] {
   const tracked = new Set(trackedDomains.map((domain) => domain.toLowerCase()));
   return hiddenDomains.filter((domain) => !tracked.has(domain.toLowerCase()));
