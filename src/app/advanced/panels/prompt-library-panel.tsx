@@ -347,7 +347,7 @@ export function PromptLibraryPanel({
         {PROMPT_CATEGORIES.map((cat) => (
           <button key={cat.id} type="button" onClick={() => setActiveTab(cat.id)} className={cn('px-3 py-2 text-[11px] font-medium transition-colors border-b-2 -mb-px', activeTab === cat.id ? 'border-purple-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700')}>
             {cat.label}
-            {(categoryCounts[cat.id] ?? 0) > 0 && <span className="ml-1.5 text-[9px] text-gray-400">{categoryCounts[cat.id]}</span>}
+            {(categoryCounts[cat.id] ?? 0) > 0 && <span className="ml-1.5 text-[9px] text-gray-500">{categoryCounts[cat.id]}</span>}
           </button>
         ))}
       </div>
@@ -385,13 +385,13 @@ export function PromptLibraryPanel({
                     <p className={cn('text-[12px] truncate cursor-pointer hover:text-gray-900 transition-colors', p.active ? 'text-gray-800' : 'text-gray-400')} onClick={() => handleStartEdit(p.id, p.promptText)} title="Click to edit">{p.promptText}</p>
                   )}
                   <div className="mt-0.5 flex items-center gap-2">
-                    <select value={p.category} onChange={(e) => handleCategoryChange(p.id, e.target.value)} className="rounded border-none bg-transparent px-0 py-0 text-[9px] uppercase tracking-wider text-gray-400 focus:outline-none cursor-pointer hover:text-gray-600">
+                    <select value={p.category} onChange={(e) => handleCategoryChange(p.id, e.target.value)} className="rounded border-none bg-transparent px-0 py-0 text-[9px] uppercase tracking-wider text-gray-500 focus:outline-none cursor-pointer hover:text-gray-600">
                       <option value="brand">Brand</option>
                       <option value="competitor">Competitor</option>
                       <option value="industry">Industry</option>
                       <option value="custom">Custom</option>
                     </select>
-                    {p.totalResults > 0 && <span className="text-[10px] text-gray-400">{p.mentionRate}% of {p.totalResults} checks</span>}
+                    {p.totalResults > 0 && <span className="text-[10px] text-gray-500">{p.mentionRate}% of {p.totalResults} checks</span>}
                   </div>
                 </div>
                 {p.mentionRate !== null && (

@@ -145,14 +145,14 @@ function ScoreTrendTooltip({
   if (typeof value !== 'number') return null;
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 shadow-lg">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">When</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">When</p>
       <p className="mt-1 text-[13px] font-medium leading-snug text-gray-900 tabular-nums">
         {row?.fullDate ?? '—'}
       </p>
-      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">Score</p>
+      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600">Score</p>
       <p className="mt-0.5 flex items-baseline gap-1">
         <span className="text-xl font-bold tabular-nums tracking-tight text-[#25c972]">{Math.round(value)}</span>
-        <span className="text-[13px] font-medium tabular-nums text-gray-500">/ 100</span>
+        <span className="text-[13px] font-medium tabular-nums text-gray-600">/ 100</span>
       </p>
     </div>
   );
@@ -332,16 +332,16 @@ export function MonitoringTrendsPanel({
               {Math.round(chartData[0].score)}
             </p>
             <p className="text-[13px] text-gray-600">Single data point on {formatShortDate(getScanTimestamp(lastScan!))}</p>
-            <p className="text-[12px] text-gray-500">Run more scans to track trends over time.</p>
+            <p className="text-[12px] text-gray-600">Run more scans to track trends over time.</p>
           </div>
         ) : (
-          <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-6 py-8 text-center text-[13px] text-gray-500">
+          <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-gray-200 bg-gray-50 px-6 py-8 text-center text-[13px] text-gray-600">
             No score history yet. Run a scan to start tracking.
           </div>
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-gray-600">
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-gray-700">
         <span>Last scanned: {displayedLastScannedAt ? formatRelativeTime(displayedLastScannedAt) : '--'}</span>
         {scoreDelta !== null && (
           <span className={scoreDelta >= 0 ? 'text-[#25c972]' : 'text-[#ff5252]'}>

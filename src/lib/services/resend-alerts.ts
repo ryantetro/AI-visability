@@ -452,7 +452,7 @@ function buildFixMySiteConfirmationHtml({
         </td></tr>
 
         <tr><td style="padding:0 32px 32px;">
-          <a href="${appUrl}/dashboard?tab=services" style="display:inline-block;padding:12px 24px;background:#6c63ff;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;border-radius:10px;">
+          <a href="${appUrl}/brand/services" style="display:inline-block;padding:12px 24px;background:#6c63ff;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;border-radius:10px;">
             View Your Order
           </a>
         </td></tr>

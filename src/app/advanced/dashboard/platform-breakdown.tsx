@@ -31,14 +31,14 @@ export function PlatformBreakdown({ platformCards, compact }: PlatformBreakdownP
 
   return (
     <DashboardPanel className={compact ? 'p-4' : 'p-6'}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-600">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-700">
         AI Platform Breakdown
       </p>
-      <p className="mt-0.5 text-[11px] text-gray-500">Mention rate by platform</p>
+      <p className="mt-0.5 text-[11px] text-gray-600">Mention rate by platform</p>
 
       {sorted.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-gray-200 p-6 text-center">
-          <p className="text-xs text-gray-500">Run a scan with AI mentions to see platform breakdown.</p>
+          <p className="text-xs text-gray-600">Run a scan with AI mentions to see platform breakdown.</p>
         </div>
       ) : (
         <div className={compact ? 'mt-3 space-y-2' : 'mt-5 space-y-3'}>

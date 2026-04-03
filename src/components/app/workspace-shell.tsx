@@ -360,7 +360,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
       {/* Welcome header */}
       <h1 className="text-3xl font-bold tracking-tight text-gray-900">Welcome to airadr</h1>
-      <p className="mt-2 text-[14px] text-gray-500">Get your AI visibility score in three simple steps</p>
+      <p className="mt-2 text-[14px] text-gray-600">Get your AI visibility score in three simple steps</p>
 
       {/* 3-step visual flow */}
       <div className="mx-auto mt-8 flex items-center gap-3">
@@ -374,7 +374,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
               <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#356df4]/30 bg-[#356df4]/10 text-[14px] font-bold text-[#356df4]">
                 {step.num}
               </div>
-              <span className="text-[11px] font-medium text-gray-500">{step.label}</span>
+              <span className="text-[11px] font-medium text-gray-600">{step.label}</span>
             </div>
             {i < 2 && <div className="mb-5 h-px w-8 bg-gray-200" />}
           </div>
@@ -386,7 +386,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
         <Plus className="h-6 w-6 text-gray-400" />
       </div>
       <h2 className="mt-5 text-2xl font-semibold tracking-tight text-gray-900">Add your first domain</h2>
-      <p className="mx-auto mt-2 max-w-[420px] text-[13px] leading-6 text-gray-500">
+      <p className="mx-auto mt-2 max-w-[420px] text-[13px] leading-6 text-gray-600">
         {resumeLandingFlow
           ? `We saved ${prefilledDomain} from the landing page. Confirm ownership, then continue the scan.`
           : 'Start monitoring your AI visibility by adding a domain.'}
@@ -425,7 +425,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
             onChange={(e) => setConfirmChecked(e.target.checked)}
             className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-gray-500"
           />
-          <span className="text-[12px] leading-5 text-gray-500">
+          <span className="text-[12px] leading-5 text-gray-600">
             I confirm that I own this domain or have authorization to monitor it.
           </span>
         </label>
@@ -535,7 +535,7 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
                   ? 'Scan failed'
                   : `Scanning ${domain}`}
             </h2>
-            <p className="mt-2 text-[13px] text-gray-500">
+            <p className="mt-2 text-[13px] text-gray-600">
               {scanStatus === 'complete'
                 ? 'Loading your report...'
                 : scanStatus === 'failed'
@@ -548,7 +548,7 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
           <div className="mt-6">
             <div className="flex items-center justify-between text-[12px]">
               <span className="font-medium text-gray-700">{progressPct}% complete</span>
-              <span className="tabular-nums text-gray-400">
+              <span className="tabular-nums text-gray-500">
                 {mins}:{secs.toString().padStart(2, '0')} elapsed
               </span>
             </div>
@@ -590,16 +590,16 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
                   <div className="min-w-0 flex-1">
                     <p className={cn(
                       'text-[13px] font-medium',
-                      isDone ? 'text-gray-400' : isRunning ? 'text-gray-900' : 'text-gray-500'
+                      isDone ? 'text-gray-500' : isRunning ? 'text-gray-900' : 'text-gray-600'
                     )}>
                       {step.label}
                     </p>
                     {isRunning && detail && (
-                      <p className="mt-0.5 text-[11px] text-gray-400">{detail}</p>
+                      <p className="mt-0.5 text-[11px] text-gray-500">{detail}</p>
                     )}
                   </div>
                   {isDone && (
-                    <span className="text-[11px] text-gray-400">Done</span>
+                    <span className="text-[11px] text-gray-500">Done</span>
                   )}
                 </div>
               );
@@ -616,7 +616,7 @@ function ScanInProgressView({ domain, scanId }: { domain: string; scanId: string
             </div>
           )}
 
-          <p className="mt-5 text-center text-[11px] text-gray-400">
+          <p className="mt-5 text-center text-[11px] text-gray-500">
             This usually takes 4–5 minutes. The page will update automatically.
           </p>
         </div>
@@ -645,7 +645,7 @@ function FirstScanPrompt({
       )}
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Domain added</p>
       <h3 className="mt-2 text-xl font-semibold text-gray-900">Run the first scan for {domain}</h3>
-      <p className="mt-3 max-w-2xl text-[13px] leading-6 text-gray-500">
+      <p className="mt-3 max-w-2xl text-[13px] leading-6 text-gray-600">
         Generate a report to see your AI visibility score and fixes.
       </p>
       <div className="mt-5 flex flex-wrap gap-3">

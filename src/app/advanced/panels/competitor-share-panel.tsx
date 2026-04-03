@@ -38,7 +38,7 @@ export function CompetitorSharePanel({ domain }: { domain: string }) {
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[12px] font-medium text-gray-700 truncate max-w-[60%]">{c.competitor}</span>
                 <div className="flex items-center gap-3">
-                  {c.avgPosition !== null && <span className="text-[10px] text-gray-500">avg pos {c.avgPosition}</span>}
+                  {c.avgPosition !== null && <span className="text-[10px] text-gray-600">avg pos {c.avgPosition}</span>}
                   <span className="text-[11px] font-semibold tabular-nums text-gray-700">{c.appearances}x</span>
                 </div>
               </div>
@@ -46,7 +46,7 @@ export function CompetitorSharePanel({ domain }: { domain: string }) {
                 <div className="h-full rounded-full bg-[#ff8a1e] transition-all" style={{ width: `${pct}%` }} />
               </div>
               <div className="mt-1.5 flex items-center gap-1.5">
-                {c.engines.map((e) => <span key={e} className="text-[9px] text-gray-400">{getAIEngineLabel(e)}</span>)}
+                {c.engines.map((e) => <span key={e} className="text-[9px] text-gray-500">{getAIEngineLabel(e)}</span>)}
                 {c.coMentionedCount > 0 && <span className="ml-auto text-[9px] text-[#25c972]/70">co-mentioned {c.coMentionedCount}x</span>}
               </div>
             </div>

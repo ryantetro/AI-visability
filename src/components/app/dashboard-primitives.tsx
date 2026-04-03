@@ -61,8 +61,8 @@ export function MiniInfoTile({
 }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-600">{title}</p>
-      <p className="mt-2 text-[11px] leading-5 text-gray-700">{body}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-700">{title}</p>
+      <p className="mt-2 text-[11px] leading-5 text-gray-800">{body}</p>
     </div>
   );
 }
@@ -78,9 +78,9 @@ export function SectionTitle({
 }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500">{eyebrow}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-600">{eyebrow}</p>
       <h2 className="mt-0.5 text-[15px] font-semibold text-gray-900">{title}</h2>
-      <p className="mt-0.5 text-[12px] leading-5 text-gray-500">{description}</p>
+      <p className="mt-0.5 text-[12px] leading-5 text-gray-600">{description}</p>
     </div>
   );
 }

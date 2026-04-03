@@ -518,7 +518,13 @@ function DomainWorkspace({
 
       {activeSection === 'brand' && (
         canAccess(tier, NAV_GATES.brand as PlanTier) ? (
-          <BrandSection report={report} files={files} domain={domain} platformLabel={platformLabel} />
+          <BrandSection
+            report={report}
+            files={files}
+            domain={domain}
+            platformLabel={platformLabel}
+            activeSection="presence"
+          />
         ) : (
           <LockedFeatureOverlay featureName="Brand & Prompts" requiredTier="starter" onUpgrade={onOpenUnlock} />
         )

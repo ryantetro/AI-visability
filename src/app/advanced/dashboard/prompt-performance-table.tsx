@@ -94,10 +94,10 @@ export function PromptPerformanceTable({ mentionResults, domain, hasPaidPlan }: 
       <DashboardPanel className="p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-600">Prompt Performance</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-700">Prompt Performance</p>
             <h2 className="mt-1.5 text-lg font-semibold text-gray-900">AI Mentions by Prompt</h2>
           </div>
-          <Link href="/brand" className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-gray-700 transition-colors hover:text-gray-900">
+          <Link href="/brand/improve" className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-gray-700 transition-colors hover:text-gray-900">
             Manage Prompts <ChevronRight className="h-3 w-3" />
           </Link>
         </div>
@@ -108,7 +108,7 @@ export function PromptPerformanceTable({ mentionResults, domain, hasPaidPlan }: 
             title="No prompts tracked yet"
             description="Run a scan to see which AI prompts mention your business across ChatGPT, Perplexity, Gemini, and Claude."
             ctaLabel="View Brand & Prompts"
-            ctaHref="/brand"
+            ctaHref="/brand/improve"
             ghostRows={3}
           />
         </div>
@@ -125,10 +125,10 @@ export function PromptPerformanceTable({ mentionResults, domain, hasPaidPlan }: 
     <DashboardPanel className="p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-600">Prompt Performance</p>
-          <p className="mt-0.5 text-[11px] text-gray-500">Visibility of your brand across AI-generated answers</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-700">Prompt Performance</p>
+          <p className="mt-0.5 text-[11px] text-gray-600">Visibility of your brand across AI-generated answers</p>
         </div>
-        <Link href="/brand" className="flex items-center gap-1 text-[11px] font-semibold text-gray-700 transition-colors hover:text-gray-900">
+        <Link href="/brand/improve" className="flex items-center gap-1 text-[11px] font-semibold text-gray-700 transition-colors hover:text-gray-900">
           View All <ChevronRight className="h-3 w-3" />
         </Link>
       </div>
@@ -138,11 +138,11 @@ export function PromptPerformanceTable({ mentionResults, domain, hasPaidPlan }: 
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="pb-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Prompt</th>
-              <th className="pb-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Top Engine</th>
-              <th className="pb-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Visibility</th>
-              <th className="pb-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Top Competitor</th>
-              <th className="pb-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Status</th>
+              <th className="pb-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-600">Prompt</th>
+              <th className="pb-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-600">Top Engine</th>
+              <th className="pb-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-600">Visibility</th>
+              <th className="pb-2 pr-4 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-600">Top Competitor</th>
+              <th className="pb-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-600">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -163,7 +163,7 @@ export function PromptPerformanceTable({ mentionResults, domain, hasPaidPlan }: 
                         <span className="text-[11px] font-medium text-gray-700">{engineMeta.label}</span>
                       </div>
                     ) : (
-                      <span className="text-[11px] text-gray-400">--</span>
+                      <span className="text-[11px] text-gray-500">--</span>
                     )}
                   </td>
                   <td className="py-2 pr-4">
@@ -182,7 +182,7 @@ export function PromptPerformanceTable({ mentionResults, domain, hasPaidPlan }: 
                     {row.topCompetitor ? (
                       <span className="text-[11px] text-gray-700">{row.topCompetitor}</span>
                     ) : (
-                      <span className="text-[11px] text-gray-400">--</span>
+                      <span className="text-[11px] text-gray-500">--</span>
                     )}
                   </td>
                   <td className="py-2 text-center">
@@ -201,7 +201,7 @@ export function PromptPerformanceTable({ mentionResults, domain, hasPaidPlan }: 
 
       {hasMore && (
         <div className="mt-3 text-center">
-          <Link href="/brand" className="text-[11px] font-semibold text-blue-600 hover:text-blue-700">
+          <Link href="/brand/improve" className="text-[11px] font-semibold text-blue-600 hover:text-blue-700">
             View all {rows.length} prompts →
           </Link>
         </div>
@@ -213,7 +213,7 @@ export function PromptPerformanceTable({ mentionResults, domain, hasPaidPlan }: 
             <p className="text-xs font-semibold text-gray-800">
               {opportunityCount} prompt{opportunityCount !== 1 ? 's' : ''} below 50% visibility
             </p>
-            <p className="mt-0.5 text-[10px] text-gray-500">Targeted content can improve your mention rate</p>
+            <p className="mt-0.5 text-[10px] text-gray-600">Targeted content can improve your mention rate</p>
           </div>
           <Link
             href="/report#fix-my-site"

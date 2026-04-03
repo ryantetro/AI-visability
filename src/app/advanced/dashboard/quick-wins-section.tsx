@@ -35,7 +35,7 @@ export function QuickWinsSection({ fixes, compact, limit = 5 }: QuickWinsSection
           </div>
           <div>
             <h2 className={cn('font-bold text-gray-900', compact ? 'text-[13px]' : 'text-base')}>Quick Wins</h2>
-            <p className="text-[10px] text-gray-500">
+            <p className="text-[10px] text-gray-600">
               Up to <span className="font-semibold text-green-700">+{totalLift} pts</span> lift
             </p>
           </div>
@@ -75,7 +75,7 @@ export function QuickWinsSection({ fixes, compact, limit = 5 }: QuickWinsSection
                   {fix.category === 'ai' ? 'AI' : 'Web'}
                 </span>
               </div>
-              {!compact && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-600">{fix.instruction}</p>}
+              {!compact && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-700">{fix.instruction}</p>}
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5">
@@ -97,7 +97,7 @@ export function QuickWinsSection({ fixes, compact, limit = 5 }: QuickWinsSection
         <div className="mt-4 flex items-center justify-between rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-gray-800">Want these fixes done for you?</p>
-            <p className="text-xs text-gray-600">Our experts implement optimizations within 48 hours</p>
+            <p className="text-xs text-gray-700">Our experts implement optimizations within 48 hours</p>
           </div>
           <Link
             href="/report#fix-my-site"

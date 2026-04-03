@@ -53,7 +53,7 @@ export const AI_ENGINE_META: Record<AIEngine, AIEngineMeta> = {
     id: 'grok',
     label: 'Grok',
     provider: 'xAI',
-    color: '#f5f5f5',
+    color: '#374151',
     envKey: 'GROK_API_KEY',
     defaultModel: 'grok-4-1-fast-non-reasoning',
     iconKey: 'grok',

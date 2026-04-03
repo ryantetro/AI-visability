@@ -1,19 +1,14 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { buildBrandHref, resolveBrandSection } from '@/lib/brand-navigation';
 
-import { WorkspaceShell } from '@/components/app/workspace-shell';
-import { BrandSection } from '@/app/advanced/brand/brand-section';
+export default async function BrandPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const reportId = typeof params.report === 'string' ? params.report : null;
+  const legacyTab = typeof params.tab === 'string' ? params.tab : null;
 
-export default function BrandPage() {
-  return (
-    <WorkspaceShell sectionKey="brand">
-      {(ctx) => (
-        <BrandSection
-          report={ctx.report}
-          files={ctx.files}
-          domain={ctx.domain}
-          platformLabel={ctx.platformLabel}
-        />
-      )}
-    </WorkspaceShell>
-  );
+  redirect(buildBrandHref(resolveBrandSection(legacyTab), reportId));
 }

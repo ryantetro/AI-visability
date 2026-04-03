@@ -339,7 +339,7 @@ export function DomainContextProvider({
       const url = new URL(window.location.href);
       url.searchParams.delete('fms');
       window.history.replaceState({}, '', url.toString());
-      window.location.href = '/brand?tab=services';
+      window.location.href = '/brand/services';
     }
   }, [searchParams]);
 

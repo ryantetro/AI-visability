@@ -201,7 +201,7 @@ export function AICrawlerPanel({
         <div className="flex items-center justify-center py-16">
           <div className="flex flex-col items-center gap-3">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-400" />
-            <p className="text-xs text-gray-500">Loading traffic data...</p>
+            <p className="text-xs text-gray-600">Loading traffic data...</p>
           </div>
         </div>
       </DashboardPanel>

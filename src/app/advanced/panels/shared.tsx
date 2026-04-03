@@ -13,7 +13,7 @@ export function CenteredLoading({ label }: { label: string }) {
     <div className="flex min-h-[60vh] items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-400" />
-        <p className="text-sm text-gray-500">{label}</p>
+        <p className="text-sm text-gray-600">{label}</p>
       </div>
     </div>
   );
@@ -31,7 +31,7 @@ export function CenteredWorkspaceState({
       'flex min-h-[180px] items-center justify-center rounded-[1.2rem] border px-6 py-10 text-center text-sm',
       tone === 'error'
         ? 'border-red-200 bg-red-50 text-red-700'
-        : 'border-gray-200 bg-gray-50 text-gray-500'
+        : 'border-gray-200 bg-gray-50 text-gray-600'
     )}>
       {label}
     </div>
@@ -41,7 +41,7 @@ export function CenteredWorkspaceState({
 export function MetricPill({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">{label}</p>
       <p className={cn('mt-1 text-sm font-semibold', scoreColor(value))}>{value == null ? '--' : `${Math.round(value)}`}</p>
     </div>
   );

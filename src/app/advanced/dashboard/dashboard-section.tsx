@@ -61,7 +61,7 @@ function KpiTile({ label, value, subValue, delta, deltaLabel, accentColor = '#6b
     <DashboardPanel className={cn('relative flex flex-col overflow-hidden px-4 py-3 transition-all', href && 'cursor-pointer hover:border-gray-300')}>
       {/* Thin colored top accent */}
       <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-[1.35rem]" style={{ backgroundColor: accentColor }} />
-      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-600">
         {label}
         {tooltip && <InfoTooltip text={tooltip} className="ml-1 align-middle" />}
       </p>
@@ -78,10 +78,10 @@ function KpiTile({ label, value, subValue, delta, deltaLabel, accentColor = '#6b
         )}
       </div>
       {subValue && (
-        <p className="mt-0.5 text-[10px] text-gray-500">{subValue}</p>
+        <p className="mt-0.5 text-[10px] text-gray-600">{subValue}</p>
       )}
       {deltaLabel && !delta && (
-        <p className="mt-0.5 text-[10px] text-gray-500">{deltaLabel}</p>
+        <p className="mt-0.5 text-[10px] text-gray-600">{deltaLabel}</p>
       )}
     </DashboardPanel>
   );
@@ -213,9 +213,9 @@ export function DashboardSection({
           <h1 className="text-base font-bold tracking-tight text-gray-900 sm:text-lg">
             Welcome back
           </h1>
-          <p className="mt-0.5 text-[11px] text-gray-500">
-            <span className="font-medium text-gray-700">{domain}</span>
-            <span className="text-gray-400"> · </span>
+          <p className="mt-0.5 text-[11px] text-gray-600">
+            <span className="font-medium text-gray-800">{domain}</span>
+            <span className="text-gray-500"> · </span>
             {formatRelativeTime(latestScanTime)}
             {scanAgeDays !== null && scanAgeDays >= 7 && (
               <span className="ml-2 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold text-red-600">Stale</span>
@@ -276,7 +276,7 @@ export function DashboardSection({
           subValue={totalChecks > 0 ? `${totalMentions}/${totalChecks} · ${platformCards.length} platforms` : 'No prompts yet'}
           accentColor="#a855f7"
           tooltip="Percentage of AI-generated answers that mention your brand."
-          href="/brand"
+          href="/brand/presence"
         />
 
         {/* Average Rank */}
@@ -332,8 +332,8 @@ export function DashboardSection({
           <DashboardPanel className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-600">Competitors</p>
-                <p className="mt-0.5 text-[11px] text-gray-500">AI visibility ranking</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-700">Competitors</p>
+                <p className="mt-0.5 text-[11px] text-gray-600">AI visibility ranking</p>
               </div>
               <Link href="/competitors" className="flex items-center gap-0.5 text-[11px] font-semibold text-gray-700 hover:text-gray-900">
                 View All <ChevronRight className="h-3 w-3" />
@@ -424,7 +424,7 @@ export function DashboardSection({
               <p className="text-[12px] font-bold text-gray-900">
                 {fixes.length} fix{fixes.length !== 1 ? 'es' : ''} available
               </p>
-              <p className="text-[11px] text-gray-600">
+              <p className="text-[11px] text-gray-700">
                 Boost your score by up to <span className="font-semibold text-blue-700">+{Math.round(totalFixLift)} pts</span>
               </p>
             </div>

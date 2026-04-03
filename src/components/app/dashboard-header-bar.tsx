@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Loader2, LogOut, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { getBrandSectionMeta } from '@/lib/brand-navigation';
 import { planStringToTier, PLANS } from '@/lib/pricing';
 import { buildLoginHref, getCurrentAppPath } from '@/lib/app-paths';
 
@@ -21,6 +22,11 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 function getPageTitle(pathname: string): string {
+  if (pathname.startsWith('/brand/')) {
+    const section = pathname.split('/')[2] ?? null;
+    return getBrandSectionMeta(section)?.label ?? 'Brand';
+  }
+
   for (const [prefix, title] of Object.entries(PAGE_TITLES)) {
     if (pathname.startsWith(prefix)) return title;
   }
@@ -132,10 +138,10 @@ export function DashboardHeaderBar() {
             {dropdownOpen && (
               <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
                 <div className="border-b border-gray-100 px-5 py-3.5">
-                  <p className="truncate text-[13px] text-gray-500">{user.email}</p>
+                  <p className="truncate text-[13px] text-gray-600">{user.email}</p>
                 </div>
                 <div className="border-b border-gray-100 px-5 py-3">
-                  <p className="text-[12px] font-medium text-gray-600">{planLabel}</p>
+                  <p className="text-[12px] font-medium text-gray-700">{planLabel}</p>
                 </div>
                 {checkoutError && (
                   <div className="border-b border-gray-100 px-5 py-2.5">
@@ -213,7 +219,7 @@ export function DashboardHeaderBar() {
                       setDropdownOpen(false);
                       void logout();
                     }}
-                    className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
+                    className="flex w-full items-center gap-3 px-5 py-2.5 text-[14px] text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
                   >
                     <LogOut className="h-4 w-4" />
                     Logout

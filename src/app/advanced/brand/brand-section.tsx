@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import { ChevronDown, Copy, Download, ExternalLink, Zap, Wrench, Sparkles } from 'lucide-react';
 import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
 import type { PrioritizedFix } from '@/types/score';
 import { cn } from '@/lib/utils';
 import { formatPlatformLabel } from '@/lib/platform-detection';
 import { usePlan } from '@/hooks/use-plan';
+import { getBrandSectionMeta, type BrandSectionKey } from '@/lib/brand-navigation';
 import { AiPresenceTab } from '../panels/ai-presence-tab';
 import { AICrawlerPanel } from '../panels/ai-crawler-panel';
 import { PromptLibraryPanel } from '../panels/prompt-library-panel';
@@ -20,53 +20,24 @@ import { FixCard } from '../panels/fix-card';
 import { getFileMeta, getGroupedFixes, matchFixToFile, verificationPath, downloadTextFile, buildCursorPrompt, buildAllFilesPrompt } from '../lib/utils';
 import type { DashboardReportData, FilesData, GeneratedFile } from '../lib/types';
 
-type BrandTab = 'presence' | 'improve' | 'citations' | 'files' | 'traffic' | 'content' | 'services';
-
 interface BrandSectionProps {
   report: DashboardReportData;
   files: FilesData | null;
   domain: string;
   platformLabel: string | null;
+  activeSection: BrandSectionKey;
 }
 
-const VALID_TABS: BrandTab[] = ['presence', 'improve', 'citations', 'files', 'traffic', 'content', 'services'];
-
-export function BrandSection({ report, files, domain, platformLabel }: BrandSectionProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+export function BrandSection({ report, files, domain, platformLabel, activeSection }: BrandSectionProps) {
   const { tier, maxPrompts } = usePlan();
-
-  const tabParam = searchParams.get('tab') as BrandTab | null;
-  const activeTab: BrandTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'presence';
-
-  const setActiveTab = useCallback((tab: BrandTab) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (tab === 'presence') {
-      params.delete('tab');
-    } else {
-      params.set('tab', tab);
-    }
-    const qs = params.toString();
-    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
-  }, [router, searchParams]);
-
   const [copiedFile, setCopiedFile] = useState<string | null>(null);
   const [copiedSinglePrompt, setCopiedSinglePrompt] = useState<string | null>(null);
   const [copiedAllPrompts, setCopiedAllPrompts] = useState(false);
 
-  const tabs: { id: BrandTab; label: string }[] = [
-    { id: 'presence', label: 'AI Presence' },
-    { id: 'improve', label: 'Improve' },
-    { id: 'citations', label: 'Citations' },
-    { id: 'files', label: 'Files' },
-    { id: 'traffic', label: 'Traffic' },
-    { id: 'content', label: 'Content' },
-    { id: 'services', label: 'Services' },
-  ];
-
   const fixes = report.score.fixes ?? report.fixes ?? [];
   const groupedFixes = getGroupedFixes(fixes);
   const effectivePlatformLabel = platformLabel ?? (files ? formatPlatformLabel(files.detectedPlatform) : null);
+  const sectionMeta = getBrandSectionMeta(activeSection);
 
   const handleCopyFile = async (file: GeneratedFile) => {
     try {
@@ -99,30 +70,35 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
 
   return (
     <div className="space-y-6">
-      {/* Sub-tab bar */}
-      <div className="flex gap-1 border-b border-gray-200 pb-px">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'px-4 py-2.5 text-[13px] font-medium transition-colors border-b-2 -mb-px',
-              activeTab === tab.id
-                ? 'border-emerald-500 text-gray-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {sectionMeta && activeSection !== 'presence' && (
+        <DashboardPanel className="overflow-hidden border-gray-200 bg-[linear-gradient(135deg,#f8fafc_0%,#eef6ff_45%,#ecfdf5_100%)] p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-600">
+                Brand Workspace
+              </p>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                {sectionMeta.label}
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {sectionMeta.description}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/75 px-4 py-3 shadow-sm shadow-slate-200/50">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                Current Domain
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{domain}</p>
+            </div>
+          </div>
+        </DashboardPanel>
+      )}
 
-      {activeTab === 'presence' && (
+      {activeSection === 'presence' && (
         <AiPresenceTab report={report} domain={domain} />
       )}
 
-      {activeTab === 'improve' && (
+      {activeSection === 'improve' && (
         <>
           {fixes.length > 0 && <FixSummaryCards fixes={fixes} />}
           <ContentGapsSection domain={domain} />
@@ -134,7 +110,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
                 return (
                   <WorkstreamSection
                     key={group.key}
-                    icon={<GroupIcon className="h-4 w-4 text-gray-400" />}
+                    icon={<GroupIcon className="h-4 w-4 text-gray-500" />}
                     title={group.title}
                     count={group.fixes.length}
                     defaultOpen={groupIdx === 0}
@@ -166,7 +142,7 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
             </div>
           ) : (
             <DashboardPanel className="p-5">
-              <p className="text-center text-sm text-gray-500">No fixes needed. Your site is in great shape!</p>
+              <p className="text-center text-sm text-gray-600">No fixes needed. Your site is in great shape!</p>
             </DashboardPanel>
           )}
 
@@ -174,9 +150,9 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
         </>
       )}
 
-      {activeTab === 'citations' && <CitationTrackingPanel report={report} />}
+      {activeSection === 'citations' && <CitationTrackingPanel report={report} />}
 
-      {activeTab === 'files' && files && files.files.length > 0 && (
+      {activeSection === 'files' && files && files.files.length > 0 && (
         <DashboardPanel className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <SectionTitle eyebrow="Files to deploy" title="Generated assets" description={`${files.files.length} deploy-ready files with verification links`} />
@@ -198,18 +174,18 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
                 <div key={file.filename} className="rounded-[1.1rem] border border-gray-200 bg-gray-50 p-4">
                   {/* File info — always on top */}
                   <div className="flex items-start gap-2.5">
-                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-gray-900">{file.filename}</p>
-                      <p className="mt-0.5 text-[12px] text-gray-500">{meta.subtitle}</p>
+                      <p className="mt-0.5 text-[12px] text-gray-600">{meta.subtitle}</p>
                       {file.installInstructions && (
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400">{file.installInstructions.split('.')[0]}.</p>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-gray-500">{file.installInstructions.split('.')[0]}.</p>
                       )}
                     </div>
                   </div>
                   {/* Actions — always on a separate row */}
                   <div className="mt-3 flex flex-wrap gap-2 pl-[26px]">
-                    <button type="button" onClick={() => handleCopyFilePrompt(file)} className="inline-flex items-center gap-1.5 rounded-xl border border-[#25c972]/20 bg-[#25c972]/[0.06] px-3 py-2 text-xs font-medium text-[#25c972] transition-colors hover:bg-[#25c972]/15">
+                    <button type="button" onClick={() => handleCopyFilePrompt(file)} className="inline-flex items-center gap-1.5 rounded-xl border border-[#25c972]/20 bg-[#25c972]/6 px-3 py-2 text-xs font-medium text-[#25c972] transition-colors hover:bg-[#25c972]/15">
                       <Zap className="h-3.5 w-3.5" />
                       {copiedSinglePrompt === file.filename ? 'Prompt copied!' : 'Copy Prompt'}
                     </button>
@@ -232,24 +208,24 @@ export function BrandSection({ report, files, domain, platformLabel }: BrandSect
         </DashboardPanel>
       )}
 
-      {activeTab === 'files' && (!files || files.files.length === 0) && (
+      {activeSection === 'files' && (!files || files.files.length === 0) && (
         <DashboardPanel className="p-5">
-          <p className="text-center text-sm text-gray-500">No generated files available. Run a scan to generate deployment files.</p>
+          <p className="text-center text-sm text-gray-600">No generated files available. Run a scan to generate deployment files.</p>
         </DashboardPanel>
       )}
 
-      {activeTab === 'traffic' && (
+      {activeSection === 'traffic' && (
         <>
           <PromptAnalyticsPanel domain={domain} />
           <AICrawlerPanel domain={domain} tier={tier} />
         </>
       )}
 
-      {activeTab === 'content' && (
+      {activeSection === 'content' && (
         <ContentGeneratorPanel domain={domain} />
       )}
 
-      {activeTab === 'services' && (
+      {activeSection === 'services' && (
         <FixMySitePanel domain={domain} />
       )}
     </div>
@@ -273,7 +249,7 @@ function FixSummaryCards({ fixes }: { fixes: PrioritizedFix[] }) {
               {quickCount}
             </span>
           </p>
-          <p className="text-[11px] text-gray-500">Minimal effort</p>
+          <p className="text-[11px] text-gray-600">Minimal effort</p>
         </div>
       </div>
       <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
@@ -285,7 +261,7 @@ function FixSummaryCards({ fixes }: { fixes: PrioritizedFix[] }) {
               {deepCount}
             </span>
           </p>
-          <p className="text-[11px] text-gray-500">Requires more effort</p>
+          <p className="text-[11px] text-gray-600">Requires more effort</p>
         </div>
       </div>
     </div>
@@ -318,10 +294,10 @@ function WorkstreamSection({
       >
         {icon}
         <span className="text-sm font-semibold text-gray-900">{title}</span>
-        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-100 px-1.5 text-[11px] font-bold text-gray-500">
+        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-100 px-1.5 text-[11px] font-bold text-gray-600">
           {count}
         </span>
-        <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-gray-400 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-gray-500 transition-transform', open && 'rotate-180')} />
       </button>
       {open && <div className="pt-0">{children}</div>}
     </div>

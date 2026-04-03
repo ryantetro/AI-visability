@@ -79,10 +79,10 @@ export function FixCard({
       {/* Body — collapsed by default */}
       {open && (
         <div className="px-4 pb-4 pt-0 space-y-3">
-          <p className="text-sm leading-6 text-gray-500 pl-9">{fix.detail}</p>
+          <p className="text-sm leading-6 text-gray-600 pl-9">{fix.detail}</p>
 
           <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 ml-9">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">How to fix it</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600">How to fix it</p>
             <p className="mt-2 text-[13px] leading-6 text-gray-700">{fix.instruction}</p>
             {(fix.actualValue || fix.expectedValue) && (
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -117,7 +117,7 @@ function MetricDot({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className={cn('h-2 w-2 rounded-full', metricDotColor(value))} />
-      <span className="text-[10px] text-gray-500">{label}</span>
+      <span className="text-[10px] text-gray-600">{label}</span>
     </div>
   );
 }

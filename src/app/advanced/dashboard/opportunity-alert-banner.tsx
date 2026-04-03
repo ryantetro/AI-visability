@@ -67,7 +67,7 @@ function OpportunityRing({ crawls, referrals }: { crawls: number; referrals: num
         <span className="mt-0.5 text-[20px] font-bold tabular-nums tracking-tight text-gray-900">
           {total > 0 ? Math.round(crawlPct) : 0}%
         </span>
-        <span className="text-[9px] font-medium uppercase tracking-wider text-gray-500">crawls</span>
+        <span className="text-[9px] font-medium uppercase tracking-wider text-gray-600">crawls</span>
       </div>
     </div>
   );
@@ -93,7 +93,7 @@ export function OpportunityAlertBanner({
           </span>
           <Link
             href={buildSettingsHref(opportunity.domain, reportId)}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-white/60 hover:text-gray-700"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-gray-600 transition-colors hover:bg-white/60 hover:text-gray-800"
           >
             <Settings2 className="h-3 w-3" />
             Manage
@@ -106,7 +106,7 @@ export function OpportunityAlertBanner({
             <h2 className="text-[20px] font-semibold leading-tight tracking-[-0.02em] text-gray-900 sm:text-[22px]">
               AI engines are already reading your site
             </h2>
-            <p className="mt-2.5 max-w-xl text-[13px] leading-relaxed text-gray-600">
+            <p className="mt-2.5 max-w-xl text-[13px] leading-relaxed text-gray-700">
               <span className="font-semibold text-gray-900">{opportunity.crawlerVisits.toLocaleString()}</span> crawler visit{opportunity.crawlerVisits === 1 ? '' : 's'} and{' '}
               <span className="font-semibold text-gray-900">{opportunity.referralVisits}</span> AI referral{opportunity.referralVisits === 1 ? '' : 's'} in the last 30 days.
               {' '}Attention is high, but AI-driven visits are still low.
@@ -117,12 +117,12 @@ export function OpportunityAlertBanner({
               <div className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-100/50 px-3 py-1.5">
                 <div className="h-1.5 w-1.5 rounded-full bg-[#ff8a1e]" />
                 <span className="text-[11px] font-semibold tabular-nums text-amber-800">{opportunity.crawlerVisits.toLocaleString()}</span>
-                <span className="text-[11px] text-gray-500">crawls</span>
+                <span className="text-[11px] text-gray-600">crawls</span>
               </div>
               <div className="inline-flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5">
                 <div className="h-1.5 w-1.5 rounded-full bg-[#20b8cd]" />
                 <span className="text-[11px] font-semibold tabular-nums text-teal-800">{opportunity.referralVisits}</span>
-                <span className="text-[11px] text-gray-500">referrals</span>
+                <span className="text-[11px] text-gray-600">referrals</span>
               </div>
             </div>
           </div>
@@ -136,7 +136,7 @@ export function OpportunityAlertBanner({
         {/* Provider chips + CTA — unified row */}
         <div className="mt-6 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white/70 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-gray-500">Top Providers</p>
+            <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-gray-600">Top Providers</p>
             <div className="mt-2.5 flex flex-wrap gap-2">
               {opportunity.topProviders.map((provider) => (
                 <div
@@ -177,8 +177,8 @@ export function OpportunityAlertBanner({
         {opportunity.topPages.length > 0 && (
           <div className="mt-4">
             <div className="flex items-center justify-between px-1">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-gray-500">Top Opportunity Pages</p>
-              <p className="text-[11px] text-gray-500">Highest crawler attention, lowest referrals</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-gray-600">Top Opportunity Pages</p>
+              <p className="text-[11px] text-gray-600">Highest crawler attention, lowest referrals</p>
             </div>
             <div className="mt-2.5 grid gap-2 md:grid-cols-3">
               {opportunity.topPages.map((page, index) => (
@@ -190,14 +190,14 @@ export function OpportunityAlertBanner({
                     <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-[#ff8a1e]/10 text-[10px] font-bold text-[#ff8a1e]">
                       {index + 1}
                     </span>
-                    <span className="text-[10px] font-semibold tabular-nums text-gray-500">
+                    <span className="text-[10px] font-semibold tabular-nums text-gray-600">
                       {page.crawlerVisits} crawl{page.crawlerVisits === 1 ? '' : 's'}
                     </span>
                   </div>
                   <p className="mt-2 truncate text-[12px] font-medium text-gray-800 group-hover:text-gray-900">{page.path}</p>
                   <div className="mt-1.5 flex items-center gap-1.5">
                     <div className="h-1 w-1 rounded-full bg-[#20b8cd]" />
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[10px] text-gray-600">
                       {page.referralVisits} referral{page.referralVisits === 1 ? '' : 's'}
                     </span>
                   </div>

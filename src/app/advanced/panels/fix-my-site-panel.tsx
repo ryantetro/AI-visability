@@ -137,7 +137,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
 
         <div className="mt-6 space-y-4">
           <div>
-            <label htmlFor="fms-domain" className="mb-1.5 block text-[12px] font-medium text-gray-500">
+            <label htmlFor="fms-domain" className="mb-1.5 block text-[12px] font-medium text-gray-600">
               Domain
             </label>
             <input
@@ -151,7 +151,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
           </div>
 
           <div>
-            <label className="mb-2 block text-[12px] font-medium text-gray-500">
+            <label className="mb-2 block text-[12px] font-medium text-gray-600">
               Files to optimize
             </label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -184,8 +184,8 @@ export function FixMySitePanel({ domain }: { domain: string }) {
           </div>
 
           <div>
-            <label htmlFor="fms-notes" className="mb-1.5 block text-[12px] font-medium text-gray-500">
-              Notes <span className="text-gray-400">(optional)</span>
+            <label htmlFor="fms-notes" className="mb-1.5 block text-[12px] font-medium text-gray-600">
+              Notes <span className="text-gray-500">(optional)</span>
             </label>
             <textarea
               id="fms-notes"
@@ -215,7 +215,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
             {submitting ? 'Creating order...' : 'Order for $499'}
           </button>
 
-          <p className="text-center text-[11px] text-gray-400">
+          <p className="text-center text-[11px] text-gray-500">
             One-time payment. 3-5 business day delivery. Secure checkout via Stripe.
           </p>
         </div>
@@ -239,7 +239,7 @@ export function FixMySitePanel({ domain }: { domain: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900">{order.domain}</p>
-                    <p className="mt-0.5 text-[11px] text-gray-500">
+                    <p className="mt-0.5 text-[11px] text-gray-600">
                       {new Date(order.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',

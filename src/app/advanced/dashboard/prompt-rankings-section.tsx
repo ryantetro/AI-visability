@@ -57,7 +57,7 @@ export function PromptRankingsSection({
           </p>
         </div>
         <Link
-          href="/brand"
+          href="/brand/improve"
           className="flex items-center gap-1 text-xs font-semibold text-gray-700 hover:text-gray-900"
         >
           Manage Prompts <ArrowRight className="h-3 w-3" />

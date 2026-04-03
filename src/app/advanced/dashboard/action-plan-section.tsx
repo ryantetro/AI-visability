@@ -73,7 +73,7 @@ export function ActionPlanSection({
         ? `You appear in ${mentionRate}% of AI responses — content and prompt optimization can grow this`
         : 'Run a scan to see how AI engines reference your business',
       status: phase1Done ? (phase2Done ? 'complete' : 'active') : 'locked',
-      cta: { label: 'View Prompts & Content', href: '/brand' },
+      cta: { label: 'View Prompts & Content', href: '/brand/improve' },
       metric: mentionRate !== null ? { value: `${mentionRate}%`, label: 'Mention Rate' } : undefined,
     },
     {
