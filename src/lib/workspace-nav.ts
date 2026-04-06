@@ -21,20 +21,20 @@ export function brandHref(reportId: string | null | undefined): string {
   return withReportQuery('/brand', reportId);
 }
 
-/** Full report with optional section hash. */
+/** Full report (now lives at /dashboard) with optional section hash. */
 export function reportHref(reportId: string | null | undefined, hash?: string): string {
-  const path = withReportQuery('/report', reportId);
+  const path = withReportQuery('/dashboard', reportId);
   return hash ? `${path}#${hash.replace(/^#/, '')}` : path;
 }
 
-/** Dashboard home with hash for AI bot tracking panel. */
+/** Action view (now lives at /report) with hash for AI bot tracking panel. */
 export function dashboardTrackingHref(reportId: string | null | undefined): string {
-  return `${withReportQuery('/dashboard', reportId)}#tracking`;
+  return `${withReportQuery('/report', reportId)}#tracking`;
 }
 
-/** Dashboard with hash for monitoring section. */
+/** Action view (now lives at /report) with hash for monitoring section. */
 export function dashboardMonitoringHref(reportId: string | null | undefined): string {
-  return `${withReportQuery('/dashboard', reportId)}#monitoring`;
+  return `${withReportQuery('/report', reportId)}#monitoring`;
 }
 
 /** Map a fix dimension to its report section anchor ID. Returns null for unknown dimensions. */

@@ -347,7 +347,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
     inputFaviconUrl,
   } = useDomainContext();
   const prefilledDomain = searchParams.get('prefillDomain')?.trim() ?? '';
-  const resumeLandingFlow = sectionKey === 'report' && searchParams.get('autoStart') === '1' && Boolean(prefilledDomain);
+  const resumeLandingFlow = sectionKey === 'dashboard' && searchParams.get('autoStart') === '1' && Boolean(prefilledDomain);
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
