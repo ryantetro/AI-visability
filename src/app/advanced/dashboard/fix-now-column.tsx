@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, Copy, Check, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { reportHref } from '@/lib/workspace-nav';
+import { reportHref, dashboardSectionHref } from '@/lib/workspace-nav';
 import type { PrioritizedFix } from '@/types/score';
 
 interface FixNowColumnProps {
@@ -56,53 +56,69 @@ export function FixNowColumn({ fixes, reportId }: FixNowColumnProps) {
           ))
         ) : topFixes.length > 0 ? (
           /* Returning users: top 3 fixes */
-          topFixes.map((fix, i) => (
-            <div
-              key={fix.checkId}
-              className="group flex items-center gap-2.5 rounded-lg border border-white/5 bg-white/[0.015] px-3 py-2.5 transition-colors hover:border-white/10 hover:bg-white/[0.03]"
-            >
-              <span className={cn(
-                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
-                i === 0 ? 'bg-[#ffbb00]/15 text-[#ffbb00]' : 'bg-white/[0.06] text-zinc-400'
-              )}>
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <p className="truncate text-[12px] font-medium text-zinc-200">{fix.label}</p>
-                  <span className={cn(
-                    'shrink-0 rounded px-1 py-0.5 text-[8px] font-bold uppercase',
-                    fix.category === 'ai'
-                      ? 'bg-[#a855f7]/15 text-[#a855f7]'
-                      : 'bg-[#3b82f6]/15 text-[#3b82f6]'
-                  )}>
-                    {fix.category === 'ai' ? 'AI' : 'Web'}
-                  </span>
+          topFixes.map((fix, i) => {
+            const sectionHref = dashboardSectionHref(reportId, fix.dimension);
+            const wrapperClass = "group flex items-center gap-2.5 rounded-lg border border-white/5 bg-white/[0.015] px-3 py-2.5 transition-colors hover:border-white/10 hover:bg-white/[0.03]";
+
+            const children = (
+              <>
+                <span className={cn(
+                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                  i === 0 ? 'bg-[#ffbb00]/15 text-[#ffbb00]' : 'bg-white/[0.06] text-zinc-400'
+                )}>
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-[12px] font-medium text-zinc-200">{fix.label}</p>
+                    <span className={cn(
+                      'shrink-0 rounded px-1 py-0.5 text-[8px] font-bold uppercase',
+                      fix.category === 'ai'
+                        ? 'bg-[#a855f7]/15 text-[#a855f7]'
+                        : 'bg-[#3b82f6]/15 text-[#3b82f6]'
+                    )}>
+                      {fix.category === 'ai' ? 'AI' : 'Web'}
+                    </span>
+                  </div>
                 </div>
+                <span className="shrink-0 text-[10px] font-semibold text-[#25c972]">
+                  +{fix.estimatedLift}pts
+                </span>
+                <span className={cn(
+                  'shrink-0 rounded px-1 py-0.5 text-[8px] font-semibold',
+                  fix.effortBand === 'quick'
+                    ? 'bg-[#25c972]/10 text-[#25c972]'
+                    : fix.effortBand === 'medium'
+                      ? 'bg-[#ffbb00]/10 text-[#ffbb00]'
+                      : 'bg-[#ff8a1e]/10 text-[#ff8a1e]'
+                )}>
+                  {fix.effortBand.charAt(0).toUpperCase() + fix.effortBand.slice(1)}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCopy(fix, i);
+                  }}
+                  className="shrink-0 rounded p-1 text-zinc-600 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100"
+                  aria-label="Copy fix"
+                >
+                  {copiedIdx === i ? <Check className="h-3 w-3 text-[#25c972]" /> : <Copy className="h-3 w-3" />}
+                </button>
+              </>
+            );
+
+            return sectionHref ? (
+              <Link key={fix.checkId} href={sectionHref} className={wrapperClass}>
+                {children}
+              </Link>
+            ) : (
+              <div key={fix.checkId} className={wrapperClass}>
+                {children}
               </div>
-              <span className="shrink-0 text-[10px] font-semibold text-[#25c972]">
-                +{fix.estimatedLift}pts
-              </span>
-              <span className={cn(
-                'shrink-0 rounded px-1 py-0.5 text-[8px] font-semibold',
-                fix.effortBand === 'quick'
-                  ? 'bg-[#25c972]/10 text-[#25c972]'
-                  : fix.effortBand === 'medium'
-                    ? 'bg-[#ffbb00]/10 text-[#ffbb00]'
-                    : 'bg-[#ff8a1e]/10 text-[#ff8a1e]'
-              )}>
-                {fix.effortBand.charAt(0).toUpperCase() + fix.effortBand.slice(1)}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleCopy(fix, i)}
-                className="shrink-0 rounded p-1 text-zinc-600 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100"
-                aria-label="Copy fix"
-              >
-                {copiedIdx === i ? <Check className="h-3 w-3 text-[#25c972]" /> : <Copy className="h-3 w-3" />}
-              </button>
-            </div>
-          ))
+            );
+          })
         ) : (
           <p className="py-4 text-center text-[12px] text-zinc-600">No fixes needed right now</p>
         )}

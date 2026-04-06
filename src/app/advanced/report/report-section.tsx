@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Copy, ArrowUpRight, RefreshCw, Share2, Check, Zap, FileCode, Search, Shield, Gauge } from 'lucide-react';
 import { ScoreSummaryHero } from '@/components/app/score-summary-hero';
 import { MentionWhyScoreCallout } from '@/components/app/mention-why-score-callout';
@@ -117,6 +117,19 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
   const assetPreview = report.assetPreview ?? null;
   const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'copied'>('idle');
+
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (!hash) return;
+    // Small delay to ensure DOM is rendered
+    const timer = setTimeout(() => {
+      const el = document.getElementById(hash);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleCopyPrompt = (key: string, prompt: string | undefined) => {
     if (!prompt) return;
