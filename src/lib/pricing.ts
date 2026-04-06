@@ -151,6 +151,7 @@ export function canAccess(userPlan: PlanTier, requiredTier: PlanTier): boolean {
 export const NAV_GATES: Record<string, PlanTier> = {
   dashboard: 'starter',
   report: 'free',
+  actions: 'free',
   brand: 'starter',
   competitors: 'pro',
   history: 'starter',
