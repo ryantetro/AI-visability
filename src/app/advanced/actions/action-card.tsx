@@ -42,7 +42,8 @@ export function ActionCard({ item, onToggle, index }: ActionCardProps) {
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all',
+        'group relative flex items-center gap-4 overflow-hidden rounded-2xl border py-4 pr-5 transition-all',
+        isDone ? 'pl-5' : 'pl-[18px]',
         item.isRegression
           ? 'border-[#ffbb00]/25 bg-[#ffbb00]/[0.04]'
           : isDone
@@ -50,9 +51,9 @@ export function ActionCard({ item, onToggle, index }: ActionCardProps) {
             : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]',
       )}
     >
-      {/* Left accent bar */}
+      {/* Left accent bar — flush with card edge, uses border-radius from overflow-hidden */}
       {!isDone && (
-        <div className={cn('absolute left-0 top-3 bottom-3 w-[3px] rounded-full', accentColor)} />
+        <div className={cn('absolute inset-y-0 left-0 w-[3px]', accentColor)} />
       )}
 
       {/* Step number or checkbox */}
