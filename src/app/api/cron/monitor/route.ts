@@ -25,13 +25,13 @@ interface CronPromptMonitoringSummary {
   queued: boolean;
 }
 
-/** Site rescans run in background via after(). Default 1 per cron run, override 0–5 via CRON_MAX_RESCANS_PER_RUN. */
+/** Site rescans run in background via after(). Default 10 per cron run, override 0–50 via CRON_MAX_RESCANS_PER_RUN. */
 function getCronMaxRescansPerRun(): number {
   const raw = process.env.CRON_MAX_RESCANS_PER_RUN;
-  if (raw === undefined || raw === '') return 1;
+  if (raw === undefined || raw === '') return 10;
   const n = parseInt(raw, 10);
-  if (!Number.isFinite(n)) return 1;
-  return Math.min(5, Math.max(0, n));
+  if (!Number.isFinite(n)) return 10;
+  return Math.min(50, Math.max(0, n));
 }
 
 /** Cap AI engine calls in Phase 2 per cron invocation (each prompt × engine). Increase via CRON_MAX_PROMPT_ENGINE_CALLS if your platform allows longer functions. */
@@ -177,8 +177,6 @@ export async function GET(request: NextRequest) {
       const maxRescans = getCronMaxRescansPerRun();
 
       for (const record of monitoredDomains) {
-        if (rescanCount >= maxRescans) break;
-
         try {
           const domain = getDomain(record.url);
           const latestScan = await db.findLatestScanByDomain(domain);
@@ -186,6 +184,11 @@ export async function GET(request: NextRequest) {
 
           if (Date.now() - lastCompleted < RESCAN_STALENESS_MS) {
             rescans.push({ domain, status: 'recent, skipping' });
+            continue;
+          }
+
+          if (rescanCount >= maxRescans) {
+            rescans.push({ domain, status: 'limit reached, skipping' });
             continue;
           }
 

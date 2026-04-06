@@ -36,10 +36,11 @@ export async function GET(request: NextRequest) {
   const cv = getCrawlerVisits();
 
   try {
-    // Fetch double the period for trend comparison
-    const [summaries, visits] = await Promise.all([
+    // Fetch double the period for trend comparison, plus accurate total count
+    const [summaries, visits, totalVisitCount] = await Promise.all([
       cv.listVisitSummaries(domain, days),
       cv.listVisits(domain, days * 2),
+      cv.countVisits(domain, days),
     ]);
 
     const now = Date.now();
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       summaries,
       timeline,
-      totalVisits: currentVisits.length,
+      totalVisits: totalVisitCount,
       providerTimeline,
       providerSummaries,
     });

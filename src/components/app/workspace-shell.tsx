@@ -136,7 +136,7 @@ export function WorkspaceShell({
         <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
           <NoDomainState sectionKey={sectionKey} onOpenUnlock={() => setUnlockModalOpen(true)} />
         </main>
-        <FloatingFeedback />
+        <FloatingFeedback userEmail={authUser?.email} />
         <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
       </div>
     );
@@ -175,7 +175,7 @@ export function WorkspaceShell({
             actionError={actionError}
           />
         </main>
-        <FloatingFeedback />
+        <FloatingFeedback userEmail={authUser?.email} />
       </div>
     );
   }
@@ -308,7 +308,7 @@ export function WorkspaceShell({
 
         {children(ctx)}
       </main>
-      <FloatingFeedback />
+      <FloatingFeedback userEmail={authUser?.email} />
       <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Clock, Copy, CreditCard, ExternalLink, KeyRound, Loader2, Lock, Mail, RefreshCw, Trash2, UserMinus, UserPlus, Users, Zap } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Clock, Copy, CreditCard, ExternalLink, KeyRound, Loader2, Lock, Mail, MessageSquare, RefreshCw, Trash2, UserMinus, UserPlus, Users, Zap } from 'lucide-react';
 import { isUnlimitedPlanLimit } from '@/lib/account-access-overrides';
 import { cn } from '@/lib/utils';
 import { buildBotTrackingInstallPrompt, buildBotTrackingSnippet, type BotTrackingRuntime } from '@/lib/llm-prompts';
@@ -452,6 +452,20 @@ export function SettingsSection({
   };
   const { monitoredSites, handleUnlockComplete } = useDomainContext();
   const displayEmail = user?.email ?? email;
+
+  /* ── Admin feedback viewer state ──────────────────────────── */
+  const [feedbackItems, setFeedbackItems] = useState<{
+    id: string;
+    user_email: string;
+    user_name: string | null;
+    category: string;
+    message: string;
+    page_url: string | null;
+    created_at: string;
+  }[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackLoaded, setFeedbackLoaded] = useState(false);
+
   const activePromptMetric = activeReadiness?.metrics.find((metric) => metric.category === 'prompts') ?? null;
   const activeDomainMetric = activeReadiness?.metrics.find((metric) => metric.category === 'domains') ?? null;
   const billingOwnerEmail = billingStatus.status?.billingOwner.email ?? null;
@@ -1241,13 +1255,16 @@ export function SettingsSection({
   };
 
   /* ── Tabs ────────────────────────────────────────────────────── */
-  type SettingsTab = 'general' | 'team' | 'monitoring' | 'platforms';
+  type SettingsTab = 'general' | 'team' | 'monitoring' | 'platforms' | 'feedback';
+
+  const isAdmin = user?.email === 'ryantetro@gmail.com';
 
   const TABS: { key: SettingsTab; label: string; icon: ReactNode }[] = [
     { key: 'general', label: 'General', icon: <CreditCard className="h-3.5 w-3.5" /> },
     { key: 'team', label: 'Team', icon: <Users className="h-3.5 w-3.5" /> },
     { key: 'monitoring', label: 'Monitoring', icon: <Mail className="h-3.5 w-3.5" /> },
     { key: 'platforms', label: 'Platforms', icon: <KeyRound className="h-3.5 w-3.5" /> },
+    ...(isAdmin ? [{ key: 'feedback' as const, label: 'Feedback', icon: <MessageSquare className="h-3.5 w-3.5" /> }] : []),
   ];
 
   const getInitialTab = useCallback((): SettingsTab => {
@@ -1263,6 +1280,21 @@ export function SettingsSection({
     setActiveTab(tab);
     window.history.replaceState(null, '', `#${tab}`);
   }, []);
+
+  /* ── Fetch admin feedback ─────────────────────────────────── */
+  useEffect(() => {
+    if (activeTab !== 'feedback' || !isAdmin || feedbackLoaded) return;
+
+    setFeedbackLoading(true);
+    fetch('/api/feedback')
+      .then((res) => res.json())
+      .then((data) => {
+        setFeedbackItems(data.feedback ?? []);
+        setFeedbackLoaded(true);
+      })
+      .catch(() => {})
+      .finally(() => setFeedbackLoading(false));
+  }, [activeTab, isAdmin, feedbackLoaded]);
 
   /* ── Shared button styles ──────────────────────────────────────── */
   const btnBase = 'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors disabled:opacity-50';
@@ -2825,6 +2857,80 @@ export function SettingsSection({
         </Card>
       </section>
 
+      </>
+      )}
+
+      {/* ─── FEEDBACK TAB (admin only) ──────────────────────────── */}
+      {activeTab === 'feedback' && isAdmin && (
+      <>
+      <section>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[15px] font-semibold text-white">User Feedback</h2>
+            <p className="mt-1 text-[12px] text-zinc-500">
+              {feedbackLoading ? 'Loading...' : `${feedbackItems.length} submission${feedbackItems.length !== 1 ? 's' : ''}`}
+            </p>
+          </div>
+          {feedbackLoaded && (
+            <button
+              type="button"
+              onClick={() => { setFeedbackLoaded(false); }}
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 transition-colors hover:text-zinc-300"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Refresh
+            </button>
+          )}
+        </div>
+
+        {feedbackLoading ? (
+          <div className="mt-4 flex items-center gap-2 text-[13px] text-zinc-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading feedback...
+          </div>
+        ) : feedbackItems.length === 0 ? (
+          <Card className="mt-4">
+            <div className="px-5 py-8 text-center text-[13px] text-zinc-500">
+              No feedback submitted yet.
+            </div>
+          </Card>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {feedbackItems.map((item) => (
+              <Card key={item.id} className="!p-0">
+                <div className="px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[12px] text-zinc-400">{item.user_email}</span>
+                    <span className={cn(
+                      'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                      item.category === 'bug' && 'bg-red-500/10 text-red-400',
+                      item.category === 'feature' && 'bg-sky-500/10 text-sky-400',
+                      item.category === 'general' && 'bg-white/[0.06] text-zinc-400',
+                    )}>
+                      {item.category === 'bug' ? 'Bug' : item.category === 'feature' ? 'Feature' : 'General'}
+                    </span>
+                    <span className="ml-auto text-[11px] text-zinc-600">
+                      {new Date(item.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                  <p className="mt-2.5 whitespace-pre-wrap text-[13px] leading-6 text-zinc-300">
+                    {item.message}
+                  </p>
+                  {item.page_url && (
+                    <p className="mt-2 truncate text-[11px] text-zinc-600">{item.page_url}</p>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
       </>
       )}
 

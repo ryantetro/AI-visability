@@ -117,10 +117,12 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
   const assetPreview = report.assetPreview ?? null;
   const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'copied'>('idle');
+  const [activeHash, setActiveHash] = useState<string | null>(null);
 
   useEffect(() => {
     const hash = window.location.hash.replace('#', '');
     if (!hash) return;
+    setActiveHash(hash);
     // Small delay to ensure DOM is rendered
     const timer = setTimeout(() => {
       const el = document.getElementById(hash);
@@ -304,6 +306,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
               passCount={mentionPass}
               failCount={mentionFail}
               unknownCount={engines.length - mentionPass - mentionFail}
+              forceExpanded={activeHash === 'section-ai-mentions'}
               checks={[]}
               subSections={[
                 {
@@ -392,6 +395,7 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
             passCount={fixes.filter((f) => f.category === 'ai').length}
             failCount={fixes.filter((f) => f.category === 'web').length}
             unknownCount={0}
+            forceExpanded={activeHash === 'section-repair-queue'}
             checks={fixes.slice(0, 10).map((fix) => ({
               label: fix.label,
               detail: `${fix.instruction} (+${fix.estimatedLift} pts, ${fix.effortBand} effort)`,
@@ -421,8 +425,9 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
               scoreColor={scoreColor(avgScore)}
               onCopyToLlm={readinessPrompt ? () => handleCopyPrompt('aiReadiness', readinessPrompt) : undefined}
               copied={copiedPromptKey === 'aiReadiness'}
-              copyLabel="Copy AI discoverability fixes to ChatGPT"
+              copyLabel="Copy AI discoverability fixes to AI"
               copiedLabel="Copied!"
+              forceExpanded={activeHash === 'section-ai-readiness'}
               passCount={allChecks.filter((c) => c.verdict === 'pass').length}
               failCount={allChecks.filter((c) => c.verdict === 'fail').length}
               unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
@@ -457,8 +462,9 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
               scoreColor={scoreColor(avgScore)}
               onCopyToLlm={contentPrompt ? () => handleCopyPrompt('contentAuthority', contentPrompt) : undefined}
               copied={copiedPromptKey === 'contentAuthority'}
-              copyLabel="Copy content fixes to ChatGPT"
+              copyLabel="Copy content fixes to AI"
               copiedLabel="Copied!"
+              forceExpanded={activeHash === 'section-content-authority'}
               passCount={allChecks.filter((c) => c.verdict === 'pass').length}
               failCount={allChecks.filter((c) => c.verdict === 'fail').length}
               unknownCount={allChecks.filter((c) => c.verdict === 'unknown').length}
@@ -504,8 +510,9 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
               scoreColor={scoreColor(qualityPillar?.percentage ?? webHealth?.percentage ?? null)}
               onCopyToLlm={qualityPrompt ? () => handleCopyPrompt('websiteQuality', qualityPrompt) : undefined}
               copied={copiedPromptKey === 'websiteQuality'}
-              copyLabel="Copy quality fixes to ChatGPT"
+              copyLabel="Copy quality fixes to AI"
               copiedLabel="Copied!"
+              forceExpanded={activeHash === 'section-website-quality'}
               passCount={qualityPass}
               failCount={qualityFail}
               unknownCount={qualityUnknown}
@@ -547,8 +554,9 @@ export function ReportSection({ report, files, domain, onReaudit, reauditing, on
               scoreColor={scoreColor(avgScore)}
               onCopyToLlm={performancePrompt ? () => handleCopyPrompt('performanceSecurity', performancePrompt) : undefined}
               copied={copiedPromptKey === 'performanceSecurity'}
-              copyLabel="Copy security fixes to ChatGPT"
+              copyLabel="Copy security fixes to AI"
               copiedLabel="Copied!"
+              forceExpanded={activeHash === 'section-performance-security'}
               passCount={totalPass}
               failCount={totalFail}
               unknownCount={totalUnknown}
@@ -621,7 +629,7 @@ function TakeActionSection({
   if (copyToLlm?.fullPrompt) {
     steps.push({
       icon: <Copy className="h-5 w-5" />,
-      title: 'Copy fix prompt into ChatGPT or Claude',
+      title: 'Copy fix prompt into your AI assistant',
       description: 'Use the full-site fix prompt with an AI assistant to get step-by-step implementation guidance tailored to your site.',
       priority: 'high',
       scrollTarget: 'section-repair-queue',

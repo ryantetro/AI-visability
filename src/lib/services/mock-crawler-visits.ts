@@ -23,6 +23,11 @@ export const mockCrawlerVisits: CrawlerVisitService = {
       .sort((a, b) => new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime());
   },
 
+  async countVisits(domain, days = 30) {
+    const cutoff = Date.now() - days * 86400000;
+    return visits.filter((v) => v.domain === domain && new Date(v.visitedAt).getTime() >= cutoff).length;
+  },
+
   async listVisitSummaries(domain, days = 30): Promise<CrawlerVisitSummary[]> {
     const cutoff = Date.now() - days * 86400000;
     const relevant = visits.filter(

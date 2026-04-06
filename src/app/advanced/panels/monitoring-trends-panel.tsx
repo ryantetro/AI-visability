@@ -1,13 +1,10 @@
 'use client';
 
-import { useId } from 'react';
 import { Bell } from 'lucide-react';
 import {
-  Area,
   CartesianGrid,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,141 +16,37 @@ import { formatShortDate, formatRelativeTime, scoreColor } from '../lib/utils';
 import type { RecentScanData } from '../lib/types';
 import { getDomain } from '@/lib/url-utils';
 
-const axisFont =
-  'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-
-function dayKeyFromTs(ts: number): string {
-  return new Date(ts).toISOString().slice(0, 10);
-}
-
-/** Recharts XAxis tick: date on first line, time on second when multiple scans fall on the same day. */
-function ScoreTrendXAxisTick({
-  x,
-  y,
-  payload,
-  scansPerDay,
-}: {
-  x: number | string;
-  y: number | string;
-  payload: { value?: number };
-  scansPerDay: Record<string, number>;
-}) {
-  const nx = Number(x);
-  const ny = Number(y);
-  const ts = payload.value;
-  if (ts == null || Number.isNaN(ts)) return null;
-  const d = new Date(ts);
-  const dayKey = dayKeyFromTs(ts);
-  const showTime = (scansPerDay[dayKey] ?? 0) > 1;
-  const dateStr = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(d);
-  const timeStr = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(d);
-
-  const textStyle = {
-    fontFamily: axisFont,
-    fontFeatureSettings: '"tnum"',
-  } as const;
-
-  if (showTime) {
-    return (
-      <g transform={`translate(${nx},${ny})`}>
-        <text
-          textAnchor="middle"
-          fill="#d4d4d8"
-          fontSize={11}
-          fontWeight={600}
-          dy={10}
-          style={textStyle}
-        >
-          {dateStr}
-        </text>
-        <text
-          textAnchor="middle"
-          fill="#71717a"
-          fontSize={10}
-          fontWeight={500}
-          letterSpacing="0.02em"
-          dy={24}
-          style={textStyle}
-        >
-          {timeStr}
-        </text>
-      </g>
-    );
-  }
-
-  return (
-    <g transform={`translate(${nx},${ny})`}>
-      <text
-        textAnchor="middle"
-        fill="#d4d4d8"
-        fontSize={11}
-        fontWeight={600}
-        letterSpacing="0.01em"
-        dy={12}
-        style={textStyle}
-      >
-        {dateStr}
-      </text>
-    </g>
-  );
-}
-
-function ScoreTrendYAxisTick({
-  x,
-  y,
-  payload,
-}: {
-  x: number | string;
-  y: number | string;
-  payload: { value?: number };
-}) {
-  const v = payload.value;
-  if (v == null) return null;
-  return (
-    <g transform={`translate(${Number(x)},${Number(y)})`}>
-      <text
-        textAnchor="end"
-        fill="#71717a"
-        fontSize={10}
-        fontWeight={500}
-        dx={-6}
-        dy={4}
-        style={{ fontFamily: axisFont, fontFeatureSettings: '"tnum"' }}
-      >
-        {Math.round(v)}
-      </text>
-    </g>
-  );
-}
+const SCORE_COLOR = '#25c972';
 
 function ScoreTrendTooltip({
   active,
   payload,
+  label,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{
     value?: number;
-    payload?: { fullDate?: string };
+    payload?: { label?: string };
   }>;
+  label?: string;
 }) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload;
   const value = payload[0]?.value;
   if (typeof value !== 'number') return null;
   return (
-    <div className="rounded-xl border border-white/[0.12] bg-zinc-950/95 px-3.5 py-2.5 shadow-2xl shadow-black/40 backdrop-blur-md">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">When</p>
-      <p className="mt-1 text-[13px] font-medium leading-snug text-zinc-100 tabular-nums">
-        {row?.fullDate ?? '—'}
-      </p>
-      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Score</p>
-      <p className="mt-0.5 flex items-baseline gap-1">
-        <span className="text-xl font-bold tabular-nums tracking-tight text-[#25c972]">{Math.round(value)}</span>
-        <span className="text-[13px] font-medium tabular-nums text-zinc-500">/ 100</span>
-      </p>
+    <div className="pointer-events-none select-none rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 shadow-lg">
+      <p className="text-[11px] font-medium text-zinc-400 mb-1.5">{row?.label ?? label ?? '—'}</p>
+      <div className="flex items-center gap-2 py-0.5">
+        <span
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ backgroundColor: SCORE_COLOR }}
+        />
+        <span className="text-[11px] text-zinc-300">Score</span>
+        <span className="ml-auto text-[11px] font-semibold tabular-nums text-white">
+          {Math.round(value)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -164,10 +57,6 @@ function getTrendScore(scan: RecentScanData): number | null {
 
 function getScanTimestamp(scan: RecentScanData): number {
   return scan.completedAt ?? scan.createdAt;
-}
-
-function svgDefId(reactId: string, suffix: string): string {
-  return `${suffix}-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 }
 
 export function MonitoringTrendsPanel({
@@ -185,10 +74,6 @@ export function MonitoringTrendsPanel({
   monitoringLoading: boolean;
   onEnableMonitoring: () => void;
 }) {
-  const chartDefsId = useId();
-  const lineGradId = svgDefId(chartDefsId, 'scoreTrendLine');
-  const areaGradId = svgDefId(chartDefsId, 'scoreTrendArea');
-
   const domainScans = recentScans
     .filter((scan) => getDomain(scan.url) === domain)
     .map((scan) => ({
@@ -199,23 +84,16 @@ export function MonitoringTrendsPanel({
     .filter((entry): entry is { scan: RecentScanData; timestamp: number; score: number } => entry.score != null)
     .sort((a, b) => a.timestamp - b.timestamp);
 
-  const scansPerDay = domainScans.reduce<Record<string, number>>((acc, entry) => {
-    const dayKey = new Date(entry.timestamp).toISOString().slice(0, 10);
-    acc[dayKey] = (acc[dayKey] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const chartData = domainScans.map((entry) => ({
-    timestamp: entry.timestamp,
-    score: entry.score,
-    fullDate: new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(entry.timestamp),
-  }));
+  const chartData = domainScans.map((entry) => {
+    const d = new Date(entry.timestamp);
+    const month = d.toLocaleString('en-US', { month: 'short' });
+    const day = d.getDate();
+    return {
+      timestamp: entry.timestamp,
+      score: entry.score,
+      label: `${month} ${day}`,
+    };
+  });
 
   const lastScan = domainScans[domainScans.length - 1]?.scan ?? null;
   const displayedLastScannedAt = lastScannedAt ?? (lastScan ? getScanTimestamp(lastScan) : null);
@@ -225,11 +103,6 @@ export function MonitoringTrendsPanel({
       ? Math.round((getTrendScore(lastScan) ?? 0) - (getTrendScore(prevScan) ?? 0))
       : null;
 
-  const trendSpanDays =
-    chartData.length < 2
-      ? 0
-      : (chartData[chartData.length - 1].timestamp - chartData[0].timestamp) / 86_400_000;
-
   return (
     <DashboardPanel id="monitoring" className="scroll-mt-6 p-5">
       <SectionTitle eyebrow="Monitoring" title="Score Trends" description="Track how your AI visibility score changes over time." />
@@ -237,94 +110,69 @@ export function MonitoringTrendsPanel({
       <div className="mt-5">
         {chartData.length >= 2 ? (
           <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
-            <ResponsiveContainer width="100%" height={252}>
-              <LineChart
-                data={chartData}
-                margin={{ left: 6, right: 10, top: 20, bottom: 6 }}
-              >
-                <defs>
-                  <linearGradient id={lineGradId} x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#1daf64" />
-                    <stop offset="100%" stopColor="#3ee89b" />
-                  </linearGradient>
-                  <linearGradient id={areaGradId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#25c972" stopOpacity={0.2} />
-                    <stop offset="55%" stopColor="#25c972" stopOpacity={0.06} />
-                    <stop offset="100%" stopColor="#25c972" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="4 6"
-                  stroke="rgba(255,255,255,0.06)"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="timestamp"
-                  type="number"
-                  domain={['dataMin', 'dataMax']}
-                  axisLine={false}
-                  tickLine={false}
-                  minTickGap={trendSpanDays > 14 ? 32 : 44}
-                  tick={(props) => (
-                    <ScoreTrendXAxisTick {...props} scansPerDay={scansPerDay} />
-                  )}
-                  height={56}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  axisLine={false}
-                  tickLine={false}
-                  ticks={[0, 25, 50, 75, 100]}
-                  width={38}
-                  tick={ScoreTrendYAxisTick}
-                  label={{
-                    value: 'Score',
-                    angle: -90,
-                    position: 'insideLeft',
-                    offset: 10,
-                    style: {
-                      fill: '#71717a',
-                      fontSize: 9,
-                      fontWeight: 600,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      fontFamily: axisFont,
-                    },
-                  }}
-                />
-                <Tooltip
-                  content={<ScoreTrendTooltip />}
-                  cursor={{ stroke: 'rgba(255,255,255,0.12)', strokeWidth: 1 }}
-                  wrapperStyle={{ outline: 'none' }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="score"
-                  stroke="none"
-                  fill={`url(#${areaGradId})`}
-                  isAnimationActive={false}
-                />
-                {chartData.map((row) => (
-                  <ReferenceLine
-                    key={row.timestamp}
-                    x={row.timestamp}
-                    stroke="rgba(255,255,255,0.07)"
-                    strokeDasharray="3 6"
-                    strokeWidth={1}
+            <div className="h-[340px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 16, right: 24, bottom: 8, left: 4 }}
+                >
+                  <defs>
+                    <filter id="score-glow">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                      <feMerge>
+                        <feMergeNode in="coloredBlur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="rgba(255,255,255,0.04)"
+                    vertical={false}
                   />
-                ))}
-                <Line
-                  type="monotone"
-                  dataKey="score"
-                  stroke={`url(#${lineGradId})`}
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  dot={{ fill: '#3ee89b', stroke: '#09090b', strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 7, fill: '#3ee89b', stroke: '#fff', strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+                  <XAxis
+                    dataKey="label"
+                    axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: '#52525b' }}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    ticks={[0, 25, 50, 75, 100]}
+                    tick={{ fontSize: 10, fill: '#3f3f46' }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                    width={32}
+                  />
+                  <Tooltip
+                    content={<ScoreTrendTooltip />}
+                    cursor={{ stroke: 'rgba(255,255,255,0.06)' }}
+                    wrapperStyle={{ pointerEvents: 'none' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke={SCORE_COLOR}
+                    strokeWidth={2}
+                    dot={{
+                      r: 3,
+                      fill: '#0a0a0c',
+                      stroke: SCORE_COLOR,
+                      strokeWidth: 2,
+                    }}
+                    activeDot={{
+                      r: 5,
+                      fill: SCORE_COLOR,
+                      stroke: '#0a0a0c',
+                      strokeWidth: 2,
+                    }}
+                    style={{ filter: `drop-shadow(0 0 4px ${SCORE_COLOR}44)` }}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         ) : chartData.length === 1 ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-6 py-8 text-center">

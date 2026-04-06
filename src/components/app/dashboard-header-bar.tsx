@@ -105,7 +105,10 @@ export function DashboardHeaderBar() {
   const planLabel = tier !== 'free' ? `${PLANS[tier].name} Plan` : 'Free Plan';
 
   return (
-    <header className="sticky top-0 z-30 flex h-[var(--header-bar-height)] shrink-0 items-center justify-between border-b border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] px-6">
+    <header
+      className="sticky top-0 z-30 flex h-[var(--header-bar-height)] shrink-0 items-center justify-between bg-[var(--sidebar-bg)] px-6"
+      style={{ borderBottom: '1px solid transparent', borderImage: 'linear-gradient(to right, rgba(255,255,255,0.06), rgba(255,255,255,0.03)) 1' }}
+    >
       {/* Left — page title (with spacing for mobile hamburger) */}
       <div className="flex items-center gap-3">
         <div className="w-10 md:hidden" /> {/* spacer for hamburger button */}

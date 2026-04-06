@@ -68,11 +68,26 @@ export const supabaseCrawlerVisits: CrawlerVisitService = {
 
     const cutoff = new Date(Date.now() - days * 86400000).toISOString();
     const res = await fetch(
-      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=2000&select=*`),
+      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=50000&select=*`),
       { headers: supabaseHeaders(), cache: 'no-store' }
     );
     if (!res.ok) throw new Error(`Failed to list visits: ${res.status}`);
     return ((await res.json()) as VisitRow[]).map(fromRow);
+  },
+
+  async countVisits(domain, days = 30) {
+    if (!hasSupabaseConfig()) throw new Error('Supabase is not configured.');
+
+    const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+    const res = await fetch(
+      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&select=id&limit=1`),
+      { headers: supabaseHeaders({ Prefer: 'count=exact' }), cache: 'no-store' }
+    );
+    if (!res.ok) return 0;
+    const range = res.headers.get('content-range');
+    if (!range) return 0;
+    const total = range.split('/')[1];
+    return total && total !== '*' ? parseInt(total, 10) : 0;
   },
 
   async listVisitSummaries(domain, days = 30): Promise<CrawlerVisitSummary[]> {
@@ -80,7 +95,7 @@ export const supabaseCrawlerVisits: CrawlerVisitService = {
 
     const cutoff = new Date(Date.now() - days * 86400000).toISOString();
     const res = await fetch(
-      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=1000&select=bot_name,bot_category,page_path,visited_at`),
+      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=50000&select=bot_name,bot_category,page_path,visited_at`),
       { headers: supabaseHeaders(), cache: 'no-store' }
     );
     if (!res.ok) throw new Error(`Failed to list visit summaries: ${res.status}`);

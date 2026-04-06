@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Copy, HelpCircle, Info, Lock, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
@@ -55,6 +55,8 @@ interface YwsBreakdownSectionProps {
   checks: CheckItem[];
   subSections?: SubSection[];
   defaultExpanded?: boolean;
+  /** When true, forces the section open (used for hash-based deep-linking) */
+  forceExpanded?: boolean;
   showClickHint?: boolean;
   /** When false, all checks show as Locked until upgrade. When true, show full check details. */
   hasPaid?: boolean;
@@ -79,12 +81,16 @@ export function YwsBreakdownSection({
   checks,
   subSections,
   defaultExpanded = false,
+  forceExpanded = false,
   showClickHint = false,
   hasPaid = false,
   tooltip,
   onLockedClick,
 }: YwsBreakdownSectionProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expanded, setExpanded] = useState(defaultExpanded || forceExpanded);
+  useEffect(() => {
+    if (forceExpanded) setExpanded(true);
+  }, [forceExpanded]);
   const displayScore = score !== null ? score : 0;
   const sections = subSections ?? [{ label: '', checks }];
 

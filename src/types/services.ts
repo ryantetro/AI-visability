@@ -150,6 +150,7 @@ export interface CrawlerVisitService {
   logVisit(visit: Omit<CrawlerVisit, 'id' | 'visitedAt'>): Promise<void>;
   listVisits(domain: string, days?: number): Promise<CrawlerVisit[]>;
   listVisitSummaries(domain: string, days?: number): Promise<CrawlerVisitSummary[]>;
+  countVisits(domain: string, days?: number): Promise<number>;
 }
 
 export type SourceEngine = 'chatgpt' | 'perplexity' | 'gemini' | 'claude' | 'grok';
@@ -167,6 +168,7 @@ export interface ReferralVisit {
 export interface ReferralVisitService {
   logVisit(visit: Omit<ReferralVisit, 'id' | 'visitedAt'>): Promise<void>;
   listVisits(domain: string, days?: number): Promise<ReferralVisit[]>;
+  countVisits(domain: string, days?: number): Promise<number>;
 }
 
 export interface OpportunityAlertProviderSummary {

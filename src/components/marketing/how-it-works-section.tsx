@@ -5,7 +5,7 @@ import { FadeIn, StaggerGrid, StaggerItem } from '@/components/marketing/motion'
 const STEPS = [
   { step: '1', title: 'Enter your URL', desc: 'We crawl your site the same way AI bots do — checking 19 factors across content, structure, and AI crawler access.' },
   { step: '2', title: 'See your score', desc: 'Get a 0–100 score with a clear breakdown of what AI engines can (and can’t) find, plus a prioritized fix list.' },
-  { step: '3', title: 'Fix everything', desc: 'Download ready-to-install files customized for your site — plus copy-paste prompts for ChatGPT or Claude to guide you step by step.' },
+  { step: '3', title: 'Fix everything', desc: 'Download ready-to-install files customized for your site — plus copy-paste prompts for any AI assistant to guide you step by step.' },
 ] as const;
 
 export function HowItWorksSection() {

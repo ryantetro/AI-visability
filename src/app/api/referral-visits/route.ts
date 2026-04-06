@@ -37,7 +37,10 @@ export async function GET(request: NextRequest) {
   const rv = getReferralVisits();
 
   try {
-    const visits = await rv.listVisits(domain, days * 2);
+    const [visits, totalVisitCount] = await Promise.all([
+      rv.listVisits(domain, days * 2),
+      rv.countVisits(domain, days),
+    ]);
 
     const now = Date.now();
     const currentCutoff = now - days * 86400000;
@@ -109,7 +112,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       engineTimeline,
       engineSummaries,
-      totalVisits: currentVisits.length,
+      totalVisits: totalVisitCount,
     });
   } catch (error) {
     return NextResponse.json(

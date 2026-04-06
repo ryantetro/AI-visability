@@ -2018,6 +2018,7 @@ export function AnalysisPageContent() {
       {(report || (isComplete && data?.score !== undefined)) && (
         <FloatingFeedback
           bottomClassName={report?.hasPaid ? 'bottom-6' : report ? 'bottom-24' : 'bottom-6'}
+          userEmail={user?.email}
         />
       )}
 

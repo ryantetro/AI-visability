@@ -597,7 +597,7 @@ export default function HistoryPage() {
           )}
         </section>
 
-        <FloatingFeedback />
+        <FloatingFeedback userEmail={user?.email} />
 
         <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
           <SheetContent
