@@ -34,6 +34,8 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [30-dashboard-conversion-ux.md](./30-dashboard-conversion-ux.md) | Next steps strip, mention “why this score”, workspace URLs, shared scoring weights | `src/lib/scoring-weights.ts`, `src/lib/workspace-nav.ts`, `src/lib/mention-insights.ts`, `src/app/advanced/dashboard/next-steps-strip.tsx` |
 | [28-analytics-page.md](./28-analytics-page.md) | Full-page analytics dashboard — KPI row, crawler/referral charts, score trends, prompt analytics | `src/app/analytics/page.tsx`, `src/app/advanced/analytics/analytics-section.tsx` |
 | [29-brand-improve-redesign.md](./29-brand-improve-redesign.md) | Brand Improve tab — 4-zone layout (KPIs, action center, filterable fixes, collapsible prompt library) | `src/app/advanced/brand/improve-section.tsx`, `use-content-gaps.ts` |
+| [31-user-feedback-system.md](./31-user-feedback-system.md) | User feedback widget + admin viewer — categorized submissions, admin-only Settings tab | `src/components/ui/floating-feedback.tsx`, `src/app/api/feedback/route.ts` |
+| [32-actions-tab.md](./32-actions-tab.md) | Actions checklist sidebar tab — persistent action plan with progress tracking and scan sync | `src/app/advanced/actions/actions-section.tsx`, `src/app/api/action-checklist/route.ts` |
 
 ## Architecture Principles
 
