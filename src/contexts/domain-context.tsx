@@ -89,6 +89,10 @@ export function useDomainContext() {
   return ctx;
 }
 
+export function useDomainContextSafe() {
+  return useContext(DomainContext);
+}
+
 export function DomainContextProvider({
   reportId,
   children,
