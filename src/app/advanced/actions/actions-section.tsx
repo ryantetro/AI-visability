@@ -220,16 +220,27 @@ export function ActionsSection({
         setItems(data.items);
         setSummary(data.summary);
         refreshCount();
+      } else {
+        throw new Error(`sync failed: ${res.status}`);
       }
     } catch {
-      setItems(
-        syncItems.map((i) => ({
-          ...i,
-          manualStatus: 'pending' as const,
-          isComplete: i.scanStatus === 'pass',
-          isRegression: false,
-        })),
-      );
+      const fallback = syncItems.map((i) => ({
+        ...i,
+        manualStatus: 'pending' as const,
+        isComplete: i.scanStatus === 'pass',
+        isRegression: false,
+      }));
+      setItems(fallback);
+      const complete = fallback.filter((i) => i.isComplete).length;
+      const potentialLift = fallback
+        .filter((i) => !i.isComplete)
+        .reduce((sum, i) => sum + i.estimatedLift, 0);
+      setSummary({
+        total: fallback.length,
+        complete,
+        remaining: fallback.length - complete,
+        potentialLift,
+      });
     } finally {
       setLoading(false);
     }
