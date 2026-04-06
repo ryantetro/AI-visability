@@ -4,11 +4,11 @@
  */
 
 export const WEIGHT_AI_VISIBILITY = 1.0;
-export const WEIGHT_PERFORMANCE = 0.5;
-export const WEIGHT_TRUST = 0.5;
+export const WEIGHT_PERFORMANCE = 0.25;
+export const WEIGHT_TRUST = 0.25;
 export const WEIGHT_MENTIONS = 1.0;
 /** Fallback when performance/trust pillars are unavailable but aggregate web health exists */
-export const WEIGHT_WEB_HEALTH_AGGREGATE = 0.5;
+export const WEIGHT_WEB_HEALTH_AGGREGATE = 0.25;
 
 const SUM_AV_PERFORMANCE_TRUST =
   WEIGHT_AI_VISIBILITY + WEIGHT_PERFORMANCE + WEIGHT_TRUST;
