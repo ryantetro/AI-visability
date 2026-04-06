@@ -48,12 +48,16 @@ export function DashboardSection({
 
   // Tracking key + last signal (shared by crawler & referral panels)
   const [trackingReady, setTrackingReady] = useState(false);
+  const [trackingLoading, setTrackingLoading] = useState(true);
   const [trackingLastUsedAt, setTrackingLastUsedAt] = useState<string | null>(null);
   const [opportunityAlert, setOpportunityAlert] = useState<OpportunityAlertSummary | null>(null);
 
   useEffect(() => {
     if (!domain) return;
     let cancelled = false;
+    const timer = setTimeout(() => {
+      if (!cancelled) setTrackingLoading(false);
+    }, 5000);
     fetch(`/api/user/tracking-key?domain=${encodeURIComponent(domain)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -62,8 +66,11 @@ export function DashboardSection({
           setTrackingLastUsedAt(typeof data.lastUsedAt === 'string' ? data.lastUsedAt : null);
         }
       })
-      .catch(() => {});
-    return () => { cancelled = true; };
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setTrackingLoading(false);
+      });
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [domain]);
 
   useEffect(() => {
@@ -142,6 +149,7 @@ export function DashboardSection({
         fixes={fixes}
         monitoringConnected={monitoringConnected}
         trackingReady={trackingReady}
+        trackingLoading={trackingLoading}
         maxCompetitors={maxCompetitors}
         reportId={report.id}
       />

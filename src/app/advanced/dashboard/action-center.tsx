@@ -8,6 +8,7 @@ interface ActionCenterProps {
   fixes: PrioritizedFix[];
   monitoringConnected: boolean;
   trackingReady: boolean;
+  trackingLoading: boolean;
   maxCompetitors: number;
   reportId?: string | null;
 }
@@ -16,6 +17,7 @@ export function ActionCenter({
   fixes,
   monitoringConnected,
   trackingReady,
+  trackingLoading,
   maxCompetitors,
   reportId,
 }: ActionCenterProps) {
@@ -29,6 +31,7 @@ export function ActionCenter({
       <KeepDoingColumn
         monitoringConnected={monitoringConnected}
         trackingReady={trackingReady}
+        trackingLoading={trackingLoading}
         hasStructuredDataFixes={hasStructuredDataFixes}
         maxCompetitors={maxCompetitors}
         reportId={reportId}

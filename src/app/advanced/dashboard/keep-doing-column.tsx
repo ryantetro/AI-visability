@@ -21,6 +21,7 @@ import {
 interface KeepDoingColumnProps {
   monitoringConnected: boolean;
   trackingReady: boolean;
+  trackingLoading: boolean;
   hasStructuredDataFixes: boolean;
   maxCompetitors: number;
   reportId?: string | null;
@@ -39,6 +40,7 @@ interface ActionItem {
 export function KeepDoingColumn({
   monitoringConnected,
   trackingReady,
+  trackingLoading,
   hasStructuredDataFixes,
   maxCompetitors,
   reportId,
@@ -116,48 +118,61 @@ export function KeepDoingColumn({
       </p>
 
       <div className="mt-3 space-y-2">
-        {items.slice(0, 5).map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.key}
-              href={item.href}
-              onClick={(e) => {
-                const hash = item.href.split('#')[1];
-                if (hash) {
-                  const el = document.getElementById(hash);
-                  if (el) {
-                    e.preventDefault();
-                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }
-              }}
-              className={cn(
-                'group flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-colors',
-                item.highlight
-                  ? 'border-[#ffbb00]/15 bg-[#ffbb00]/[0.04] hover:border-[#ffbb00]/25 hover:bg-[#ffbb00]/[0.07]'
-                  : 'border-white/5 bg-white/[0.015] hover:border-white/10 hover:bg-white/[0.03]'
-              )}
-            >
-              <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                style={{ backgroundColor: `${item.iconColor}15`, color: item.iconColor }}
+        {trackingLoading
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2.5 rounded-lg border border-white/5 bg-white/[0.015] px-3 py-2.5"
               >
-                <Icon className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className={cn(
-                  'truncate text-[12px] font-medium',
-                  item.highlight ? 'text-white' : 'text-zinc-200'
-                )}>
-                  {item.label}
-                </p>
-                <p className="truncate text-[10px] text-zinc-500">{item.description}</p>
+                <span className="h-7 w-7 shrink-0 animate-pulse rounded-lg bg-white/[0.06]" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-3 w-32 animate-pulse rounded bg-white/[0.06]" />
+                  <div className="h-2 w-48 animate-pulse rounded bg-white/[0.04]" />
+                </div>
               </div>
-              <ArrowRight className="h-3 w-3 shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-400" />
-            </Link>
-          );
-        })}
+            ))
+          : items.slice(0, 5).map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  onClick={(e) => {
+                    const hash = item.href.split('#')[1];
+                    if (hash) {
+                      const el = document.getElementById(hash);
+                      if (el) {
+                        e.preventDefault();
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }
+                  }}
+                  className={cn(
+                    'group flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-colors',
+                    item.highlight
+                      ? 'border-[#ffbb00]/15 bg-[#ffbb00]/[0.04] hover:border-[#ffbb00]/25 hover:bg-[#ffbb00]/[0.07]'
+                      : 'border-white/5 bg-white/[0.015] hover:border-white/10 hover:bg-white/[0.03]'
+                  )}
+                >
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: `${item.iconColor}15`, color: item.iconColor }}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={cn(
+                      'truncate text-[12px] font-medium',
+                      item.highlight ? 'text-white' : 'text-zinc-200'
+                    )}>
+                      {item.label}
+                    </p>
+                    <p className="truncate text-[10px] text-zinc-500">{item.description}</p>
+                  </div>
+                  <ArrowRight className="h-3 w-3 shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-400" />
+                </Link>
+              );
+            })}
       </div>
     </div>
   );
