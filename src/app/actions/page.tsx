@@ -1,9 +1,10 @@
 'use client';
 
+import { Suspense } from 'react';
 import { WorkspaceShell } from '@/components/app/workspace-shell';
 import { ActionsSection } from '@/app/advanced/actions/actions-section';
 
-export default function ActionsPage() {
+function ActionsContent() {
   return (
     <WorkspaceShell sectionKey="actions">
       {(ctx) => (
@@ -17,5 +18,13 @@ export default function ActionsPage() {
         />
       )}
     </WorkspaceShell>
+  );
+}
+
+export default function ActionsPage() {
+  return (
+    <Suspense>
+      <ActionsContent />
+    </Suspense>
   );
 }

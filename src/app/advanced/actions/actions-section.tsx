@@ -115,7 +115,7 @@ function buildSyncItems(
     });
   }
 
-  for (const dim of report.score.dimensions) {
+  for (const dim of report.score.dimensions ?? []) {
     for (const check of dim.checks) {
       if (check.verdict === 'pass') {
         const alreadyInFixes = report.score.fixes.some((f) => f.checkId === check.id);
@@ -125,9 +125,9 @@ function buildSyncItems(
             actionType: 'fix',
             scanStatus: 'pass',
             label: check.label,
-            detail: check.detail,
-            dimension: check.dimension,
-            category: check.category,
+            detail: '',
+            dimension: dim.key as SyncItemPayload['dimension'],
+            category: null,
             estimatedLift: 0,
             effortBand: null,
             copyPrompt: null,
