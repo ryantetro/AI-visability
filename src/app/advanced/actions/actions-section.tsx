@@ -346,15 +346,15 @@ export function ActionsSection({
   return (
     <div className="space-y-6">
       {summary && (
-        <div className="flex items-center gap-6 rounded-2xl border border-white/8 bg-white/[0.02] p-6">
+        <div className="flex items-center gap-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.03] to-white/[0.01] p-6">
           <ProgressRing complete={summary.complete} total={summary.total} />
           <div>
-            <p className="text-[16px] font-semibold text-white">
+            <p className="text-[17px] font-semibold text-white">
               {summary.complete} of {summary.total} actions complete
             </p>
             {summary.potentialLift > 0 && (
-              <p className="mt-0.5 text-[12px] text-zinc-400">
-                +{summary.potentialLift} pts possible
+              <p className="mt-1 text-[13px] text-zinc-400">
+                Complete the remaining items to earn up to <span className="font-semibold text-[#25c972]">+{summary.potentialLift} pts</span>
               </p>
             )}
           </div>
@@ -398,21 +398,21 @@ export function ActionsSection({
       </div>
 
       {viewMode === 'priority' && (
-        <div className="space-y-2">
-          {sortedByPriority.map((item) => (
-            <ActionCard key={item.checkId} item={item} onToggle={handleToggle} />
+        <div className="space-y-3">
+          {sortedByPriority.map((item, i) => (
+            <ActionCard key={item.checkId} item={item} onToggle={handleToggle} index={item.isComplete ? undefined : i + 1} />
           ))}
         </div>
       )}
 
       {viewMode === 'category' && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {Array.from(groupByCategory(filtered)).map(([key, groupItems]) => (
             <div key={key}>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
                 {DIMENSION_LABELS[key] ?? 'Setup'}
               </p>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {groupItems.map((item) => (
                   <ActionCard key={item.checkId} item={item} onToggle={handleToggle} />
                 ))}
@@ -423,14 +423,14 @@ export function ActionsSection({
       )}
 
       {viewMode === 'effort' && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {Array.from(groupByEffort(filtered)).map(([key, groupItems]) =>
             groupItems.length > 0 ? (
               <div key={key}>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
                   {EFFORT_LABELS[key] ?? key}
                 </p>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {groupItems.map((item) => (
                     <ActionCard key={item.checkId} item={item} onToggle={handleToggle} />
                   ))}

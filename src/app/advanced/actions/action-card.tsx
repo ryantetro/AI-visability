@@ -1,16 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, Check, CheckCircle2, Copy } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Copy, Bot, Globe, Zap, Clock, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ActionChecklistItem } from '@/types/action-checklist';
 
 interface ActionCardProps {
   item: ActionChecklistItem;
   onToggle: (checkId: string, newStatus: 'done' | 'pending') => void;
+  index?: number;
 }
 
-export function ActionCard({ item, onToggle }: ActionCardProps) {
+const EFFORT_CONFIG = {
+  quick: { label: 'Quick win', icon: Zap, color: 'text-[#25c972]', bg: 'bg-[#25c972]/10', border: 'border-[#25c972]/20' },
+  medium: { label: 'Medium', icon: Clock, color: 'text-[#ffbb00]', bg: 'bg-[#ffbb00]/10', border: 'border-[#ffbb00]/20' },
+  technical: { label: 'Technical', icon: Wrench, color: 'text-[#ff8a1e]', bg: 'bg-[#ff8a1e]/10', border: 'border-[#ff8a1e]/20' },
+} as const;
+
+const LEFT_ACCENT = {
+  quick: 'bg-[#25c972]',
+  medium: 'bg-[#ffbb00]',
+  technical: 'bg-[#ff8a1e]',
+} as const;
+
+export function ActionCard({ item, onToggle, index }: ActionCardProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -22,25 +35,35 @@ export function ActionCard({ item, onToggle }: ActionCardProps) {
 
   const scanVerified = item.scanStatus === 'pass';
   const isDone = item.isComplete && !item.isRegression;
+  const effort = item.effortBand ? EFFORT_CONFIG[item.effortBand] : null;
+  const accentColor = item.effortBand ? LEFT_ACCENT[item.effortBand] : 'bg-zinc-600';
+  const isAI = item.category === 'ai';
 
   return (
     <div
       className={cn(
-        'group flex items-start gap-3 rounded-xl border px-4 py-3 transition-colors',
+        'group relative flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all',
         item.isRegression
-          ? 'border-[#ffbb00]/20 bg-[#ffbb00]/[0.03]'
+          ? 'border-[#ffbb00]/25 bg-[#ffbb00]/[0.04]'
           : isDone
-            ? 'border-white/5 bg-white/[0.01] opacity-60'
-            : 'border-white/8 bg-white/[0.02] hover:border-white/12 hover:bg-white/[0.035]',
+            ? 'border-white/5 bg-white/[0.01] opacity-50'
+            : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]',
       )}
     >
-      {/* Checkbox / status icon */}
-      <div className="mt-0.5 shrink-0">
+      {/* Left accent bar */}
+      {!isDone && (
+        <div className={cn('absolute left-0 top-3 bottom-3 w-[3px] rounded-full', accentColor)} />
+      )}
+
+      {/* Step number or checkbox */}
+      <div className="shrink-0">
         {scanVerified ? (
-          <CheckCircle2 className="h-5 w-5 text-[#25c972]" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#25c972]/15">
+            <CheckCircle2 className="h-4.5 w-4.5 text-[#25c972]" />
+          </div>
         ) : item.isRegression ? (
-          <div className="relative" title="Regression: latest scan found this still failing">
-            <AlertTriangle className="h-5 w-5 text-[#ffbb00]" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ffbb00]/15" title="Regression: latest scan found this still failing">
+            <AlertTriangle className="h-4.5 w-4.5 text-[#ffbb00]" />
           </div>
         ) : (
           <button
@@ -49,85 +72,101 @@ export function ActionCard({ item, onToggle }: ActionCardProps) {
               onToggle(item.checkId, item.manualStatus === 'done' ? 'pending' : 'done')
             }
             className={cn(
-              'flex h-5 w-5 items-center justify-center rounded-md border-2 transition-colors',
+              'flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all',
               item.manualStatus === 'done'
-                ? 'border-[#25c972] bg-[#25c972]/20'
-                : 'border-zinc-600 hover:border-zinc-400',
+                ? 'border-[#25c972] bg-[#25c972]/15'
+                : 'border-zinc-600 bg-white/[0.02] hover:border-zinc-400 hover:bg-white/[0.05]',
             )}
           >
-            {item.manualStatus === 'done' && (
-              <Check className="h-3 w-3 text-[#25c972]" />
-            )}
+            {item.manualStatus === 'done' ? (
+              <Check className="h-3.5 w-3.5 text-[#25c972]" />
+            ) : index !== undefined ? (
+              <span className="text-[11px] font-bold tabular-nums text-zinc-500">{index}</span>
+            ) : null}
           </button>
         )}
       </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1">
-        <p className={cn(
-          'text-[13px] font-medium',
-          isDone ? 'text-zinc-500 line-through' : 'text-zinc-200',
-        )}>
-          {item.label}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className={cn(
+            'text-[14px] font-semibold leading-snug',
+            isDone ? 'text-zinc-500 line-through' : 'text-white',
+          )}>
+            {item.label}
+          </p>
+        </div>
         {item.detail && (
-          <p className="mt-0.5 text-[11px] text-zinc-500 line-clamp-2">
+          <p className="mt-1 text-[12px] leading-relaxed text-zinc-500 line-clamp-2">
             {item.detail}
           </p>
         )}
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+
+        {/* Tags row */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
           {item.category && (
             <span
               className={cn(
-                'rounded px-1.5 py-0.5 text-[9px] font-bold uppercase',
-                item.category === 'ai'
-                  ? 'bg-[#a855f7]/15 text-[#a855f7]'
-                  : 'bg-[#3b82f6]/15 text-[#3b82f6]',
+                'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                isAI
+                  ? 'bg-[#a855f7]/12 text-[#c084fc]'
+                  : 'bg-[#3b82f6]/12 text-[#60a5fa]',
               )}
             >
-              {item.category === 'ai' ? 'AI' : 'Web'}
+              {isAI ? <Bot className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+              {isAI ? 'AI Visibility' : 'Web Health'}
             </span>
           )}
-          {item.effortBand && (
+          {effort && !isDone && (
             <span
               className={cn(
-                'rounded px-1.5 py-0.5 text-[9px] font-semibold',
-                item.effortBand === 'quick'
-                  ? 'bg-[#25c972]/10 text-[#25c972]'
-                  : item.effortBand === 'medium'
-                    ? 'bg-[#ffbb00]/10 text-[#ffbb00]'
-                    : 'bg-[#ff8a1e]/10 text-[#ff8a1e]',
+                'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold',
+                effort.bg, effort.color,
               )}
             >
-              {item.effortBand.charAt(0).toUpperCase() + item.effortBand.slice(1)}
+              <effort.icon className="h-3 w-3" />
+              {effort.label}
             </span>
           )}
           {item.isRegression && (
-            <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold bg-[#ffbb00]/10 text-[#ffbb00]">
-              Regression
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#ffbb00]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#ffbb00]">
+              <AlertTriangle className="h-3 w-3" />
+              Needs re-fix
             </span>
           )}
         </div>
       </div>
 
       {/* Right side: points + copy */}
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
         {item.estimatedLift > 0 && !isDone && (
-          <span className="text-[11px] font-semibold text-[#25c972]">
-            +{item.estimatedLift}pts
+          <span className="rounded-full bg-[#25c972]/10 px-3 py-1 text-[12px] font-bold tabular-nums text-[#25c972]">
+            +{item.estimatedLift} pts
           </span>
         )}
         {item.copyPrompt && (
           <button
             type="button"
             onClick={handleCopy}
-            className="rounded p-1 text-zinc-600 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100"
+            className={cn(
+              'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-all',
+              copied
+                ? 'bg-[#25c972]/10 text-[#25c972]'
+                : 'text-zinc-600 hover:bg-white/[0.06] hover:text-zinc-300 opacity-0 group-hover:opacity-100',
+            )}
             aria-label="Copy fix prompt"
           >
             {copied ? (
-              <Check className="h-3.5 w-3.5 text-[#25c972]" />
+              <>
+                <Check className="h-3 w-3" />
+                Copied
+              </>
             ) : (
-              <Copy className="h-3.5 w-3.5" />
+              <>
+                <Copy className="h-3 w-3" />
+                Copy fix
+              </>
             )}
           </button>
         )}
