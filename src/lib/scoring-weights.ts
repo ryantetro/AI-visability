@@ -16,8 +16,8 @@ const SUM_AV_WEB_FALLBACK = WEIGHT_AI_VISIBILITY + WEIGHT_WEB_HEALTH_AGGREGATE;
 
 /**
  * Scan-time overall (mentions not available yet).
- * When both pillars exist: weighted mean with weights 1.0 / 0.5 / 0.5.
- * Else if aggregate web health exists: (aiVisibility + 0.5 * webHealth) / 1.5.
+ * When both pillars exist: weighted mean with weights 1.0 / 0.25 / 0.25.
+ * Else if aggregate web health exists: (aiVisibility + 0.25 * webHealth) / 1.25.
  */
 export function computeOverallFromPillars(
   aiVisibility: number,
