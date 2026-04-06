@@ -909,7 +909,7 @@ export function DashboardSidebar() {
 
   const isFree = !planLoading && tier === 'free';
 
-  const remainingCount = useActionChecklistCount();
+  const { remainingCount } = useActionChecklistCount();
 
   // ── Keyboard shortcut: Cmd+B / Ctrl+B ──────────────────────────────
   useEffect(() => {
