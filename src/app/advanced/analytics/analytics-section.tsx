@@ -378,7 +378,7 @@ export function AnalyticsSection({
         onEnableMonitoring={onEnableMonitoring}
       />
 
-      {/* Prompt Analytics — full width */}
+      {/* Prompt Mention Trends */}
       <PromptAnalyticsPanel domain={domain} />
 
       {/* Platform Breakdown */}

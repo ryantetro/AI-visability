@@ -10,7 +10,7 @@ import { DomainContextProvider } from '@/contexts/domain-context';
 const LANDING_PATHS = ['/', '/landing/b', '/landing/c'];
 
 /** Routes that need sidebar + domain context (workspace pages) */
-const WORKSPACE_PREFIXES = ['/dashboard', '/report', '/brand', '/competitors', '/settings', '/advanced', '/history', '/analytics', '/leaderboard', '/actions'];
+const WORKSPACE_PREFIXES = ['/dashboard', '/report', '/brand', '/competitors', '/settings', '/advanced', '/history', '/analytics', '/leaderboard', '/actions', '/prompts', '/content-studio'];
 
 /** Routes that need sidebar but NOT domain context */
 const APP_PATH_PREFIXES = ['/featured', ...WORKSPACE_PREFIXES];

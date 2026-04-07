@@ -45,12 +45,15 @@ import type { SiteSummary } from '@/app/advanced/lib/types';
 export function WorkspaceShell({
   sectionKey,
   requiredTier,
+  wide,
   children,
 }: {
   /** The NAV_GATES key for this section, e.g. 'dashboard', 'report', 'brand' */
   sectionKey: string;
   /** Override the required tier (defaults to NAV_GATES[sectionKey]) */
   requiredTier?: PlanTier;
+  /** Use wider max-width (1440px) for premium dashboard layouts */
+  wide?: boolean;
   /** Section content renderer — receives workspace data */
   children: (ctx: WorkspaceContext) => React.ReactNode;
 }) {
@@ -210,7 +213,12 @@ export function WorkspaceShell({
 
   return (
     <div className="text-white">
-      <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
+      <main className={cn(
+        "relative mx-auto pb-20 pt-6",
+        wide
+          ? "max-w-[1440px] px-4 sm:px-6"
+          : "max-w-[1120px] px-4 sm:px-6 lg:px-8"
+      )}>
         {checkoutBanner && (
           <div className="mb-4 rounded-2xl border border-[#25c972]/30 bg-[#25c972]/10 px-4 py-3 text-sm text-[#25c972]">
             <div className="flex items-start justify-between gap-3">

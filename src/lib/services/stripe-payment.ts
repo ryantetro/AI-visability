@@ -270,6 +270,21 @@ async function clearInvalidStripeSubscriptionLinkForUser(userId: string): Promis
     .eq('id', userId);
 }
 
+async function clearStaleStripeCustomerForUser(userId: string): Promise<void> {
+  await getSupabaseClient()
+    .from('user_profiles')
+    .update({
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      stripe_subscription_schedule_id: null,
+      plan_expires_at: null,
+      plan_cancel_at_period_end: false,
+      plan_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+}
+
 async function retrieveManageableStripeSubscriptionById(subscriptionId: string): Promise<StripeSubscriptionState | null> {
   const stripe = getStripe();
 
@@ -315,12 +330,21 @@ async function releaseScheduleIfManageable(scheduleId: string, preserveCancelDat
 
 export async function findManageableStripeSubscriptionForCustomer(customerId: string): Promise<StripeSubscriptionState | null> {
   const stripe = getStripe();
-  const subscriptions = await stripe.subscriptions.list({
-    customer: customerId,
-    status: 'all',
-    limit: 20,
-    expand: ['data.schedule'],
-  });
+
+  let subscriptions;
+  try {
+    subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'all',
+      limit: 20,
+      expand: ['data.schedule'],
+    });
+  } catch (error) {
+    if (isStripeResourceMissing(error)) {
+      return null;
+    }
+    throw error;
+  }
 
   const manageable = subscriptions.data
     .filter((subscription) => isManageableSubscriptionStatus(subscription.status))
@@ -440,17 +464,33 @@ export async function resolveBillingIdentityForUser(
   }
 
   if (customerId) {
-    const synced = await syncStripeSubscriptionForUser(userId, customerId);
-    if (synced) {
-      return {
-        state: 'healthy',
-        subscription: synced,
-        attemptedRepair: attemptRepair,
-        repaired: false,
-        requiresStripeSubscription,
-        message: null,
-        recoveryAction: null,
-      };
+    // Verify the customer exists in the current Stripe mode before syncing
+    let customerValid = true;
+    try {
+      const stripe = getStripe();
+      await stripe.customers.retrieve(customerId);
+    } catch (error) {
+      if (isStripeResourceMissing(error)) {
+        customerValid = false;
+        await clearStaleStripeCustomerForUser(userId);
+      } else {
+        throw error;
+      }
+    }
+
+    if (customerValid) {
+      const synced = await syncStripeSubscriptionForUser(userId, customerId);
+      if (synced) {
+        return {
+          state: 'healthy',
+          subscription: synced,
+          attemptedRepair: attemptRepair,
+          repaired: false,
+          requiresStripeSubscription,
+          message: null,
+          recoveryAction: null,
+        };
+      }
     }
   }
 
@@ -765,7 +805,22 @@ export async function getOrCreateStripeCustomer(userId: string, email: string): 
     .single();
 
   if (profile?.stripe_customer_id) {
-    return profile.stripe_customer_id;
+    // Verify the customer still exists in the current Stripe mode (test vs live)
+    try {
+      const stripe = getStripe();
+      await stripe.customers.retrieve(profile.stripe_customer_id);
+      return profile.stripe_customer_id;
+    } catch (error) {
+      if (isStripeResourceMissing(error)) {
+        // Stale customer ID (e.g. test-mode ID used with live key) — clear it and create a new one
+        await supabase
+          .from('user_profiles')
+          .update({ stripe_customer_id: null, updated_at: new Date().toISOString() })
+          .eq('id', userId);
+      } else {
+        throw error;
+      }
+    }
   }
 
   const existingCustomerId = await searchStripeCustomerByMetadataUserId(userId)

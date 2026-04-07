@@ -36,6 +36,8 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [29-brand-improve-redesign.md](./29-brand-improve-redesign.md) | Brand Improve tab — 4-zone layout (KPIs, action center, filterable fixes, collapsible prompt library) | `src/app/advanced/brand/improve-section.tsx`, `use-content-gaps.ts` |
 | [31-user-feedback-system.md](./31-user-feedback-system.md) | User feedback widget + admin viewer — categorized submissions, admin-only Settings tab | `src/components/ui/floating-feedback.tsx`, `src/app/api/feedback/route.ts` |
 | [32-actions-tab.md](./32-actions-tab.md) | Actions checklist sidebar tab — persistent action plan with progress tracking and scan sync | `src/app/advanced/actions/actions-section.tsx`, `src/app/api/action-checklist/route.ts` |
+| [33-prompts-tab.md](./33-prompts-tab.md) | Dedicated prompt monitoring dashboard — Active/Inactive/Suggestions tabs, CRUD, engine mentions | `src/app/advanced/prompts/prompts-section.tsx`, `src/app/prompts/page.tsx` |
+| [34-content-studio-tab.md](./34-content-studio-tab.md) | Content Studio — 4-step content creation wizard, audience management, brief/article generation | `src/app/advanced/content-studio/`, `src/app/api/content-studio/` |
 
 ## Architecture Principles
 

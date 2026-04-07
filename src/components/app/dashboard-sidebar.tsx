@@ -17,8 +17,10 @@ import {
   ListChecks,
   Lock,
   Menu,
+  MessageSquareText,
   PanelLeftClose,
   PanelLeftOpen,
+  PenTool,
   Plus,
   Settings2,
   Trophy,
@@ -55,6 +57,21 @@ const BRAND_TABS = [
 ] as const;
 
 type BrandTabId = typeof BRAND_TABS[number]['id'];
+
+const PROMPT_TABS = [
+  { id: 'active',      label: 'Active' },
+  { id: 'inactive',    label: 'Inactive' },
+  { id: 'suggestions', label: 'Suggestions' },
+] as const;
+
+type PromptTabId = typeof PROMPT_TABS[number]['id'];
+
+const CONTENT_STUDIO_TABS = [
+  { id: 'contents',  label: 'Contents' },
+  { id: 'audiences', label: 'Audiences' },
+] as const;
+
+type ContentStudioTabId = typeof CONTENT_STUDIO_TABS[number]['id'];
 
 const NAV_ITEMS: SidebarItem[] = [
   {
@@ -100,6 +117,13 @@ const NAV_ITEMS: SidebarItem[] = [
     matchFn: (p) => p === '/analytics',
   },
   {
+    key: 'prompts',
+    label: 'Prompts',
+    href: '/prompts',
+    icon: MessageSquareText,
+    matchFn: (p) => p === '/prompts',
+  },
+  {
     key: 'leaderboard',
     label: 'Leaderboard',
     href: '/leaderboard',
@@ -125,7 +149,7 @@ const PRICING_ITEM: SidebarItem = {
 };
 
 /** Routes that represent the active workspace and should carry ?report= */
-const WORKSPACE_KEYS = new Set(['dashboard', 'report', 'actions', 'brand', 'competitors', 'settings']);
+const WORKSPACE_KEYS = new Set(['dashboard', 'report', 'actions', 'brand', 'competitors', 'settings', 'prompts', 'content-studio']);
 
 const SIDEBAR_STORAGE_KEY = 'aiso_sidebar_collapsed';
 
@@ -192,6 +216,22 @@ function buildBrandTabHref(tabId: string, reportId: string | null): string {
   if (tabId !== 'presence') params.set('tab', tabId);
   const qs = params.toString();
   return qs ? `/brand?${qs}` : '/brand';
+}
+
+function buildPromptTabHref(tabId: string, reportId: string | null): string {
+  const params = new URLSearchParams();
+  if (reportId) params.set('report', reportId);
+  if (tabId !== 'active') params.set('tab', tabId);
+  const qs = params.toString();
+  return qs ? `/prompts?${qs}` : '/prompts';
+}
+
+function buildContentStudioTabHref(tabId: string, reportId: string | null): string {
+  const params = new URLSearchParams();
+  if (reportId) params.set('report', reportId);
+  if (tabId !== 'contents') params.set('tab', tabId);
+  const qs = params.toString();
+  return qs ? `/content-studio?${qs}` : '/content-studio';
 }
 
 // ── NavItem ────────────────────────────────────────────────────────────
@@ -487,6 +527,466 @@ function BrandNavItem({
                         {isActive && (
                           <motion.span
                             layoutId="brand-active-tick"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 h-[14px] w-px bg-[var(--sidebar-accent)]"
+                            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                          />
+                        )}
+                        {tab.label}
+                      </Link>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── PromptsNavItem ──────────────────────────────────────────────────────
+
+function PromptsNavItem({
+  isOnPrompts,
+  activeTab,
+  reportParam,
+  locked,
+  collapsed,
+  onClick,
+}: {
+  isOnPrompts: boolean;
+  activeTab: PromptTabId | null;
+  reportParam: string | null;
+  locked?: boolean;
+  collapsed?: boolean;
+  onClick?: () => void;
+}) {
+  const [expanded, setExpanded] = useState(() => isOnPrompts);
+  const [hovered, setHovered] = useState(false);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
+  const flyoutRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOnPrompts) setExpanded(true);
+  }, [isOnPrompts]);
+
+  useEffect(() => {
+    if (!flyoutOpen) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
+        setFlyoutOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [flyoutOpen]);
+
+  const promptsHref = buildNavHref('/prompts', reportParam);
+
+  if (locked) {
+    return (
+      <Link
+        href="/prompts"
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={cn(
+          'relative flex items-center rounded-lg text-[13px] font-medium transition-all duration-200',
+          'h-[var(--sidebar-item-height)]',
+          'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-400',
+          collapsed ? 'justify-center px-0' : 'gap-3 px-4'
+        )}
+      >
+        <MessageSquareText className="h-[18px] w-[18px] shrink-0 text-zinc-600" />
+        {!collapsed && <span className="flex-1">Prompts</span>}
+        {!collapsed && <Lock className="h-3 w-3 shrink-0 text-zinc-600" />}
+        {collapsed && <SidebarTooltip label="Prompts" show={hovered} />}
+      </Link>
+    );
+  }
+
+  // Collapsed mode — icon with flyout popover for sub-tabs
+  if (collapsed) {
+    return (
+      <div ref={flyoutRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setFlyoutOpen((v) => !v)}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          className={cn(
+            'relative flex w-full items-center justify-center rounded-lg text-[13px] font-medium transition-all duration-200',
+            'h-[var(--sidebar-item-height)]',
+            isOnPrompts
+              ? 'bg-white/[0.08] text-white'
+              : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200'
+          )}
+        >
+          {isOnPrompts && (
+            <motion.span
+              layoutId="nav-active-indicator"
+              className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--sidebar-accent)]"
+              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+            />
+          )}
+          <MessageSquareText className={cn('h-[18px] w-[18px] shrink-0', isOnPrompts ? 'text-white' : 'text-zinc-500')} />
+          {!flyoutOpen && <SidebarTooltip label="Prompts" show={hovered} />}
+        </button>
+        <AnimatePresence>
+          {flyoutOpen && (
+            <motion.div
+              initial={{ opacity: 0, x: -4 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -4 }}
+              transition={{ duration: 0.15 }}
+              className="absolute top-1/2 -translate-y-1/2 min-w-[160px] py-2 px-1"
+              style={{
+                left: 'calc(100% + 8px)',
+                zIndex: 100,
+                background: 'rgba(24, 24, 27, 0.96)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              }}
+            >
+              <p className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Prompts</p>
+              <div className="space-y-px">
+                {PROMPT_TABS.map((tab) => {
+                  const isActive = isOnPrompts && (activeTab === tab.id || (!activeTab && tab.id === 'active'));
+                  return (
+                    <Link
+                      key={tab.id}
+                      href={buildPromptTabHref(tab.id, reportParam)}
+                      onClick={() => { setFlyoutOpen(false); onClick?.(); }}
+                      className={cn(
+                        'flex items-center rounded-md px-2.5 py-1.5 text-[12px] transition-colors',
+                        isActive
+                          ? 'font-semibold text-white bg-white/[0.08]'
+                          : 'font-medium text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]',
+                      )}
+                    >
+                      {tab.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  // Expanded sidebar — collapsible sub-items
+  return (
+    <div>
+      <div
+        className={cn(
+          'relative flex items-center rounded-lg transition-all duration-200',
+          'h-[var(--sidebar-item-height)]',
+          isOnPrompts
+            ? 'bg-white/[0.08] text-white'
+            : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200',
+        )}
+      >
+        {isOnPrompts && (
+          <motion.span
+            layoutId="nav-active-indicator"
+            className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--sidebar-accent)]"
+            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+          />
+        )}
+        <Link
+          href={promptsHref}
+          onClick={onClick}
+          className="flex flex-1 items-center gap-3 px-4 text-[13px] font-medium h-full min-w-0"
+        >
+          <MessageSquareText className={cn('h-[18px] w-[18px] shrink-0', isOnPrompts ? 'text-white' : 'text-zinc-500')} />
+          <span>Prompts</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex h-full items-center pr-3 pl-2 text-zinc-600 hover:text-zinc-300 transition-colors"
+          aria-label={expanded ? 'Collapse prompts menu' : 'Expand prompts menu'}
+        >
+          <motion.div
+            animate={{ rotate: expanded ? 90 : 0 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </motion.div>
+        </button>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="prompts-subnav"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{
+              height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+              opacity: { duration: 0.18, ease: 'easeOut' },
+            }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="relative ml-[30px] mt-1 pb-1.5">
+              <div className="absolute left-0 top-0 bottom-0 w-px bg-white/[0.07]" />
+              <div className="space-y-px">
+                {PROMPT_TABS.map((tab, i) => {
+                  const isActive = isOnPrompts && (activeTab === tab.id || (!activeTab && tab.id === 'active'));
+                  return (
+                    <motion.div
+                      key={tab.id}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.15, delay: i * 0.03, ease: 'easeOut' }}
+                    >
+                      <Link
+                        href={buildPromptTabHref(tab.id, reportParam)}
+                        onClick={onClick}
+                        className={cn(
+                          'relative flex items-center pl-4 pr-2 py-[6px] rounded-md text-[12.5px] transition-colors',
+                          isActive
+                            ? 'font-semibold text-white'
+                            : 'font-medium text-zinc-500 hover:text-zinc-200',
+                        )}
+                      >
+                        {isActive && (
+                          <motion.span
+                            layoutId="prompts-active-tick"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 h-[14px] w-px bg-[var(--sidebar-accent)]"
+                            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                          />
+                        )}
+                        {tab.label}
+                      </Link>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── ContentStudioNavItem ────────────────────────────────────────────────
+
+function ContentStudioNavItem({
+  isOnContentStudio,
+  activeTab,
+  reportParam,
+  locked,
+  collapsed,
+  onClick,
+}: {
+  isOnContentStudio: boolean;
+  activeTab: ContentStudioTabId | null;
+  reportParam: string | null;
+  locked?: boolean;
+  collapsed?: boolean;
+  onClick?: () => void;
+}) {
+  const [expanded, setExpanded] = useState(() => isOnContentStudio);
+  const [hovered, setHovered] = useState(false);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
+  const flyoutRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOnContentStudio) setExpanded(true);
+  }, [isOnContentStudio]);
+
+  useEffect(() => {
+    if (!flyoutOpen) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
+        setFlyoutOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [flyoutOpen]);
+
+  const csHref = buildNavHref('/content-studio', reportParam);
+
+  if (locked) {
+    return (
+      <Link
+        href="/content-studio"
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={cn(
+          'relative flex items-center rounded-lg text-[13px] font-medium transition-all duration-200',
+          'h-[var(--sidebar-item-height)]',
+          'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-400',
+          collapsed ? 'justify-center px-0' : 'gap-3 px-4'
+        )}
+      >
+        <PenTool className="h-[18px] w-[18px] shrink-0 text-zinc-600" />
+        {!collapsed && <span className="flex-1">Content Studio</span>}
+        {!collapsed && <Lock className="h-3 w-3 shrink-0 text-zinc-600" />}
+        {collapsed && <SidebarTooltip label="Content Studio" show={hovered} />}
+      </Link>
+    );
+  }
+
+  if (collapsed) {
+    return (
+      <div ref={flyoutRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setFlyoutOpen((v) => !v)}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          className={cn(
+            'relative flex w-full items-center justify-center rounded-lg text-[13px] font-medium transition-all duration-200',
+            'h-[var(--sidebar-item-height)]',
+            isOnContentStudio
+              ? 'bg-white/[0.08] text-white'
+              : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200'
+          )}
+        >
+          {isOnContentStudio && (
+            <motion.span
+              layoutId="nav-active-indicator"
+              className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--sidebar-accent)]"
+              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+            />
+          )}
+          <PenTool className={cn('h-[18px] w-[18px] shrink-0', isOnContentStudio ? 'text-white' : 'text-zinc-500')} />
+          {!flyoutOpen && <SidebarTooltip label="Content Studio" show={hovered} />}
+        </button>
+        <AnimatePresence>
+          {flyoutOpen && (
+            <motion.div
+              initial={{ opacity: 0, x: -4 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -4 }}
+              transition={{ duration: 0.15 }}
+              className="absolute top-1/2 -translate-y-1/2 min-w-[160px] py-2 px-1"
+              style={{
+                left: 'calc(100% + 8px)',
+                zIndex: 100,
+                background: 'rgba(24, 24, 27, 0.96)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              }}
+            >
+              <p className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Content Studio</p>
+              <div className="space-y-px">
+                {CONTENT_STUDIO_TABS.map((tab) => {
+                  const isActive = isOnContentStudio && (activeTab === tab.id || (!activeTab && tab.id === 'contents'));
+                  return (
+                    <Link
+                      key={tab.id}
+                      href={buildContentStudioTabHref(tab.id, reportParam)}
+                      onClick={() => { setFlyoutOpen(false); onClick?.(); }}
+                      className={cn(
+                        'flex items-center rounded-md px-2.5 py-1.5 text-[12px] transition-colors',
+                        isActive
+                          ? 'font-semibold text-white bg-white/[0.08]'
+                          : 'font-medium text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]',
+                      )}
+                    >
+                      {tab.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div
+        className={cn(
+          'relative flex items-center rounded-lg transition-all duration-200',
+          'h-[var(--sidebar-item-height)]',
+          isOnContentStudio
+            ? 'bg-white/[0.08] text-white'
+            : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-200',
+        )}
+      >
+        {isOnContentStudio && (
+          <motion.span
+            layoutId="nav-active-indicator"
+            className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--sidebar-accent)]"
+            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+          />
+        )}
+        <Link
+          href={csHref}
+          onClick={onClick}
+          className="flex flex-1 items-center gap-3 px-4 text-[13px] font-medium h-full min-w-0"
+        >
+          <PenTool className={cn('h-[18px] w-[18px] shrink-0', isOnContentStudio ? 'text-white' : 'text-zinc-500')} />
+          <span>Content Studio</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex h-full items-center pr-3 pl-2 text-zinc-600 hover:text-zinc-300 transition-colors"
+          aria-label={expanded ? 'Collapse content studio menu' : 'Expand content studio menu'}
+        >
+          <motion.div
+            animate={{ rotate: expanded ? 90 : 0 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </motion.div>
+        </button>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="cs-subnav"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{
+              height: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+              opacity: { duration: 0.18, ease: 'easeOut' },
+            }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="relative ml-[30px] mt-1 pb-1.5">
+              <div className="absolute left-0 top-0 bottom-0 w-px bg-white/[0.07]" />
+              <div className="space-y-px">
+                {CONTENT_STUDIO_TABS.map((tab, i) => {
+                  const isActive = isOnContentStudio && (activeTab === tab.id || (!activeTab && tab.id === 'contents'));
+                  return (
+                    <motion.div
+                      key={tab.id}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.15, delay: i * 0.03, ease: 'easeOut' }}
+                    >
+                      <Link
+                        href={buildContentStudioTabHref(tab.id, reportParam)}
+                        onClick={onClick}
+                        className={cn(
+                          'relative flex items-center pl-4 pr-2 py-[6px] rounded-md text-[12.5px] transition-colors',
+                          isActive
+                            ? 'font-semibold text-white'
+                            : 'font-medium text-zinc-500 hover:text-zinc-200',
+                        )}
+                      >
+                        {isActive && (
+                          <motion.span
+                            layoutId="cs-active-tick"
                             className="absolute left-0 top-1/2 -translate-y-1/2 h-[14px] w-px bg-[var(--sidebar-accent)]"
                             transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
                           />
@@ -895,6 +1395,10 @@ export function DashboardSidebar() {
   const mobilePanelRef = useRef<HTMLElement>(null);
 
   const isOnBrand = pathname === '/brand';
+  const isOnPrompts = pathname === '/prompts';
+  const isOnContentStudio = pathname === '/content-studio';
+  const promptTab = isOnPrompts ? (searchParams.get('tab') as PromptTabId | null) : null;
+  const csTab = isOnContentStudio ? (searchParams.get('tab') as ContentStudioTabId | null) : null;
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -1061,6 +1565,21 @@ export function DashboardSidebar() {
             {NAV_ITEMS.slice(3).map((item) => {
               const requiredTier = NAV_GATES[item.key] ?? 'free';
               const isLocked = !planLoading && !canAccess(tier, requiredTier);
+
+              if (item.key === 'prompts') {
+                return (
+                  <PromptsNavItem
+                    key={item.key}
+                    isOnPrompts={isOnPrompts}
+                    activeTab={promptTab}
+                    reportParam={reportParam}
+                    locked={isLocked}
+                    collapsed={isCollapsed}
+                    onClick={closeMobile}
+                  />
+                );
+              }
+
               const href = WORKSPACE_KEYS.has(item.key)
                 ? buildNavHref(item.href, reportParam)
                 : item.href;
@@ -1076,6 +1595,16 @@ export function DashboardSidebar() {
                 />
               );
             })}
+
+            {/* Content Studio — expandable with sub-tabs */}
+            <ContentStudioNavItem
+              isOnContentStudio={isOnContentStudio}
+              activeTab={csTab}
+              reportParam={reportParam}
+              locked={!planLoading && !canAccess(tier, NAV_GATES['content-studio'] ?? 'free')}
+              collapsed={isCollapsed}
+              onClick={closeMobile}
+            />
           </nav>
         </div>
 

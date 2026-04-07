@@ -156,6 +156,8 @@ export const NAV_GATES: Record<string, PlanTier> = {
   competitors: 'pro',
   history: 'starter',
   analytics: 'starter',
+  prompts: 'starter',
+  'content-studio': 'pro',
   leaderboard: 'free',
   settings: 'starter',
   export: 'pro',
@@ -182,6 +184,7 @@ export const FEATURE_GATES: Record<string, PlanTier> = {
   topic_performance: 'pro',
   data_export: 'pro',
   content_generation: 'pro',
+  content_studio: 'pro',
   multi_region: 'pro',
   multi_seat: 'pro',
 
