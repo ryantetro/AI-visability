@@ -1027,6 +1027,8 @@ function SidebarDomainList({ onCloseMobile, collapsed }: { onCloseMobile?: () =>
   const [hovered, setHovered] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const handleSelectDomain = (domain: string) => {
     selectDomain(domain);
@@ -1236,7 +1238,7 @@ function SidebarDomainList({ onCloseMobile, collapsed }: { onCloseMobile?: () =>
       </p>
 
       <div className="space-y-0.5">
-        {recentLoading ? (
+        {!mounted || recentLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="flex items-center gap-2.5 rounded-lg px-3 py-2">
               <span className="h-4 w-4 shrink-0 animate-pulse rounded-full bg-white/[0.06]" />

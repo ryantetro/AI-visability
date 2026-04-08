@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { PartyPopper, RefreshCw } from 'lucide-react';
+import { Lock, PartyPopper, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { type PlanTier, canAccess } from '@/lib/pricing';
 import { ProgressRing } from './progress-ring';
 import { ActionCard } from './action-card';
 import { useActionChecklistCount } from '@/contexts/action-checklist-context';
@@ -16,6 +17,8 @@ import type {
   ToggleResponse,
 } from '@/types/action-checklist';
 import type { DashboardReportData } from '../lib/types';
+
+const FREE_VISIBLE_FIXES = 3;
 
 const DIMENSION_LABELS: Record<string, string> = {
   'file-presence': 'File Presence',
@@ -35,7 +38,7 @@ const EFFORT_LABELS: Record<string, string> = {
   technical: 'Technical',
 };
 
-const KEEP_DOING_ITEMS: Omit<SyncItemPayload, 'scanStatus'>[] = [
+const KEEP_DOING_ITEMS: (Omit<SyncItemPayload, 'scanStatus'> & { minTier: PlanTier })[] = [
   {
     checkId: 'kd-articles',
     actionType: 'keep_doing',
@@ -46,6 +49,7 @@ const KEEP_DOING_ITEMS: Omit<SyncItemPayload, 'scanStatus'>[] = [
     estimatedLift: 0,
     effortBand: null,
     copyPrompt: null,
+    minTier: 'pro',
   },
   {
     checkId: 'kd-monitoring',
@@ -57,6 +61,7 @@ const KEEP_DOING_ITEMS: Omit<SyncItemPayload, 'scanStatus'>[] = [
     estimatedLift: 0,
     effortBand: null,
     copyPrompt: null,
+    minTier: 'starter',
   },
   {
     checkId: 'kd-structured-data',
@@ -68,6 +73,7 @@ const KEEP_DOING_ITEMS: Omit<SyncItemPayload, 'scanStatus'>[] = [
     estimatedLift: 0,
     effortBand: null,
     copyPrompt: null,
+    minTier: 'starter',
   },
   {
     checkId: 'kd-tracking',
@@ -79,6 +85,7 @@ const KEEP_DOING_ITEMS: Omit<SyncItemPayload, 'scanStatus'>[] = [
     estimatedLift: 0,
     effortBand: null,
     copyPrompt: null,
+    minTier: 'starter',
   },
   {
     checkId: 'kd-competitors',
@@ -90,6 +97,7 @@ const KEEP_DOING_ITEMS: Omit<SyncItemPayload, 'scanStatus'>[] = [
     estimatedLift: 0,
     effortBand: null,
     copyPrompt: null,
+    minTier: 'pro',
   },
 ];
 
@@ -97,6 +105,7 @@ function buildSyncItems(
   report: DashboardReportData,
   monitoringConnected: boolean,
   trackingReady: boolean,
+  userTier: PlanTier,
 ): SyncItemPayload[] {
   const items: SyncItemPayload[] = [];
 
@@ -190,6 +199,8 @@ interface ActionsSectionProps {
   trackingReady: boolean;
   onReaudit?: () => void;
   reauditing?: boolean;
+  tier?: PlanTier;
+  onOpenUnlock?: () => void;
 }
 
 export function ActionsSection({
@@ -199,7 +210,11 @@ export function ActionsSection({
   trackingReady,
   onReaudit,
   reauditing,
+  tier = 'free',
+  onOpenUnlock,
 }: ActionsSectionProps) {
+  const isFree = !canAccess(tier, 'starter');
+  const isPro = canAccess(tier, 'pro');
   const [items, setItems] = useState<ActionChecklistItem[]>([]);
   const [summary, setSummary] = useState<ActionChecklistSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -208,7 +223,7 @@ export function ActionsSection({
   const { refreshCount } = useActionChecklistCount();
 
   const syncData = useCallback(async () => {
-    const syncItems = buildSyncItems(report, monitoringConnected, trackingReady);
+    const syncItems = buildSyncItems(report, monitoringConnected, trackingReady, tier);
     try {
       const res = await fetch('/api/action-checklist', {
         method: 'POST',
@@ -244,7 +259,7 @@ export function ActionsSection({
     } finally {
       setLoading(false);
     }
-  }, [report, domain, monitoringConnected, trackingReady, refreshCount]);
+  }, [report, domain, monitoringConnected, trackingReady, tier, refreshCount]);
 
   useEffect(() => {
     syncData();
@@ -361,51 +376,127 @@ export function ActionsSection({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex rounded-lg border border-white/8 bg-white/[0.02] p-0.5">
-          {([['priority', 'By Priority'], ['category', 'By Category'], ['effort', 'By Effort']] as const).map(
-            ([mode, label]) => (
+      {/* View mode & filter toggles — starter+ only */}
+      {!isFree && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-lg border border-white/8 bg-white/[0.02] p-0.5">
+            {([['priority', 'By Priority'], ['category', 'By Category'], ['effort', 'By Effort']] as const).map(
+              ([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors',
+                    viewMode === mode ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300',
+                  )}
+                >
+                  {label}
+                </button>
+              ),
+            )}
+          </div>
+
+          <div className="flex rounded-lg border border-white/8 bg-white/[0.02] p-0.5">
+            {([['all', 'All'], ['todo', 'To Do'], ['done', 'Done']] as const).map(([filter, label]) => (
               <button
-                key={mode}
+                key={filter}
                 type="button"
-                onClick={() => setViewMode(mode)}
+                onClick={() => setStatusFilter(filter)}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors',
-                  viewMode === mode ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300',
+                  statusFilter === filter ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300',
                 )}
               >
                 {label}
               </button>
-            ),
-          )}
-        </div>
-
-        <div className="flex rounded-lg border border-white/8 bg-white/[0.02] p-0.5">
-          {([['all', 'All'], ['todo', 'To Do'], ['done', 'Done']] as const).map(([filter, label]) => (
-            <button
-              key={filter}
-              type="button"
-              onClick={() => setStatusFilter(filter)}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors',
-                statusFilter === filter ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {viewMode === 'priority' && (
-        <div className="space-y-3">
-          {sortedByPriority.map((item, i) => (
-            <ActionCard key={item.checkId} item={item} onToggle={handleToggle} index={item.isComplete ? undefined : i + 1} />
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
-      {viewMode === 'category' && (
+      {/* Priority view (default for free, or when selected) */}
+      {(isFree || viewMode === 'priority') && (() => {
+        // Split items for free users: first N incomplete are visible, rest are locked
+        let incompleteCount = 0;
+        const visibleItems: { item: typeof sortedByPriority[0]; index?: number }[] = [];
+        const lockedItems: { item: typeof sortedByPriority[0]; index?: number }[] = [];
+
+        for (const item of sortedByPriority) {
+          if (item.isComplete) {
+            visibleItems.push({ item });
+          } else {
+            incompleteCount++;
+            if (isFree && incompleteCount > FREE_VISIBLE_FIXES) {
+              lockedItems.push({ item, index: incompleteCount });
+            } else {
+              visibleItems.push({ item, index: incompleteCount });
+            }
+          }
+        }
+
+        return (
+          <div className="space-y-3">
+            {visibleItems.map(({ item, index }) => (
+              <ActionCard
+                key={item.checkId}
+                item={item}
+                onToggle={handleToggle}
+                index={index}
+              />
+            ))}
+
+            {/* Locked section for free users — real cards with blur overlay + upgrade CTA */}
+            {isFree && lockedItems.length > 0 && (
+              <div className="relative">
+                {/* Render real ActionCards but non-interactive */}
+                <div className="space-y-3 select-none pointer-events-none blur-[3px]">
+                  {lockedItems.map(({ item, index }) => (
+                    <ActionCard
+                      key={item.checkId}
+                      item={item}
+                      onToggle={() => {}}
+                      index={index}
+                    />
+                  ))}
+                </div>
+
+                {/* Gradient overlay for smooth fade */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0d0d0f]/60 to-[#0d0d0f]/90 rounded-2xl" />
+
+                {/* Centered upgrade CTA */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#161618]/95 px-8 py-6 shadow-2xl shadow-black/50 backdrop-blur-sm text-center">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#356df4]/15">
+                      <Lock className="h-5 w-5 text-[#356df4]" />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-white">
+                        {lockedItems.length} more action{lockedItems.length !== 1 ? 's' : ''} available
+                      </p>
+                      <p className="mt-1 text-[12px] text-zinc-400 max-w-[260px]">
+                        Upgrade to unlock all fixes, copy-to-LLM prompts, and advanced filtering.
+                      </p>
+                    </div>
+                    {onOpenUnlock && (
+                      <button
+                        type="button"
+                        onClick={onOpenUnlock}
+                        className="mt-1 inline-flex items-center gap-2 rounded-lg bg-[#356df4] px-6 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+                      >
+                        Unlock all actions
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Category view — paid only */}
+      {!isFree && viewMode === 'category' && (
         <div className="space-y-8">
           {Array.from(groupByCategory(filtered)).map(([key, groupItems]) => (
             <div key={key}>
@@ -422,7 +513,8 @@ export function ActionsSection({
         </div>
       )}
 
-      {viewMode === 'effort' && (
+      {/* Effort view — paid only */}
+      {!isFree && viewMode === 'effort' && (
         <div className="space-y-8">
           {Array.from(groupByEffort(filtered)).map(([key, groupItems]) =>
             groupItems.length > 0 ? (
@@ -441,7 +533,8 @@ export function ActionsSection({
         </div>
       )}
 
-      {filtered.length === 0 && (
+
+      {!isFree && filtered.length === 0 && (
         <p className="py-8 text-center text-[13px] text-zinc-500">
           {statusFilter === 'done'
             ? 'No completed actions yet.'
@@ -453,3 +546,4 @@ export function ActionsSection({
     </div>
   );
 }
+

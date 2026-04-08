@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { CollapsibleSection } from '@/components/app/dashboard-primitives';
 import { AI_ENGINES } from '@/lib/ai-engines';
-import { OnboardingChecklist } from '@/components/app/onboarding-checklist';
 import { OpportunityAlertBanner } from './opportunity-alert-banner';
 import { ScoreHeader } from './score-header';
 import { ActionCenter } from './action-center';
@@ -114,8 +113,7 @@ export function DashboardSection({
 
   return (
     <div className="space-y-6">
-      {/* Onboarding (shown for new users only) */}
-      <OnboardingChecklist />
+      {/* Onboarding is now rendered as a floating widget in workspace-shell */}
 
       {/* Opportunity Alert Banner */}
       {opportunityAlert && (

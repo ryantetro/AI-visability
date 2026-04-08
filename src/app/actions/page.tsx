@@ -15,6 +15,8 @@ function ActionsContent() {
           trackingReady={false}
           onReaudit={ctx.handleReaudit}
           reauditing={ctx.reauditing}
+          tier={ctx.tier}
+          onOpenUnlock={ctx.onOpenUnlock}
         />
       )}
     </WorkspaceShell>

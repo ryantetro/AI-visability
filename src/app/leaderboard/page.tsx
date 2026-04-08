@@ -1,6 +1,5 @@
 import { listLeaderboardEntriesFiltered } from '@/lib/public-proof';
 
-import { FloatingFeedback } from '@/components/ui/floating-feedback';
 import { LeaderboardContent } from './leaderboard-content';
 
 export const metadata = {
@@ -35,7 +34,6 @@ export default async function LeaderboardPage() {
           <LeaderboardContent entries={displayEntries} />
         </section>
 
-        <FloatingFeedback />
       </div>
   );
 }

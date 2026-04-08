@@ -23,7 +23,7 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { MiniInfoTile } from '@/components/app/dashboard-primitives';
-import { FloatingFeedback } from '@/components/ui/floating-feedback';
+import { OnboardingChecklist } from '@/components/app/onboarding-checklist';
 import { UnlockFeaturesModal } from '@/components/ui/unlock-features-modal';
 import { LockedFeatureOverlay } from '@/components/ui/locked-feature-overlay';
 import { cn } from '@/lib/utils';
@@ -88,6 +88,7 @@ export function WorkspaceShell({
     reauditLoading,
     handleReaudit,
     handleRunFirstScan,
+    scanAutoStarting,
     monitoringConnected,
     monitoringLoading,
     handleEnableMonitoring,
@@ -139,8 +140,7 @@ export function WorkspaceShell({
         <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
           <NoDomainState sectionKey={sectionKey} onOpenUnlock={() => setUnlockModalOpen(true)} />
         </main>
-        <FloatingFeedback userEmail={authUser?.email} />
-        <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
+                <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
       </div>
     );
   }
@@ -166,8 +166,11 @@ export function WorkspaceShell({
     );
   }
 
-  // No scan yet — prompt to run first scan
+  // No scan yet — show loading if scan is auto-starting, otherwise prompt
   if (!expandedSite.latestScan) {
+    if (scanAutoStarting) {
+      return <CenteredWorkspaceState label="Starting scan..." />;
+    }
     return (
       <div className="text-white">
         <main className="relative mx-auto max-w-[1120px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
@@ -178,8 +181,7 @@ export function WorkspaceShell({
             actionError={actionError}
           />
         </main>
-        <FloatingFeedback userEmail={authUser?.email} />
-      </div>
+              </div>
     );
   }
 
@@ -316,8 +318,8 @@ export function WorkspaceShell({
 
         {children(ctx)}
       </main>
-      <FloatingFeedback userEmail={authUser?.email} />
-      <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
+      <OnboardingChecklist />
+            <UnlockFeaturesModal open={unlockModalOpen} onOpenChange={setUnlockModalOpen} onUnlock={handleUnlockComplete} loading={unlockLoading} />
     </div>
   );
 }
@@ -367,7 +369,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
       <div className="mx-auto mt-8 flex items-center gap-3">
         {[
           { num: '1', label: 'Add domain' },
-          { num: '2', label: 'Run scan' },
+          { num: '2', label: 'Auto scan' },
           { num: '3', label: 'Get score' },
         ].map((step, i) => (
           <div key={step.num} className="flex items-center gap-3">
@@ -415,7 +417,7 @@ function NoDomainState({ sectionKey, onOpenUnlock }: { sectionKey: string; onOpe
             onClick={() => void handleAddDomain()}
             className="h-11 shrink-0 rounded-lg bg-[var(--color-primary)] px-5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
           >
-            {resumeLandingFlow ? 'Add & run scan' : 'Add'}
+            Add & scan
           </button>
         </div>
         {addError && <p className="text-[11px] text-red-400">{addError}</p>}

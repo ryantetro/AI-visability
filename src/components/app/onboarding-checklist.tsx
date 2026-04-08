@@ -1,85 +1,140 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Circle, ChevronRight, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useOnboarding } from '@/hooks/use-onboarding';
-import { DashboardPanel } from '@/components/app/dashboard-primitives';
+import { useOnboarding, type OnboardingStep } from '@/hooks/use-onboarding';
+
+const LS_COLLAPSED_KEY = 'aiso_onboarding_collapsed';
 
 export function OnboardingChecklist() {
-  const { steps, completedCount, totalSteps, progressPct, allComplete, dismissed, dismiss } = useOnboarding();
+  const {
+    steps,
+    completedCount,
+    totalSteps,
+    progressPct,
+    allComplete,
+    dismissed,
+    dismiss,
+  } = useOnboarding();
 
-  if (allComplete || dismissed) return null;
+  const [expanded, setExpanded] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(LS_COLLAPSED_KEY);
+    setExpanded(stored === '1' ? false : true);
+  }, []);
+
+  const toggleExpanded = useCallback(() => {
+    setExpanded((prev) => {
+      const next = !prev;
+      localStorage.setItem(LS_COLLAPSED_KEY, next ? '0' : '1');
+      return next;
+    });
+  }, []);
+
+  if (allComplete || dismissed || expanded === null) return null;
+
+  const nextStep = steps.find((s) => !s.completed) ?? null;
 
   return (
-    <DashboardPanel className="relative p-6">
-      {/* Dismiss button */}
-      <button
-        type="button"
-        onClick={dismiss}
-        className="absolute right-4 top-4 rounded-lg p-1.5 text-zinc-600 transition-colors hover:text-zinc-300"
-        aria-label="Dismiss getting started"
-      >
-        <X className="h-4 w-4" />
-      </button>
-
-      {/* Header */}
-      <div className="pr-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Getting Started</p>
-        <p className="mt-1 text-[15px] font-semibold text-white">
-          {completedCount}/{totalSteps} complete
-        </p>
-      </div>
-
-      {/* Progress bar */}
-      <div className="mt-3 h-1.5 w-full rounded-full bg-white/[0.06]">
-        <div
-          className="h-full rounded-full bg-[#25c972] transition-all duration-500"
-          style={{ width: `${progressPct}%` }}
-        />
-      </div>
-
-      {/* Steps */}
-      <div className="mt-5 space-y-1">
-        {steps.map((step, i) => {
-          const isNext = !step.completed && steps.slice(0, i).every((s) => s.completed);
-          return (
-            <Link
-              key={step.key}
-              href={step.href}
-              onClick={(e) => {
-                const hash = step.href.split('#')[1];
-                if (hash) {
-                  const el = document.getElementById(hash);
-                  if (el) {
-                    e.preventDefault();
-                    el.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }
-              }}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors',
-                isNext ? 'bg-[#356df4]/8' : 'hover:bg-white/[0.03]'
-              )}
+    <div className="fixed bottom-5 right-5 z-50 w-[240px]">
+      <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#161618]/95 shadow-2xl shadow-black/50 backdrop-blur-sm">
+        {/* Header */}
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <span className="text-[13px] font-semibold text-white">
+            Setup progress ({completedCount}/{totalSteps})
+          </span>
+          <div className="flex items-center gap-1">
+            <span className="flex h-6 w-6 items-center justify-center rounded text-zinc-400">
+              {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+            </span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); dismiss(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); dismiss(); } }}
+              className="flex h-6 w-6 items-center justify-center rounded text-zinc-500 transition-colors hover:text-zinc-300"
+              aria-label="Dismiss"
             >
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                {step.completed ? (
-                  <CheckCircle2 className="h-4.5 w-4.5 text-[#25c972]" />
-                ) : (
-                  <Circle className={cn('h-4.5 w-4.5', isNext ? 'text-[#356df4]' : 'text-zinc-600')} />
-                )}
-              </div>
-              <span className={cn(
-                'flex-1 text-[13px] font-medium',
-                step.completed ? 'text-zinc-500 line-through decoration-zinc-700' : isNext ? 'text-white' : 'text-zinc-400'
-              )}>
-                {step.label}
-              </span>
-              {isNext && <ChevronRight className="h-4 w-4 text-[#356df4]" />}
-            </Link>
-          );
-        })}
+              <X className="h-3.5 w-3.5" />
+            </span>
+          </div>
+        </button>
+
+        {expanded && (
+          <div className="px-4 pb-4">
+            {/* Progress bar */}
+            <div className="h-1 w-full rounded-full bg-white/[0.06]">
+              <div
+                className="h-full rounded-full bg-[#356df4] transition-all duration-500"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+
+            {/* Steps */}
+            <div className="mt-3 space-y-px">
+              {steps.map((step) => (
+                <StepRow key={step.key} step={step} isNext={step === nextStep} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-    </DashboardPanel>
+    </div>
+  );
+}
+
+function StepRow({ step, isNext }: { step: OnboardingStep; isNext: boolean }) {
+  const inner = (
+    <div
+      className={cn(
+        'flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors',
+        isNext ? 'bg-[#356df4]/[0.08]' : 'hover:bg-white/[0.02]',
+      )}
+    >
+      <div className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+        {step.completed ? (
+          <div className="flex h-[16px] w-[16px] items-center justify-center rounded-full bg-[#25c972]">
+            <Check className="h-2.5 w-2.5 text-black" strokeWidth={3} />
+          </div>
+        ) : isNext ? (
+          <div className="h-[16px] w-[16px] rounded-full border-2 border-[#356df4]" />
+        ) : (
+          <div className="h-[16px] w-[16px] rounded-full border-[1.5px] border-zinc-700" />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <span
+          className={cn(
+            'block text-[12px] font-medium leading-[18px]',
+            step.completed
+              ? 'text-zinc-500 line-through decoration-zinc-700'
+              : isNext ? 'text-white' : 'text-zinc-400',
+          )}
+        >
+          {step.label}
+        </span>
+        {isNext && step.description && (
+          <span className="mt-0.5 block text-[11px] leading-[1.35] text-zinc-500">
+            {step.description}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  if (step.completed) return <div>{inner}</div>;
+
+  return (
+    <Link href={step.href} className="block">
+      {inner}
+    </Link>
   );
 }

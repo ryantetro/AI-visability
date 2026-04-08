@@ -149,8 +149,8 @@ export function canAccess(userPlan: PlanTier, requiredTier: PlanTier): boolean {
 
 /** Which nav items require which minimum tier */
 export const NAV_GATES: Record<string, PlanTier> = {
-  dashboard: 'starter',
-  report: 'free',
+  dashboard: 'free',
+  report: 'starter',
   actions: 'free',
   brand: 'starter',
   competitors: 'pro',
@@ -159,7 +159,7 @@ export const NAV_GATES: Record<string, PlanTier> = {
   prompts: 'starter',
   'content-studio': 'pro',
   leaderboard: 'free',
-  settings: 'starter',
+  settings: 'free',
   export: 'pro',
 };
 

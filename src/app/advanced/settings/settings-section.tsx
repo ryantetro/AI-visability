@@ -21,6 +21,7 @@ import {
   planStringToTier,
   type AIPlatform,
   type PaymentPlanString,
+  type PlanTier,
 } from '@/lib/pricing';
 import { useTeam } from '@/hooks/use-team';
 import { invalidatePlanCache } from '@/hooks/use-plan';
@@ -41,6 +42,8 @@ interface SettingsSectionProps {
   monitoringLoading: boolean;
   onEnableMonitoring: () => void;
   onDisableMonitoring: () => void;
+  tier?: PlanTier;
+  onOpenUnlock?: () => void;
 }
 
 type TrackingKeyState = {
@@ -202,6 +205,8 @@ export function SettingsSection({
   monitoringLoading,
   onEnableMonitoring,
   onDisableMonitoring,
+  tier: _tierProp,
+  onOpenUnlock,
 }: SettingsSectionProps) {
   const [portalLoading, setPortalLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
@@ -1296,6 +1301,8 @@ export function SettingsSection({
       .finally(() => setFeedbackLoading(false));
   }, [activeTab, isAdmin, feedbackLoaded]);
 
+  const isTabLocked = useCallback((minTier: PlanTier) => !canAccess(tier, minTier), [tier]);
+
   /* ── Shared button styles ──────────────────────────────────────── */
   const btnBase = 'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors disabled:opacity-50';
   const btnPrimary = cn(btnBase, 'bg-white/[0.08] text-zinc-200 hover:bg-white/[0.12]');
@@ -2227,6 +2234,7 @@ export function SettingsSection({
 
       {/* ─── TEAM TAB ────────────────────────────────────────────── */}
       {activeTab === 'team' && (
+      <GatedTabContent locked={isTabLocked('starter')} label="Team management requires Starter" onUpgrade={onOpenUnlock}>
       <>
       {/* ─── Team Management ──────────────────────────────────────── */}
       <section id="team" className="scroll-mt-6">
@@ -2481,10 +2489,12 @@ export function SettingsSection({
       </section>
 
       </>
+      </GatedTabContent>
       )}
 
       {/* ─── MONITORING TAB ──────────────────────────────────────── */}
       {activeTab === 'monitoring' && (
+      <GatedTabContent locked={isTabLocked('starter')} label="Monitoring requires Starter" onUpgrade={onOpenUnlock}>
       <>
       {/* ─── Monitoring & Alerts ─────────────────────────────────── */}
       <section id="monitoring" className="scroll-mt-6">
@@ -2577,133 +2587,7 @@ export function SettingsSection({
         </Card>
       </section>
 
-      </>
-      )}
-
-      {/* ─── PLATFORMS TAB ───────────────────────────────────────── */}
-      {activeTab === 'platforms' && (
-      <>
-      {/* ─── AI Platform Selection ──────────────────────────────── */}
-      <section id="platforms" className="scroll-mt-6">
-        <h2 className="text-[15px] font-semibold text-white">AI Platforms</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">
-          Choose which AI engines to track for {domain}. Your {planConfig.name} plan includes up to {maxPlatforms} platform{maxPlatforms !== 1 ? 's' : ''}.
-        </p>
-
-        <Card className="mt-4">
-          {platformsLoading ? (
-            <div className="px-5 py-4 text-[13px] text-zinc-500">Loading platforms...</div>
-          ) : (
-            <div className="divide-y divide-white/[0.06]">
-              {AI_PLATFORMS.map((platform) => {
-                const isSelected = selectedPlatforms.includes(platform);
-                const isDisabled = !isSelected && selectedPlatforms.length >= maxPlatforms;
-                return (
-                  <div key={platform} className="flex items-center justify-between px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[13px] font-medium text-zinc-200">{PLATFORM_LABELS[platform]}</span>
-                      {isDisabled && (
-                        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-500">
-                          Upgrade to add
-                        </span>
-                      )}
-                    </div>
-                    <ToggleSwitch
-                      checked={isSelected}
-                      disabled={platformsSaving || (isDisabled && !isSelected) || (isSelected && selectedPlatforms.length <= 1)}
-                      onToggle={() => void handleTogglePlatform(platform)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {platformsError && (
-            <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
-              {platformsError}
-            </div>
-          )}
-          {selectedPlatforms.length >= maxPlatforms && tier !== 'growth' && (
-            <div className="border-t border-white/[0.06] px-5 py-3">
-              <button
-                type="button"
-                onClick={() => handleUnlockComplete(tier === 'free' ? 'starter_monthly' : tier === 'starter' ? 'pro_monthly' : 'growth_monthly')}
-                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
-              >
-                Upgrade for more platforms &rarr;
-              </button>
-            </div>
-          )}
-        </Card>
-      </section>
-
-      {/* ─── Region Targeting ──────────────────────────────────── */}
-      <section id="regions" className="scroll-mt-6">
-        <h2 className="text-[15px] font-semibold text-white">Region Targeting</h2>
-        <p className="mt-1 text-[12px] text-zinc-500">
-          Choose regions for AI mention testing. Your {planConfig.name} plan includes {planConfig.regions === -1 ? 'unlimited' : planConfig.regions} region{planConfig.regions !== 1 ? 's' : ''}.
-          {planConfig.regions === 1 && (
-            <> Upgrade to Pro for multi-region testing.</>
-          )}
-        </p>
-
-        <Card className="mt-4">
-          {regionsLoading ? (
-            <div className="px-5 py-4 text-[13px] text-zinc-500">Loading regions...</div>
-          ) : (
-            <div className="divide-y divide-white/[0.06]">
-              {REGIONS.map((region) => {
-                const isSelected = selectedRegions.includes(region.id);
-                const isDisabled = !isSelected && selectedRegions.length >= maxRegions;
-                return (
-                  <div key={region.id} className="flex items-center justify-between px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-base">{regionFlag(region.flag)}</span>
-                      <div>
-                        <span className="text-[13px] font-medium text-zinc-200">{region.label}</span>
-                        <span className="ml-2 text-[11px] text-zinc-500">{region.language}</span>
-                      </div>
-                      {isDisabled && (
-                        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-500">
-                          Upgrade to add
-                        </span>
-                      )}
-                    </div>
-                    <ToggleSwitch
-                      checked={isSelected}
-                      disabled={regionsSaving || (isDisabled && !isSelected) || (isSelected && selectedRegions.length <= 1)}
-                      onToggle={() => void handleToggleRegion(region.id)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {regionsError && (
-            <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
-              {regionsError}
-            </div>
-          )}
-          {selectedRegions.length >= maxRegions && tier !== 'growth' && (
-            <div className="border-t border-white/[0.06] px-5 py-3">
-              <button
-                type="button"
-                onClick={() => handleUnlockComplete(tier === 'free' ? 'starter_monthly' : tier === 'starter' ? 'pro_monthly' : 'growth_monthly')}
-                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
-              >
-                Upgrade for more regions &rarr;
-              </button>
-            </div>
-          )}
-        </Card>
-      </section>
-
-      </>
-      )}
-
-      {/* ─── AI Bot Tracking (Monitoring tab) ──────────────────────── */}
-      {activeTab === 'monitoring' && (
-      <>
+      {/* ─── AI Bot Tracking ────────────────────────────────────── */}
       <section id="tracking" className="scroll-mt-6">
         <h2 className="text-[15px] font-semibold text-white">AI Bot Tracking</h2>
         <p className="mt-1 text-[12px] text-zinc-500">
@@ -2833,6 +2717,130 @@ export function SettingsSection({
       </section>
 
       </>
+      </GatedTabContent>
+      )}
+
+      {/* ─── PLATFORMS TAB ───────────────────────────────────────── */}
+      {activeTab === 'platforms' && (
+      <GatedTabContent locked={isTabLocked('starter')} label="Platform settings require Starter" onUpgrade={onOpenUnlock}>
+      <>
+      {/* ─── AI Platform Selection ──────────────────────────────── */}
+      <section id="platforms" className="scroll-mt-6">
+        <h2 className="text-[15px] font-semibold text-white">AI Platforms</h2>
+        <p className="mt-1 text-[12px] text-zinc-500">
+          Choose which AI engines to track for {domain}. Your {planConfig.name} plan includes up to {maxPlatforms} platform{maxPlatforms !== 1 ? 's' : ''}.
+        </p>
+
+        <Card className="mt-4">
+          {platformsLoading ? (
+            <div className="px-5 py-4 text-[13px] text-zinc-500">Loading platforms...</div>
+          ) : (
+            <div className="divide-y divide-white/[0.06]">
+              {AI_PLATFORMS.map((platform) => {
+                const isSelected = selectedPlatforms.includes(platform);
+                const isDisabled = !isSelected && selectedPlatforms.length >= maxPlatforms;
+                return (
+                  <div key={platform} className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[13px] font-medium text-zinc-200">{PLATFORM_LABELS[platform]}</span>
+                      {isDisabled && (
+                        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-500">
+                          Upgrade to add
+                        </span>
+                      )}
+                    </div>
+                    <ToggleSwitch
+                      checked={isSelected}
+                      disabled={platformsSaving || (isDisabled && !isSelected) || (isSelected && selectedPlatforms.length <= 1)}
+                      onToggle={() => void handleTogglePlatform(platform)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {platformsError && (
+            <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+              {platformsError}
+            </div>
+          )}
+          {selectedPlatforms.length >= maxPlatforms && tier !== 'growth' && (
+            <div className="border-t border-white/[0.06] px-5 py-3">
+              <button
+                type="button"
+                onClick={() => handleUnlockComplete(tier === 'free' ? 'starter_monthly' : tier === 'starter' ? 'pro_monthly' : 'growth_monthly')}
+                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
+              >
+                Upgrade for more platforms &rarr;
+              </button>
+            </div>
+          )}
+        </Card>
+      </section>
+
+      {/* ─── Region Targeting ──────────────────────────────────── */}
+      <section id="regions" className="scroll-mt-6">
+        <h2 className="text-[15px] font-semibold text-white">Region Targeting</h2>
+        <p className="mt-1 text-[12px] text-zinc-500">
+          Choose regions for AI mention testing. Your {planConfig.name} plan includes {planConfig.regions === -1 ? 'unlimited' : planConfig.regions} region{planConfig.regions !== 1 ? 's' : ''}.
+          {planConfig.regions === 1 && (
+            <> Upgrade to Pro for multi-region testing.</>
+          )}
+        </p>
+
+        <Card className="mt-4">
+          {regionsLoading ? (
+            <div className="px-5 py-4 text-[13px] text-zinc-500">Loading regions...</div>
+          ) : (
+            <div className="divide-y divide-white/[0.06]">
+              {REGIONS.map((region) => {
+                const isSelected = selectedRegions.includes(region.id);
+                const isDisabled = !isSelected && selectedRegions.length >= maxRegions;
+                return (
+                  <div key={region.id} className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-base">{regionFlag(region.flag)}</span>
+                      <div>
+                        <span className="text-[13px] font-medium text-zinc-200">{region.label}</span>
+                        <span className="ml-2 text-[11px] text-zinc-500">{region.language}</span>
+                      </div>
+                      {isDisabled && (
+                        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-zinc-500">
+                          Upgrade to add
+                        </span>
+                      )}
+                    </div>
+                    <ToggleSwitch
+                      checked={isSelected}
+                      disabled={regionsSaving || (isDisabled && !isSelected) || (isSelected && selectedRegions.length <= 1)}
+                      onToggle={() => void handleToggleRegion(region.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {regionsError && (
+            <div className="border-t border-white/[0.06] px-5 py-3 text-[12px] text-red-400">
+              {regionsError}
+            </div>
+          )}
+          {selectedRegions.length >= maxRegions && tier !== 'growth' && (
+            <div className="border-t border-white/[0.06] px-5 py-3">
+              <button
+                type="button"
+                onClick={() => handleUnlockComplete(tier === 'free' ? 'starter_monthly' : tier === 'starter' ? 'pro_monthly' : 'growth_monthly')}
+                className="text-[12px] font-medium text-[var(--color-primary)] transition-colors hover:text-white"
+              >
+                Upgrade for more regions &rarr;
+              </button>
+            </div>
+          )}
+        </Card>
+      </section>
+
+      </>
+      </GatedTabContent>
       )}
 
       {/* ─── Account (General tab) ──────────────────────────────────── */}
@@ -2935,6 +2943,51 @@ export function SettingsSection({
       )}
 
     </div>
+    </div>
+  );
+}
+
+function GatedTabContent({
+  locked,
+  label,
+  children,
+  onUpgrade,
+}: {
+  locked: boolean;
+  label: string;
+  children: ReactNode;
+  onUpgrade?: () => void;
+}) {
+  if (!locked) return <>{children}</>;
+
+  return (
+    <div className="relative">
+      <div className="select-none pointer-events-none blur-[3px]">
+        {children}
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0d0d0f]/60 to-[#0d0d0f]/90 rounded-2xl" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#161618]/95 px-8 py-6 shadow-2xl shadow-black/50 backdrop-blur-sm text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#356df4]/15">
+            <Lock className="h-5 w-5 text-[#356df4]" />
+          </div>
+          <div>
+            <p className="text-[15px] font-semibold text-white">{label}</p>
+            <p className="mt-1 text-[12px] text-zinc-400 max-w-[260px]">
+              Upgrade your plan to access this feature.
+            </p>
+          </div>
+          {onUpgrade && (
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="mt-1 inline-flex items-center gap-2 rounded-lg bg-[#356df4] px-6 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              Upgrade to unlock
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

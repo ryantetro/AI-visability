@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDomainContext } from '@/contexts/domain-context';
+import { usePlan } from '@/hooks/use-plan';
 
 const LS_REPORT_VIEWED = 'aiso_onboarding_report_viewed';
 const LS_TRACKING_INSTALLED = 'aiso_onboarding_tracking_installed';
@@ -10,6 +11,7 @@ const LS_DISMISSED = 'aiso_onboarding_dismissed';
 export interface OnboardingStep {
   key: string;
   label: string;
+  description: string;
   completed: boolean;
   href: string;
 }
@@ -23,6 +25,8 @@ export function useOnboarding() {
     monitoringConnected,
   } = useDomainContext();
 
+  const { tier } = usePlan();
+
   const [reportViewed, setReportViewed] = useState(false);
   const [trackingInstalled, setTrackingInstalled] = useState(false);
   const [trackingKeyOnServer, setTrackingKeyOnServer] = useState(false);
@@ -31,7 +35,8 @@ export function useOnboarding() {
   // Read localStorage on mount
   useEffect(() => {
     setReportViewed(localStorage.getItem(LS_REPORT_VIEWED) === '1');
-    setTrackingInstalled(localStorage.getItem(LS_TRACKING_INSTALLED) === '1');
+    // Don't trust localStorage for tracking — server check is the source of truth
+    setTrackingInstalled(false);
     setDismissed(localStorage.getItem(LS_DISMISSED) === '1');
   }, []);
 
@@ -44,11 +49,13 @@ export function useOnboarding() {
     const q = new URLSearchParams({ domain: selectedDomain });
     fetch(`/api/user/tracking-key?${q.toString()}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { siteKey?: string | null } | null) => {
+      .then((data: { siteKey?: string | null; lastUsedAt?: string | null } | null) => {
         if (cancelled || !data) return;
-        const hasKey = Boolean(data.siteKey);
-        setTrackingKeyOnServer(hasKey);
-        if (hasKey) {
+        // Only mark tracking as installed when the key has actually been used
+        // (meaning the script is installed on their site and sending data)
+        const isActive = Boolean(data.siteKey && data.lastUsedAt);
+        setTrackingKeyOnServer(isActive);
+        if (isActive) {
           localStorage.setItem(LS_TRACKING_INSTALLED, '1');
           setTrackingInstalled(true);
         }
@@ -78,38 +85,58 @@ export function useOnboarding() {
 
   const isMonitoring = selectedDomain ? Boolean(monitoringConnected[selectedDomain]) : false;
 
-  const steps: OnboardingStep[] = useMemo(() => [
-    {
-      key: 'add_domain',
-      label: 'Add your first domain',
-      completed: monitoredSites.length > 0,
-      href: '/dashboard',
-    },
-    {
-      key: 'run_scan',
-      label: 'Run your first scan (30 sec)',
-      completed: expandedSite?.latestScan?.status === 'complete',
-      href: '/dashboard',
-    },
-    {
-      key: 'review_report',
-      label: 'See your AI visibility score',
-      completed: reportViewed || !!report,
-      href: '/report',
-    },
-    {
-      key: 'install_tracking',
-      label: 'Monitor AI bot traffic (optional)',
-      completed: trackingInstalled || trackingKeyOnServer,
-      href: '/dashboard#tracking',
-    },
-    {
-      key: 'enable_monitoring',
-      label: 'Get weekly score updates',
-      completed: isMonitoring,
-      href: '/dashboard#monitoring',
-    },
-  ], [
+  const steps: OnboardingStep[] = useMemo(() => {
+    const base: OnboardingStep[] = [
+      {
+        key: 'add_domain',
+        label: 'Add your first domain',
+        description: 'Enter the domain you want to monitor for AI visibility.',
+        completed: monitoredSites.length > 0,
+        href: '/dashboard',
+      },
+      {
+        key: 'run_scan',
+        label: 'Run your first scan',
+        description: 'Full analysis takes 4\u20135 minutes. We\u2019ll scan your site across all AI engines.',
+        completed: expandedSite?.latestScan?.status === 'complete',
+        href: '/dashboard',
+      },
+      {
+        key: 'review_report',
+        label: 'Review your AI visibility score',
+        description: 'See how AI engines rank and reference your site.',
+        completed: reportViewed || !!report,
+        href: '/dashboard',
+      },
+      {
+        key: 'install_tracking',
+        label: 'Install AI bot tracking',
+        description: 'Add a one-line script to track which AI bots visit your site.',
+        completed: trackingInstalled || trackingKeyOnServer,
+        href: '/report#tracking',
+      },
+      {
+        key: 'enable_monitoring',
+        label: 'Enable weekly score updates',
+        description: 'Get notified when your AI visibility score changes.',
+        completed: isMonitoring,
+        href: '/report#monitoring',
+      },
+    ];
+
+    // Add plan-specific steps for paid users
+    if (tier === 'pro' || tier === 'growth') {
+      base.push({
+        key: 'add_competitor',
+        label: 'Add a competitor to track',
+        description: 'Benchmark your AI visibility against competitors.',
+        completed: false, // will be populated when competitor data is available
+        href: '/competitors',
+      });
+    }
+
+    return base;
+  }, [
     monitoredSites.length,
     expandedSite?.latestScan?.status,
     reportViewed,
@@ -117,6 +144,7 @@ export function useOnboarding() {
     trackingInstalled,
     trackingKeyOnServer,
     isMonitoring,
+    tier,
   ]);
 
   const completedCount = steps.filter((s) => s.completed).length;

@@ -28,7 +28,7 @@ export function NextStepsCard() {
       iconColor: '#3b82f6',
       title: 'See your score & fixes',
       description: 'View your full AI visibility breakdown and what to fix to rank higher with ChatGPT and Perplexity.',
-      href: '/report',
+      href: '/dashboard',
       cta: 'See Your Score',
     });
   }
@@ -41,7 +41,7 @@ export function NextStepsCard() {
       iconColor: '#a855f7',
       title: 'Track AI bot visits',
       description: 'See which AI crawlers visit your site (ChatGPT, Perplexity, etc.) and which send you real visitors. Takes ~5 min to install.',
-      href: '/dashboard#tracking',
+      href: '/report#tracking',
       cta: 'Install Tracking (5 min)',
     });
   }
@@ -54,7 +54,7 @@ export function NextStepsCard() {
       iconColor: '#25c972',
       title: 'Get weekly score updates',
       description: 'Automatic weekly scans so you know when your AI visibility improves or drops.',
-      href: '/dashboard#monitoring',
+      href: '/report#monitoring',
       cta: 'Enable Weekly Scans',
     });
   }

@@ -13,6 +13,8 @@ export default function SettingsPage() {
           monitoringLoading={ctx.monitoringLoading}
           onEnableMonitoring={ctx.handleEnableMonitoring}
           onDisableMonitoring={ctx.handleDisableMonitoring}
+          tier={ctx.tier}
+          onOpenUnlock={ctx.onOpenUnlock}
         />
       )}
     </WorkspaceShell>

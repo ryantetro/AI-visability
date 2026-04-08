@@ -45,6 +45,7 @@ interface DomainContextValue {
   addError: string | null;
   confirmChecked: boolean;
   setConfirmChecked: (v: boolean) => void;
+  scanAutoStarting: boolean;
 
   // Workspace data
   hasPaidAccess: boolean;
@@ -135,6 +136,7 @@ export function DomainContextProvider({
   const [addDomainInput, setAddDomainInput] = useState('');
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [scanAutoStarting, setScanAutoStarting] = useState(false);
 
   useEffect(() => {
     if (!prefilledDomain) return;
@@ -708,31 +710,30 @@ export function DomainContextProvider({
     setAddDomainInput('');
     setConfirmChecked(false);
 
-    if (shouldAutoStartPrefilledScan) {
-      try {
-        const res = await fetch('/api/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: normalizedDomain }),
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(payload.error || 'Failed to start scan');
-        }
-
-        rememberRecentScan(payload.id, storageScope);
-        router.replace(`/report?report=${payload.id}`);
-        return { ok: true };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to start scan';
-        setActionError(message);
-        router.replace(`/report?domain=${encodeURIComponent(normalizedDomain)}`);
-        return { ok: true, error: message };
+    // Always auto-start a scan after adding a domain
+    setScanAutoStarting(true);
+    try {
+      const res = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: normalizedDomain }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'Failed to start scan');
       }
-    }
 
-    return result;
-  }, [normalizedDomain, manualDomains, confirmChecked, addTrackedDomain, shouldAutoStartPrefilledScan, storageScope, router]);
+      rememberRecentScan(payload.id, storageScope);
+      router.replace(`/dashboard?report=${payload.id}`);
+      return { ok: true };
+    } catch (err) {
+      setScanAutoStarting(false);
+      const message = err instanceof Error ? err.message : 'Failed to start scan';
+      setActionError(message);
+      router.replace(`/dashboard?domain=${encodeURIComponent(normalizedDomain)}`);
+      return { ok: true, error: message };
+    }
+  }, [normalizedDomain, manualDomains, confirmChecked, addTrackedDomain, storageScope, router]);
 
   const handleRemoveDomain = useCallback((domain: string) => {
     // Write-through to DB
@@ -824,7 +825,7 @@ export function DomainContextProvider({
 
   const handleRunFirstScan = useCallback(async (site: SiteSummary) => {
     setActionError('');
-    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: site.url }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); rememberRecentScan(payload.id, storageScope); router.push(`/report?report=${payload.id}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); }
+    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: site.url }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); rememberRecentScan(payload.id, storageScope); router.push(`/dashboard?report=${payload.id}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); }
   }, [router, storageScope]);
 
   const handleReaudit = useCallback(async () => {
@@ -847,7 +848,7 @@ export function DomainContextProvider({
       setRecentScans((prev) => [newScanEntry, ...prev]);
       setReport(null); setFiles(null); setLoadError(''); setWorkspaceLoading(true);
       setReportCache({}); setFilesCache({});
-      router.push(`/report?report=${payload.id}`);
+      router.push(`/dashboard?report=${payload.id}`);
     } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); } finally { setReauditLoading(false); }
   }, [files?.url, report?.url, expandedSite, router, storageScope]);
 
@@ -886,6 +887,7 @@ export function DomainContextProvider({
     addError,
     confirmChecked,
     setConfirmChecked,
+    scanAutoStarting,
     hasPaidAccess,
     report,
     files,
@@ -914,7 +916,7 @@ export function DomainContextProvider({
     inputFaviconUrl,
   }), [
     monitoredSites, trackedSites, scannedSites, selectedDomain, selectDomain, addDomainInput, handleAddDomain, addTrackedDomain, handleRemoveDomain,
-    addError, confirmChecked, hasPaidAccess, report, files, workspaceLoading, loadError, recentScans,
+    addError, confirmChecked, scanAutoStarting, hasPaidAccess, report, files, workspaceLoading, loadError, recentScans,
     recentLoading, expandedSite, actionError, reauditLoading, handleReaudit, handleRunFirstScan,
     monitoringConnected, monitoringLoading, handleEnableMonitoring, handleDisableMonitoring, unlockModalOpen, handleUnlockComplete,
     unlockLoading, pendingDomain, paidOverride, debugPaidPreview, checkoutBanner, dismissCheckoutBanner, inputFaviconUrl,
