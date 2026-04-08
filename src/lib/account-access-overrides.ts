@@ -10,6 +10,7 @@ interface AccountAccessOverride {
 }
 
 const ACCOUNT_ACCESS_OVERRIDES = new Map<string, AccountAccessOverride>([
+  ['ryantetro@gmail.com', { plan: 'growth_annual', tier: 'growth', maxDomains: UNLIMITED_PLAN_LIMIT }],
   ['cydtetro@gmail.com', { plan: 'pro_annual', tier: 'pro', maxDomains: UNLIMITED_PLAN_LIMIT }],
 ]);
 
