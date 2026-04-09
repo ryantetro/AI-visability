@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -5,6 +6,7 @@ import { upgradeUserPlan } from '@/lib/user-profile';
 import { trimWorkspaceToFit } from '@/lib/billing';
 import { planStringToTier, TIER_LEVEL } from '@/lib/pricing';
 import { setStripeIds } from '@/lib/fix-my-site';
+import { triggerFixMySiteAgent } from '@/lib/fix-my-site/pipeline';
 import { getDatabase } from '@/lib/services/registry';
 import { sendFixMySiteOrderNotification, sendFixMySiteConfirmation } from '@/lib/services/resend-alerts';
 
@@ -300,6 +302,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           }
         }
       }
+
+      // Trigger the agent to generate files in the background
+      after(() => triggerFixMySiteAgent(orderId));
     }
 
     return;
