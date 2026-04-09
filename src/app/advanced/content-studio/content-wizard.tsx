@@ -286,7 +286,6 @@ export function ContentWizard({
       // no intermediate animation. The brief-viewer shows real-time progress.
       onComplete({ ...item, status: 'brief_generating' });
     } catch (err) {
-      setGenerating(false);
       setSubmitting(false);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
     }
