@@ -37,10 +37,10 @@ export async function GET(
     ?? '# Implementation Guide\n\nGuide was not generated — the agent may have been interrupted. Try re-running from your dashboard.';
   zip.file('IMPLEMENTATION-GUIDE.md', guide);
 
-  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+  const buffer = await zip.generateAsync({ type: 'arraybuffer' });
   const safeDomain = order.domain.replace(/[^a-zA-Z0-9.-]/g, '_');
 
-  return new NextResponse(buffer, {
+  return new Response(buffer, {
     headers: {
       'Content-Type': 'application/zip',
       'Content-Disposition': `attachment; filename="fix-my-site-${safeDomain}.zip"`,
