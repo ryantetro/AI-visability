@@ -40,6 +40,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [34-content-studio-tab.md](./34-content-studio-tab.md) | Content Studio — 4-step content creation wizard, audience management, brief/article generation | `src/app/advanced/content-studio/`, `src/app/api/content-studio/` |
 | [35-managed-agents-integration.md](./35-managed-agents-integration.md) | Claude Managed Agents — feature suggestions for autonomous content, scanning, monitoring, and onboarding | `@anthropic-ai/claude-agent-sdk` |
 | [36-content-studio-pipeline.md](./36-content-studio-pipeline.md) | Content Studio AI Pipeline — Agent SDK autonomous brief/article generation with WebSearch | `src/lib/content-studio/`, `src/app/api/content-studio/[id]/generate/` |
+| [37-fix-my-site-agent.md](./37-fix-my-site-agent.md) | Fix My Site Agent — autonomous file generation after payment via Agent SDK | `src/lib/fix-my-site/`, `src/app/api/fix-my-site/[id]/download/` |
 
 ## Architecture Principles
 
