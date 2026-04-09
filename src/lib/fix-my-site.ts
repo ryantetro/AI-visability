@@ -2,6 +2,22 @@ import { getSupabaseClient } from '@/lib/supabase';
 
 /* ── Types ──────────────────────────────────────────────────────── */
 
+export interface GeneratedFile {
+  filename: string;
+  content: string;
+  description: string;
+}
+
+export interface AgentProgress {
+  step: number;
+  totalSteps: number;
+  progress: number;
+  currentTask: string;
+  filesCompleted: string[];
+  error: string | null;
+  startedAt: string | null;
+}
+
 export interface FixMySiteOrder {
   id: string;
   user_id: string;
@@ -15,6 +31,10 @@ export interface FixMySiteOrder {
   created_at: string;
   updated_at: string | null;
   completed_at: string | null;
+  generated_files: Record<string, GeneratedFile> | null;
+  guide_markdown: string | null;
+  agent_progress: AgentProgress | null;
+  scan_id: string | null;
 }
 
 export type FixMySiteStatus = FixMySiteOrder['status'];
@@ -133,5 +153,120 @@ export async function setStripeIds(
 
   if (error) {
     throw new Error(`Failed to store Stripe IDs: ${error.message}`);
+  }
+}
+
+export async function updateOrderProgress(
+  orderId: string,
+  progress: Partial<AgentProgress>,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { data: current } = await supabase
+    .from('fix_my_site_orders')
+    .select('agent_progress, status')
+    .eq('id', orderId)
+    .single();
+
+  const existing = (current?.agent_progress ?? {}) as AgentProgress;
+  const merged = { ...existing, ...progress };
+
+  const updates: Record<string, unknown> = {
+    agent_progress: merged,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Set status to in_progress if not already
+  if (current?.status === 'ordered') {
+    updates.status = 'in_progress';
+  }
+
+  const { error } = await supabase
+    .from('fix_my_site_orders')
+    .update(updates)
+    .eq('id', orderId);
+
+  if (error) {
+    console.error(`[fix-my-site] Failed to update progress for ${orderId}:`, error.message);
+  }
+}
+
+export async function saveGeneratedFile(
+  orderId: string,
+  fileType: string,
+  file: GeneratedFile,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { data: current } = await supabase
+    .from('fix_my_site_orders')
+    .select('generated_files, agent_progress')
+    .eq('id', orderId)
+    .single();
+
+  const files = (current?.generated_files ?? {}) as Record<string, GeneratedFile>;
+  files[fileType] = file;
+
+  const progress = (current?.agent_progress ?? {}) as AgentProgress;
+  const completed = progress.filesCompleted ?? [];
+  if (!completed.includes(fileType)) {
+    completed.push(fileType);
+  }
+  progress.filesCompleted = completed;
+
+  const { error } = await supabase
+    .from('fix_my_site_orders')
+    .update({
+      generated_files: files,
+      agent_progress: progress,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId);
+
+  if (error) {
+    console.error(`[fix-my-site] Failed to save file ${fileType} for ${orderId}:`, error.message);
+  }
+}
+
+export async function completeOrder(
+  orderId: string,
+  guideMarkdown: string,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  const now = new Date().toISOString();
+
+  const { data: current } = await supabase
+    .from('fix_my_site_orders')
+    .select('agent_progress')
+    .eq('id', orderId)
+    .single();
+
+  const progress = (current?.agent_progress ?? {}) as AgentProgress;
+  progress.progress = 100;
+  progress.currentTask = 'Complete';
+
+  const { error } = await supabase
+    .from('fix_my_site_orders')
+    .update({
+      status: 'delivered',
+      guide_markdown: guideMarkdown,
+      agent_progress: progress,
+      completed_at: now,
+      updated_at: now,
+    })
+    .eq('id', orderId);
+
+  if (error) {
+    throw new Error(`Failed to complete order ${orderId}: ${error.message}`);
+  }
+}
+
+export async function setScanId(orderId: string, scanId: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from('fix_my_site_orders')
+    .update({ scan_id: scanId, updated_at: new Date().toISOString() })
+    .eq('id', orderId);
+
+  if (error) {
+    console.error(`[fix-my-site] Failed to set scan_id for ${orderId}:`, error.message);
   }
 }
