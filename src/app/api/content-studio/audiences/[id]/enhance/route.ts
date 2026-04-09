@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
 import { getSupabaseClient } from '@/lib/supabase';
+import { enhanceAudienceProfile } from '@/lib/content-studio/audience-enhance';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,25 +39,34 @@ export async function POST(
     return NextResponse.json({ error: 'Audience not found.' }, { status: 404 });
   }
 
-  // In production, this would call an AI service to enhance the description.
-  // For now, generate an enhanced placeholder based on the audience name.
-  const enhanced = `## ${audience.name}\n\n**Demographics:** Decision-makers and professionals in target industries, typically aged 25-55, with moderate to high digital literacy.\n\n**Pain Points:**\n- Difficulty finding reliable solutions in a crowded market\n- Need for streamlined workflows and efficiency gains\n- Budget constraints balanced with quality expectations\n\n**Goals:**\n- Improve operational efficiency and ROI\n- Stay ahead of industry trends and competitors\n- Build sustainable, scalable processes\n\n**Preferred Channels:** LinkedIn, industry publications, webinars, email newsletters\n\n**Content Preferences:** Data-driven insights, actionable guides, case studies with measurable results`;
+  try {
+    const enhanced = await enhanceAudienceProfile(
+      audience.name,
+      audience.description,
+    );
 
-  // Update the audience with the enhanced description
-  const { data, error: updateError } = await supabase
-    .from('content_studio_audiences')
-    .update({
-      description: enhanced,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .select()
-    .single();
+    // Update the audience with the enhanced description
+    const { data, error: updateError } = await supabase
+      .from('content_studio_audiences')
+      .update({
+        description: enhanced,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('[content-studio] Audience enhancement failed:', error);
+    return NextResponse.json(
+      { error: 'Failed to enhance audience profile.' },
+      { status: 500 },
+    );
   }
-
-  return NextResponse.json(data);
 }

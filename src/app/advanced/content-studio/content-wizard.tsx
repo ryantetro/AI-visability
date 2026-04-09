@@ -114,9 +114,6 @@ export function ContentWizard({
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genStep, setGenStep] = useState(0);
-  const [genProgress, setGenProgress] = useState(0);
   const [createdItem, setCreatedItem] = useState<ContentItem | null>(null);
 
   // Step 1
@@ -232,35 +229,7 @@ export function ContentWizard({
     if (step > 1) setStep(step - 1);
   };
 
-  /* ── Generating phase — animated workflow steps ──── */
-  const GEN_WORKFLOW = [
-    { label: 'Creating content brief',   duration: 800 },
-    { label: 'Web Research',              duration: 1200 },
-    { label: 'Quote Extraction',          duration: 1000 },
-    { label: 'Outline Generation',        duration: 1100 },
-    { label: 'Brief Generation',          duration: 1400 },
-    { label: 'Finalizing',               duration: 600 },
-  ];
-
-  // Animate through generation workflow steps
-  useEffect(() => {
-    if (!generating) return;
-    let active = true;
-    let currentStep = 0;
-
-    function advanceStep() {
-      if (!active || currentStep >= GEN_WORKFLOW.length) return;
-      setGenStep(currentStep);
-      setGenProgress(Math.round(((currentStep + 1) / GEN_WORKFLOW.length) * 100));
-      currentStep++;
-      if (currentStep < GEN_WORKFLOW.length) {
-        setTimeout(advanceStep, GEN_WORKFLOW[currentStep - 1].duration);
-      }
-    }
-
-    advanceStep();
-    return () => { active = false; };
-  }, [generating]);
+  /* (Generating animation removed — brief-viewer handles real-time progress) */
 
   /* ── Submit ──── */
   const handleSubmit = async () => {
@@ -302,29 +271,20 @@ export function ContentWizard({
       const item = await res.json();
       setCreatedItem(item);
 
-      // Switch to generating animation
       setSubmitting(false);
-      setGenerating(true);
 
       // Trigger generation in background
       const genRes = await fetch(`/api/content-studio/${item.id}/generate`, { method: 'POST' });
 
       if (!genRes.ok) {
         const genData = await genRes.json().catch(() => ({ error: 'Generation failed.' }));
-        setGenerating(false);
         setError(genData.error || 'Brief generation failed. You can try again from the content list.');
         return;
       }
 
-      // Wait for the animation to complete before transitioning
-      const totalDuration = GEN_WORKFLOW.reduce((sum, s) => sum + s.duration, 0);
-      await new Promise((resolve) => setTimeout(resolve, totalDuration + 400));
-
-      // Re-fetch the item to get updated status/content
-      const updatedRes = await fetch(`/api/content-studio/${item.id}`);
-      const updatedItem = updatedRes.ok ? await updatedRes.json() : item;
-
-      onComplete(updatedItem);
+      // Go straight to the brief-viewer with the generating status —
+      // no intermediate animation. The brief-viewer shows real-time progress.
+      onComplete({ ...item, status: 'brief_generating' });
     } catch (err) {
       setGenerating(false);
       setSubmitting(false);
@@ -356,47 +316,6 @@ export function ContentWizard({
   };
 
   const progressPct = Math.round(((step - 1) / (STEPS.length - 1)) * 100);
-
-  /* ── Generating state — centered animation ──── */
-  if (generating) {
-    const currentLabel = GEN_WORKFLOW[genStep]?.label ?? 'Preparing...';
-    return (
-      <div>
-        <div className="flex min-h-[520px] items-center justify-center py-16">
-          <div className="w-full max-w-sm text-center">
-            {/* Animated ring */}
-            <div className="mx-auto flex h-24 w-24 items-center justify-center">
-              <div className="relative flex h-24 w-24 items-center justify-center">
-                <svg className="h-24 w-24 -rotate-90" viewBox="0 0 96 96">
-                  <circle cx="48" cy="48" r="42" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="4" />
-                  <circle cx="48" cy="48" r="42" fill="none" stroke="var(--color-primary-600,#2455dc)" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(genProgress / 100) * 264} 264`} className="transition-all duration-700 ease-out" />
-                </svg>
-                <Sparkles className="absolute h-6 w-6 animate-pulse text-[var(--color-primary-600,#2455dc)]" />
-              </div>
-            </div>
-
-            <p className="mt-6 text-[17px] font-semibold text-white">{currentLabel}</p>
-            <p className="mt-1 text-[13px] text-zinc-500">{genProgress}% complete</p>
-
-            <div className="mx-auto mt-8 max-w-xs space-y-1.5 text-left">
-              {GEN_WORKFLOW.map((ws, i) => {
-                const isDone = genStep > i;
-                const isActive = genStep === i;
-                return (
-                  <div key={ws.label} className={cn('flex items-center gap-3 rounded-lg px-3 py-2 transition-all', isActive && 'bg-white/[0.03]')}>
-                    {isDone ? <CheckCircle2 className="h-4 w-4 shrink-0 text-[#25c972]" /> : isActive ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--color-primary-600,#2455dc)]" /> : <Circle className="h-4 w-4 shrink-0 text-zinc-700" />}
-                    <span className={cn('text-[13px]', isDone ? 'text-zinc-500' : isActive ? 'font-medium text-white' : 'text-zinc-600')}>{ws.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="mt-8 text-[11px] text-zinc-600">This usually takes a few moments.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div>

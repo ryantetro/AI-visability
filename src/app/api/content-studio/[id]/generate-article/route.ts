@@ -3,7 +3,7 @@ import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
 import { getSupabaseClient } from '@/lib/supabase';
 import { PLANS } from '@/lib/pricing';
-import { runBriefPipeline } from '@/lib/content-studio/pipeline';
+import { runArticlePipeline } from '@/lib/content-studio/pipeline';
 import type { PipelineContext, ContentItem, AudienceData } from '@/lib/content-studio/types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,7 +29,7 @@ export async function POST(
 
   const supabase = getSupabaseClient();
 
-  // Monthly usage limit — count items that have been generated this month
+  // Monthly usage limit — count completed articles this month
   const maxPages = PLANS[access.tier].contentPages;
   if (maxPages > 0) {
     const monthStart = new Date();
@@ -59,7 +59,7 @@ export async function POST(
     }
   }
 
-  // Verify item exists and belongs to user
+  // Verify item exists, belongs to user, and has a brief
   const { data: item, error: fetchError } = await supabase
     .from('content_studio_items')
     .select('*')
@@ -71,11 +71,17 @@ export async function POST(
     return NextResponse.json({ error: 'Content item not found.' }, { status: 404 });
   }
 
-  // Guard: reject if already generating
-  if (item.status === 'brief_generating' || item.status === 'article_generating') {
+  if (item.status !== 'brief_ready') {
     return NextResponse.json(
-      { error: 'Content is already being generated.' },
-      { status: 409 },
+      { error: 'Brief must be ready before generating an article.' },
+      { status: 400 },
+    );
+  }
+
+  if (!item.brief_markdown) {
+    return NextResponse.json(
+      { error: 'No brief content found.' },
+      { status: 400 },
     );
   }
 
@@ -90,33 +96,26 @@ export async function POST(
     if (aud) audience = aud as AudienceData;
   }
 
-  // Build pipeline context
   const ctx: PipelineContext = {
     item: item as ContentItem,
     audience,
   };
 
-  // Schedule the pipeline to run after the response is sent
+  // Schedule article generation after response
   after(async () => {
     try {
-      await runBriefPipeline(ctx);
+      await runArticlePipeline(ctx);
     } catch (error) {
-      console.error('[content-studio] Pipeline crashed:', error);
-      // Reset status so user can retry
+      console.error('[content-studio] Article pipeline crashed:', error);
       await supabase
         .from('content_studio_items')
         .update({
-          status: 'draft',
-          workflow_progress: {
-            step: 0,
-            progress: 0,
-            currentTask: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          },
+          status: 'brief_ready',
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
     }
   });
 
-  return NextResponse.json({ ok: true, status: 'brief_generating' });
+  return NextResponse.json({ ok: true, status: 'article_generating' });
 }

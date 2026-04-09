@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
+  Eye,
   Loader2,
   Pencil,
   Plus,
@@ -52,7 +55,7 @@ function ModalBackdrop({ children, onClose }: { children: React.ReactNode; onClo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg">{children}</div>
+      <div className="relative z-10 w-full max-w-xl">{children}</div>
     </div>
   );
 }
@@ -92,10 +95,12 @@ function AudienceModal({
   audience,
   onClose,
   onSaved,
+  onSavedAndClose,
 }: {
   audience: Audience | null; // null = create mode
   onClose: () => void;
   onSaved: (a: Audience) => void;
+  onSavedAndClose: (a: Audience) => void;
 }) {
   const isEdit = !!audience;
   const [name, setName] = useState(audience?.name ?? '');
@@ -104,6 +109,9 @@ function AudienceModal({
   const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [descMode, setDescMode] = useState<'edit' | 'preview'>(audience?.description ? 'preview' : 'edit');
+  // Track the real audience id (needed when creating then enhancing)
+  const [audienceId, setAudienceId] = useState<string | null>(audience?.id ?? null);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -130,7 +138,7 @@ function AudienceModal({
       }
 
       const saved = await res.json();
-      onSaved(saved);
+      onSavedAndClose(saved);
     } catch {
       setError('Network error.');
       setSaving(false);
@@ -138,13 +146,14 @@ function AudienceModal({
   };
 
   const handleEnhance = async () => {
-    if (!isEdit) {
-      // Need to save first, then enhance
-      if (!name.trim()) {
-        setError('Save the audience first, then enhance.');
-        return;
-      }
-      // Create, then enhance
+    if (!name.trim()) {
+      setError('Enter an audience name first.');
+      return;
+    }
+
+    // If audience hasn't been saved yet, create it first
+    let id = audienceId;
+    if (!id) {
       setSaving(true);
       try {
         const createRes = await fetch('/api/content-studio/audiences', {
@@ -154,38 +163,38 @@ function AudienceModal({
         });
         if (!createRes.ok) {
           setSaving(false);
+          setError('Failed to save audience.');
           return;
         }
         const created = await createRes.json();
-        setSaving(false);
-        setEnhancing(true);
-
-        const enhRes = await fetch(`/api/content-studio/audiences/${created.id}/enhance`, { method: 'POST' });
-        if (enhRes.ok) {
-          const enhanced = await enhRes.json();
-          setDescription(enhanced.description || '');
-          setToast('Description enhanced! You can edit further if needed.');
-          // Update the audience reference so next save is a PUT
-          onSaved(enhanced);
-          onClose();
-        }
-        setEnhancing(false);
+        id = created.id;
+        setAudienceId(created.id);
+        onSaved(created);
       } catch {
         setSaving(false);
-        setEnhancing(false);
+        setError('Network error.');
+        return;
       }
-      return;
+      setSaving(false);
     }
 
+    // Enhance the description
     setEnhancing(true);
     try {
-      const res = await fetch(`/api/content-studio/audiences/${audience.id}/enhance`, { method: 'POST' });
+      const res = await fetch(`/api/content-studio/audiences/${id}/enhance`, { method: 'POST' });
       if (res.ok) {
         const enhanced = await res.json();
         setDescription(enhanced.description || '');
-        setToast('Description enhanced! You can edit further if needed.');
+        setDescMode('preview');
+        setToast('Description enhanced! Click the edit icon to make changes.');
+        onSaved(enhanced);
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error || 'Enhancement failed.');
       }
-    } catch { /* ignore */ }
+    } catch {
+      setError('Network error during enhancement.');
+    }
     setEnhancing(false);
   };
 
@@ -219,28 +228,47 @@ function AudienceModal({
 
             {/* Description */}
             <div>
-              <label className="block text-[12px] font-medium text-zinc-300">Description</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-[12px] font-medium text-zinc-300">Description</label>
+                {description && (
+                  <button
+                    type="button"
+                    onClick={() => setDescMode(descMode === 'edit' ? 'preview' : 'edit')}
+                    className="inline-flex items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-300"
+                  >
+                    {descMode === 'edit' ? <Eye className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+                    {descMode === 'edit' ? 'Preview' : 'Edit'}
+                  </button>
+                )}
+              </div>
               <div className="mt-1.5">
-                {/* Simple formatting toolbar */}
-                <div className="flex flex-wrap gap-1 rounded-t-lg border border-b-0 border-white/[0.08] bg-white/[0.03] px-2 py-1.5">
-                  {['B', 'I', 'S', '<>', 'H2', 'H3', 'UL', 'OL', '""', '—'].map((btn) => (
-                    <button
-                      key={btn}
-                      type="button"
-                      className="rounded px-1.5 py-0.5 text-[11px] font-medium text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-300"
-                      title={btn}
+                {descMode === 'edit' ? (
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe this audience's demographics, pain points, goals, and preferences..."
+                    rows={8}
+                    className="w-full rounded-lg border border-white/[0.08] bg-white/[0.05] px-3 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-500 focus:border-white/[0.15] focus:outline-none"
+                  />
+                ) : (
+                  <div className="audience-preview max-h-[320px] overflow-y-auto rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h2: ({ children }) => <h2 className="mb-2 mt-4 text-[14px] font-bold text-white first:mt-0">{children}</h2>,
+                        h3: ({ children }) => <h3 className="mb-1.5 mt-3 text-[13px] font-semibold text-zinc-200">{children}</h3>,
+                        p: ({ children }) => <p className="mb-2 text-[13px] leading-relaxed text-zinc-300">{children}</p>,
+                        strong: ({ children }) => <strong className="font-semibold text-zinc-100">{children}</strong>,
+                        ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
+                        li: ({ children }) => <li className="text-[13px] text-zinc-300">{children}</li>,
+                        blockquote: ({ children }) => <blockquote className="border-l-2 border-zinc-600 pl-3 text-[13px] italic text-zinc-400">{children}</blockquote>,
+                      }}
                     >
-                      {btn}
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe this audience's demographics, pain points, goals, and preferences..."
-                  rows={6}
-                  className="w-full rounded-b-lg border border-white/[0.08] bg-white/[0.05] px-3 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-500 focus:border-white/[0.15] focus:outline-none"
-                />
+                      {description}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -345,6 +373,10 @@ export function AudiencesTab({ domain }: { domain: string }) {
       if (exists) return prev.map((x) => (x.id === a.id ? a : x));
       return [a, ...prev];
     });
+  };
+
+  const handleSavedAndClose = (a: Audience) => {
+    handleSaved(a);
     setModalOpen(false);
     setEditingAudience(null);
   };
@@ -490,6 +522,7 @@ export function AudiencesTab({ domain }: { domain: string }) {
           audience={editingAudience}
           onClose={() => { setModalOpen(false); setEditingAudience(null); }}
           onSaved={handleSaved}
+          onSavedAndClose={handleSavedAndClose}
         />
       )}
 

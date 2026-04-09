@@ -38,6 +38,8 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [32-actions-tab.md](./32-actions-tab.md) | Actions checklist sidebar tab — persistent action plan with progress tracking and scan sync | `src/app/advanced/actions/actions-section.tsx`, `src/app/api/action-checklist/route.ts` |
 | [33-prompts-tab.md](./33-prompts-tab.md) | Dedicated prompt monitoring dashboard — Active/Inactive/Suggestions tabs, CRUD, engine mentions | `src/app/advanced/prompts/prompts-section.tsx`, `src/app/prompts/page.tsx` |
 | [34-content-studio-tab.md](./34-content-studio-tab.md) | Content Studio — 4-step content creation wizard, audience management, brief/article generation | `src/app/advanced/content-studio/`, `src/app/api/content-studio/` |
+| [35-managed-agents-integration.md](./35-managed-agents-integration.md) | Claude Managed Agents — feature suggestions for autonomous content, scanning, monitoring, and onboarding | `@anthropic-ai/claude-agent-sdk` |
+| [36-content-studio-pipeline.md](./36-content-studio-pipeline.md) | Content Studio AI Pipeline — Agent SDK autonomous brief/article generation with WebSearch | `src/lib/content-studio/`, `src/app/api/content-studio/[id]/generate/` |
 
 ## Architecture Principles
 
