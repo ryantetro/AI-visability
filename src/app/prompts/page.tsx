@@ -8,6 +8,7 @@ export default function PromptsPage() {
     <WorkspaceShell sectionKey="prompts">
       {(ctx) => (
         <PromptsSection
+          key={ctx.domain}
           report={ctx.report}
           domain={ctx.domain}
           tier={ctx.tier}

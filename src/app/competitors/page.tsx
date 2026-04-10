@@ -7,7 +7,7 @@ export default function CompetitorsPage() {
   return (
     <WorkspaceShell sectionKey="competitors">
       {(ctx) => (
-        <CompetitorsDashboard domain={ctx.domain} />
+        <CompetitorsDashboard key={ctx.domain} domain={ctx.domain} />
       )}
     </WorkspaceShell>
   );

@@ -21,7 +21,7 @@ function DashboardContent({ ctx }: { ctx: WorkspaceContext }) {
   return (
     <>
       <ReportSection
-        report={ctx.report}
+        report={ctx.report!}
         files={ctx.files}
         domain={ctx.domain}
         onReaudit={ctx.handleReaudit}

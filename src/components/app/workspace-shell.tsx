@@ -46,6 +46,7 @@ export function WorkspaceShell({
   sectionKey,
   requiredTier,
   wide,
+  requiresReport,
   children,
 }: {
   /** The NAV_GATES key for this section, e.g. 'dashboard', 'report', 'brand' */
@@ -54,6 +55,8 @@ export function WorkspaceShell({
   requiredTier?: PlanTier;
   /** Use wider max-width (1440px) for premium dashboard layouts */
   wide?: boolean;
+  /** Some sections only need the selected domain, not a completed scan report */
+  requiresReport?: boolean;
   /** Section content renderer — receives workspace data */
   children: (ctx: WorkspaceContext) => React.ReactNode;
 }) {
@@ -103,6 +106,7 @@ export function WorkspaceShell({
   } = useDomainContext();
 
   const minTier = requiredTier ?? (NAV_GATES[sectionKey] as PlanTier) ?? 'free';
+  const mustHaveReport = requiresReport ?? !['content-studio', 'settings', 'competitors', 'prompts'].includes(sectionKey);
   const hasAccess = canAccess(tier, minTier);
   const isFreeUser = !hasPaidAccess;
   const isMonitoring = selectedDomain ? Boolean(monitoringConnected[selectedDomain]) : false;
@@ -113,7 +117,7 @@ export function WorkspaceShell({
     return <CenteredLoading label="Loading workspace..." />;
   }
 
-  if (recentLoading) {
+  if (recentLoading && monitoredSites.length === 0) {
     return <CenteredLoading label="Loading workspace..." />;
   }
 
@@ -150,10 +154,10 @@ export function WorkspaceShell({
     return <CenteredLoading label="Loading workspace..." />;
   }
 
-  if (workspaceLoading) {
+  if (mustHaveReport && workspaceLoading) {
     return <CenteredWorkspaceState label="Loading this domain workspace..." />;
   }
-  if (loadError && !report) {
+  if (mustHaveReport && loadError && !report) {
     const isScanInProgress = loadError === 'Scan not complete';
     if (isScanInProgress) {
       return <ScanInProgressView domain={selectedDomain ?? ''} scanId={expandedSite?.latestScan?.id ?? ''} />;
@@ -167,7 +171,7 @@ export function WorkspaceShell({
   }
 
   // No scan yet — show loading if scan is auto-starting, otherwise prompt
-  if (!expandedSite.latestScan) {
+  if (mustHaveReport && !expandedSite.latestScan) {
     if (scanAutoStarting) {
       return <CenteredWorkspaceState label="Starting scan..." />;
     }
@@ -185,7 +189,7 @@ export function WorkspaceShell({
     );
   }
 
-  if (!report) {
+  if (mustHaveReport && !report) {
     // If the latest scan is still in progress, show progress view instead of a dead-end message
     const latestStatus = expandedSite?.latestScan?.status;
     if (latestStatus && latestStatus !== 'complete' && latestStatus !== 'failed') {
@@ -326,7 +330,7 @@ export function WorkspaceShell({
 
 export interface WorkspaceContext {
   domain: string;
-  report: import('@/app/advanced/lib/types').DashboardReportData;
+  report: import('@/app/advanced/lib/types').DashboardReportData | null;
   files: import('@/app/advanced/lib/types').FilesData | null;
   expandedSite: SiteSummary;
   recentScans: import('@/app/advanced/lib/types').RecentScanData[];

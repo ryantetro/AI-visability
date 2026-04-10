@@ -25,6 +25,9 @@ const AI_CRAWLER_DEFINITIONS: AiCrawlerDefinition[] = [
   { botName: 'Google-CloudVertexBot', category: 'training', company: 'Google', provider: 'gemini', matchInUserAgent: 'Google-CloudVertexBot' },
   { botName: 'Google-Extended', category: 'training', company: 'Google', provider: 'gemini' },
   { botName: 'GrokBot', category: 'indexing', company: 'xAI', provider: 'grok', matchInUserAgent: 'GrokBot' },
+  { botName: 'Grok', category: 'indexing', company: 'xAI', provider: 'grok', matchInUserAgent: 'Grok' },
+  { botName: 'xAI-Bot', category: 'indexing', company: 'xAI', provider: 'grok', matchInUserAgent: 'xAI-Bot' },
+  { botName: 'xai-grok', category: 'indexing', company: 'xAI', provider: 'grok', matchInUserAgent: 'xai-grok' },
 ];
 
 const DETECTABLE_AI_CRAWLERS = AI_CRAWLER_DEFINITIONS.filter(

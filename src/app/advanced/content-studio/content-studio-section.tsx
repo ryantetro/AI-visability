@@ -9,7 +9,7 @@ import type { PlanTier } from '@/lib/pricing';
 export function ContentStudioSection({
   domain,
 }: {
-  report: DashboardReportData;
+  report: DashboardReportData | null;
   domain: string;
   tier: PlanTier;
   onOpenUnlock: () => void;
@@ -25,9 +25,9 @@ export function ContentStudioSection({
       </div>
 
       {tab === 'audiences' ? (
-        <AudiencesTab domain={domain} />
+        <AudiencesTab key={domain} domain={domain} />
       ) : (
-        <ContentsTab domain={domain} />
+        <ContentsTab key={domain} domain={domain} />
       )}
     </div>
   );

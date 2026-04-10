@@ -346,6 +346,8 @@ Generate a complete robots.txt that:
    - ClaudeBot (Anthropic)
    - anthropic-ai (Anthropic)
    - PerplexityBot (Perplexity)
+   - GrokBot (xAI)
+   - Grok (xAI)
    - Googlebot (Google)
    - Googlebot-Image
    - Bingbot (Microsoft)

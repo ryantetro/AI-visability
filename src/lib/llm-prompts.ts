@@ -106,7 +106,7 @@ export function buildFullReportPrompt(url: string, score: ScoreResult): string {
         .join('\n\n')
     : 'No blocking fixes were identified.';
 
-  return `You are a senior web developer, technical SEO engineer, and structured-data specialist. A client's website has been audited for AI visibility — how well AI models (ChatGPT, Claude, Perplexity, Gemini, and Claude) can discover, understand, and accurately reference the site.
+  return `You are a senior web developer, technical SEO engineer, and structured-data specialist. A client's website has been audited for AI visibility — how well AI models (ChatGPT, Claude, Perplexity, Gemini, and Grok) can discover, understand, and accurately reference the site.
 
 ## Non-Negotiable Rules
 - Fix only the issues listed below unless a hard dependency must be included.
@@ -702,7 +702,7 @@ Paragraph about the company.
 \`\`\`
 `,
     'fp-robots-txt': `## Technical Context
-AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended) respect robots.txt directives. The file must:
+AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, GrokBot, Grok) respect robots.txt directives. The file must:
 - Be served at exactly \`/robots.txt\` (site root)
 - Explicitly allow AI crawlers with \`User-agent: GPTBot\` / \`Allow: /\` blocks
 - Include a \`Sitemap:\` directive pointing to your sitemap.xml

@@ -738,4 +738,3 @@ export function ContentWizard({
     </div>
   );
 }
-

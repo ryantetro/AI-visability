@@ -9,7 +9,7 @@ function ActionsContent() {
     <WorkspaceShell sectionKey="actions">
       {(ctx) => (
         <ActionsSection
-          report={ctx.report}
+          report={ctx.report!}
           domain={ctx.domain}
           monitoringConnected={ctx.monitoringConnected}
           trackingReady={false}

@@ -123,6 +123,10 @@ export const BOT_COLORS: Record<string, string> = {
   GoogleOther: '#ef4444',
   'Google-CloudVertexBot': '#f87171',
   'Google-Extended': '#ef4444',
+  GrokBot: '#f5f5f5',
+  Grok: '#f5f5f5',
+  'xAI-Bot': '#f5f5f5',
+  'xai-grok': '#f5f5f5',
 };
 
 export const BOT_CATEGORY_LABEL: Record<string, string> = {

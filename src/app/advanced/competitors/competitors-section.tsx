@@ -13,15 +13,19 @@ export function CompetitorsSection({ domain }: { domain: string }) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setCompetitors([]);
     (async () => {
       try {
         const res = await fetch(`/api/competitors?domain=${encodeURIComponent(domain)}`);
         if (res.ok) {
           const data = await res.json();
-          setCompetitors(data.competitors ?? []);
+          if (active) setCompetitors(data.competitors ?? []);
         }
-      } catch { /* silently fail */ } finally { setLoading(false); }
+      } catch { /* silently fail */ } finally { if (active) setLoading(false); }
     })();
+    return () => { active = false; };
   }, [domain]);
 
   const sorted = [...competitors].sort((a, b) => {

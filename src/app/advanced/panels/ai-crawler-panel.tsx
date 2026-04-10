@@ -308,9 +308,8 @@ export function AICrawlerPanel({
   const totalAllVisits = providerSummaries.reduce((sum, s) => sum + s.visits, 0);
   const showOtherInSidebar = otherSummary && otherSummary.visits > 0;
 
-  // Show "other" in chart only if >= 5% of total
-  const showOtherInChart = otherSummary && totalAllVisits > 0 && (otherSummary.visits / totalAllVisits) >= 0.05;
-  const chartProviders = showOtherInChart
+  // If it is ranked in the provider list, it should be visible in the chart too.
+  const chartProviders = showOtherInSidebar
     ? [...activeProviders, 'other' as const]
     : activeProviders;
 

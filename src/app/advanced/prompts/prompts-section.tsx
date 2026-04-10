@@ -385,7 +385,7 @@ type PromptTab = 'active' | 'inactive' | 'suggestions';
 type PromptRow = PromptMonitoringData['prompts'][number];
 
 interface PromptsSectionProps {
-  report: DashboardReportData;
+  report: DashboardReportData | null;
   domain: string;
   tier: PlanTier;
   onOpenUnlock: () => void;
@@ -1521,4 +1521,3 @@ export function PromptsSection({ report, domain, tier, onOpenUnlock }: PromptsSe
     </div>
   );
 }
-

@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getFaviconUrl } from '@/lib/url-utils';
-import { useDomainContext } from '@/contexts/domain-context';
+import { useDomainContext, useDomainContextSafe } from '@/contexts/domain-context';
 import { usePlan } from '@/hooks/use-plan';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { NAV_GATES, canAccess } from '@/lib/pricing';
@@ -149,7 +149,19 @@ const PRICING_ITEM: SidebarItem = {
 };
 
 /** Routes that represent the active workspace and should carry ?report= */
-const WORKSPACE_KEYS = new Set(['dashboard', 'report', 'actions', 'brand', 'competitors', 'settings', 'prompts', 'content-studio']);
+const WORKSPACE_KEYS = new Set([
+  'dashboard',
+  'report',
+  'actions',
+  'brand',
+  'competitors',
+  'settings',
+  'analytics',
+  'history',
+  'leaderboard',
+  'prompts',
+  'content-studio',
+]);
 
 const SIDEBAR_STORAGE_KEY = 'aiso_sidebar_collapsed';
 
@@ -205,30 +217,38 @@ function SidebarTooltip({ label, show }: { label: string; show: boolean }) {
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-function buildNavHref(base: string, reportId: string | null): string {
-  if (!reportId) return base;
-  return `${base}?report=${reportId}`;
+function appendWorkspaceParams(params: URLSearchParams, reportId: string | null, domain: string | null) {
+  if (reportId) params.set('report', reportId);
+  if (domain) params.set('domain', domain);
 }
 
-function buildBrandTabHref(tabId: string, reportId: string | null): string {
+function buildNavHref(base: string, reportId: string | null, domain: string | null): string {
   const params = new URLSearchParams();
-  if (reportId) params.set('report', reportId);
+  appendWorkspaceParams(params, reportId, domain);
+  const qs = params.toString();
+  if (!qs) return base;
+  return `${base}?${qs}`;
+}
+
+function buildBrandTabHref(tabId: string, reportId: string | null, domain: string | null): string {
+  const params = new URLSearchParams();
+  appendWorkspaceParams(params, reportId, domain);
   if (tabId !== 'presence') params.set('tab', tabId);
   const qs = params.toString();
   return qs ? `/brand?${qs}` : '/brand';
 }
 
-function buildPromptTabHref(tabId: string, reportId: string | null): string {
+function buildPromptTabHref(tabId: string, reportId: string | null, domain: string | null): string {
   const params = new URLSearchParams();
-  if (reportId) params.set('report', reportId);
+  appendWorkspaceParams(params, reportId, domain);
   if (tabId !== 'active') params.set('tab', tabId);
   const qs = params.toString();
   return qs ? `/prompts?${qs}` : '/prompts';
 }
 
-function buildContentStudioTabHref(tabId: string, reportId: string | null): string {
+function buildContentStudioTabHref(tabId: string, reportId: string | null, domain: string | null): string {
   const params = new URLSearchParams();
-  if (reportId) params.set('report', reportId);
+  appendWorkspaceParams(params, reportId, domain);
   if (tabId !== 'contents') params.set('tab', tabId);
   const qs = params.toString();
   return qs ? `/content-studio?${qs}` : '/content-studio';
@@ -316,6 +336,7 @@ function BrandNavItem({
   isOnBrand,
   activeTab,
   reportParam,
+  domainParam,
   locked,
   collapsed,
   onClick,
@@ -323,6 +344,7 @@ function BrandNavItem({
   isOnBrand: boolean;
   activeTab: BrandTabId | null;
   reportParam: string | null;
+  domainParam: string | null;
   locked?: boolean;
   collapsed?: boolean;
   onClick?: () => void;
@@ -347,7 +369,7 @@ function BrandNavItem({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [flyoutOpen]);
 
-  const brandHref = buildNavHref('/brand', reportParam);
+  const brandHref = buildNavHref('/brand', reportParam, domainParam);
 
   if (locked) {
     return (
@@ -422,7 +444,7 @@ function BrandNavItem({
                   return (
                     <Link
                       key={tab.id}
-                      href={buildBrandTabHref(tab.id, reportParam)}
+                      href={buildBrandTabHref(tab.id, reportParam, domainParam)}
                       onClick={() => { setFlyoutOpen(false); onClick?.(); }}
                       className={cn(
                         'flex items-center rounded-md px-2.5 py-1.5 text-[12px] transition-colors',
@@ -514,7 +536,7 @@ function BrandNavItem({
                       transition={{ duration: 0.15, delay: i * 0.03, ease: 'easeOut' }}
                     >
                       <Link
-                        href={buildBrandTabHref(tab.id, reportParam)}
+                        href={buildBrandTabHref(tab.id, reportParam, domainParam)}
                         onClick={onClick}
                         className={cn(
                           'relative flex items-center pl-4 pr-2 py-[6px] rounded-md text-[12.5px] transition-colors',
@@ -551,6 +573,7 @@ function PromptsNavItem({
   isOnPrompts,
   activeTab,
   reportParam,
+  domainParam,
   locked,
   collapsed,
   onClick,
@@ -558,6 +581,7 @@ function PromptsNavItem({
   isOnPrompts: boolean;
   activeTab: PromptTabId | null;
   reportParam: string | null;
+  domainParam: string | null;
   locked?: boolean;
   collapsed?: boolean;
   onClick?: () => void;
@@ -582,7 +606,7 @@ function PromptsNavItem({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [flyoutOpen]);
 
-  const promptsHref = buildNavHref('/prompts', reportParam);
+  const promptsHref = buildNavHref('/prompts', reportParam, domainParam);
 
   if (locked) {
     return (
@@ -657,7 +681,7 @@ function PromptsNavItem({
                   return (
                     <Link
                       key={tab.id}
-                      href={buildPromptTabHref(tab.id, reportParam)}
+                      href={buildPromptTabHref(tab.id, reportParam, domainParam)}
                       onClick={() => { setFlyoutOpen(false); onClick?.(); }}
                       className={cn(
                         'flex items-center rounded-md px-2.5 py-1.5 text-[12px] transition-colors',
@@ -746,7 +770,7 @@ function PromptsNavItem({
                       transition={{ duration: 0.15, delay: i * 0.03, ease: 'easeOut' }}
                     >
                       <Link
-                        href={buildPromptTabHref(tab.id, reportParam)}
+                        href={buildPromptTabHref(tab.id, reportParam, domainParam)}
                         onClick={onClick}
                         className={cn(
                           'relative flex items-center pl-4 pr-2 py-[6px] rounded-md text-[12.5px] transition-colors',
@@ -782,6 +806,7 @@ function ContentStudioNavItem({
   isOnContentStudio,
   activeTab,
   reportParam,
+  domainParam,
   locked,
   collapsed,
   onClick,
@@ -789,6 +814,7 @@ function ContentStudioNavItem({
   isOnContentStudio: boolean;
   activeTab: ContentStudioTabId | null;
   reportParam: string | null;
+  domainParam: string | null;
   locked?: boolean;
   collapsed?: boolean;
   onClick?: () => void;
@@ -813,7 +839,7 @@ function ContentStudioNavItem({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [flyoutOpen]);
 
-  const csHref = buildNavHref('/content-studio', reportParam);
+  const csHref = buildNavHref('/content-studio', reportParam, domainParam);
 
   if (locked) {
     return (
@@ -887,7 +913,7 @@ function ContentStudioNavItem({
                   return (
                     <Link
                       key={tab.id}
-                      href={buildContentStudioTabHref(tab.id, reportParam)}
+                      href={buildContentStudioTabHref(tab.id, reportParam, domainParam)}
                       onClick={() => { setFlyoutOpen(false); onClick?.(); }}
                       className={cn(
                         'flex items-center rounded-md px-2.5 py-1.5 text-[12px] transition-colors',
@@ -975,7 +1001,7 @@ function ContentStudioNavItem({
                       transition={{ duration: 0.15, delay: i * 0.03, ease: 'easeOut' }}
                     >
                       <Link
-                        href={buildContentStudioTabHref(tab.id, reportParam)}
+                        href={buildContentStudioTabHref(tab.id, reportParam, domainParam)}
                         onClick={onClick}
                         className={cn(
                           'relative flex items-center pl-4 pr-2 py-[6px] rounded-md text-[12.5px] transition-colors',
@@ -1095,7 +1121,7 @@ function SidebarDomainList({ onCloseMobile, collapsed }: { onCloseMobile?: () =>
             >
               <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Domains</p>
               <div className="space-y-0.5">
-                {recentLoading ? (
+                {recentLoading && monitoredSites.length === 0 ? (
                   <div className="px-2.5 py-2 text-[11px] text-zinc-500">Loading…</div>
                 ) : (
                   monitoredSites.map((site) => (
@@ -1238,7 +1264,7 @@ function SidebarDomainList({ onCloseMobile, collapsed }: { onCloseMobile?: () =>
       </p>
 
       <div className="space-y-0.5">
-        {!mounted || recentLoading ? (
+        {!mounted || (recentLoading && monitoredSites.length === 0) ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="flex items-center gap-2.5 rounded-lg px-3 py-2">
               <span className="h-4 w-4 shrink-0 animate-pulse rounded-full bg-white/[0.06]" />
@@ -1390,11 +1416,16 @@ export function DashboardSidebar() {
   const searchParams = useSearchParams();
   const section = searchParams.get('section');
   const reportParam = searchParams.get('report');
+  const urlDomainParam = searchParams.get('domain');
   const tabParam = searchParams.get('tab') as BrandTabId | null;
   const [mobileOpen, setMobileOpen] = useState(false);
   const { tier, loading: planLoading } = usePlan();
   const { collapsed, toggle, mounted } = useSidebarCollapsed();
   const mobilePanelRef = useRef<HTMLElement>(null);
+  const domainContext = useDomainContextSafe();
+  const hasDomainContext = Boolean(domainContext);
+  const activeReportParam = domainContext?.activeReportId ?? reportParam;
+  const activeDomainParam = domainContext?.selectedDomain ?? urlDomainParam;
 
   const isOnBrand = pathname === '/brand';
   const isOnPrompts = pathname === '/prompts';
@@ -1403,15 +1434,6 @@ export function DashboardSidebar() {
   const csTab = isOnContentStudio ? (searchParams.get('tab') as ContentStudioTabId | null) : null;
 
   const closeMobile = () => setMobileOpen(false);
-
-  // Check if context is available (only on /advanced routes)
-  let hasDomainContext = false;
-  try {
-    useDomainContext();
-    hasDomainContext = true;
-  } catch {
-    hasDomainContext = false;
-  }
 
   const isFree = !planLoading && tier === 'free';
 
@@ -1539,7 +1561,7 @@ export function DashboardSidebar() {
               const requiredTier = NAV_GATES[item.key] ?? 'free';
               const isLocked = !planLoading && !canAccess(tier, requiredTier);
               const href = WORKSPACE_KEYS.has(item.key)
-                ? buildNavHref(item.href, reportParam)
+                ? buildNavHref(item.href, activeReportParam, activeDomainParam)
                 : item.href;
               return (
                 <NavItem
@@ -1558,7 +1580,8 @@ export function DashboardSidebar() {
             <BrandNavItem
               isOnBrand={isOnBrand}
               activeTab={tabParam}
-              reportParam={reportParam}
+              reportParam={activeReportParam}
+              domainParam={activeDomainParam}
               locked={!planLoading && !canAccess(tier, NAV_GATES.brand ?? 'free')}
               collapsed={isCollapsed}
               onClick={closeMobile}
@@ -1574,7 +1597,8 @@ export function DashboardSidebar() {
                     key={item.key}
                     isOnPrompts={isOnPrompts}
                     activeTab={promptTab}
-                    reportParam={reportParam}
+                    reportParam={activeReportParam}
+                    domainParam={activeDomainParam}
                     locked={isLocked}
                     collapsed={isCollapsed}
                     onClick={closeMobile}
@@ -1583,7 +1607,7 @@ export function DashboardSidebar() {
               }
 
               const href = WORKSPACE_KEYS.has(item.key)
-                ? buildNavHref(item.href, reportParam)
+                ? buildNavHref(item.href, activeReportParam, activeDomainParam)
                 : item.href;
               return (
                 <NavItem
@@ -1602,7 +1626,8 @@ export function DashboardSidebar() {
             <ContentStudioNavItem
               isOnContentStudio={isOnContentStudio}
               activeTab={csTab}
-              reportParam={reportParam}
+              reportParam={activeReportParam}
+              domainParam={activeDomainParam}
               locked={!planLoading && !canAccess(tier, NAV_GATES['content-studio'] ?? 'free')}
               collapsed={isCollapsed}
               onClick={closeMobile}
@@ -1615,7 +1640,7 @@ export function DashboardSidebar() {
           <div className="mx-3 border-t border-white/[0.06]" />
           <nav className={cn('space-y-0.5 py-2', isCollapsed ? 'px-2' : 'px-3')}>
             <NavItem
-              item={{ ...SETTINGS_ITEM, href: buildNavHref(SETTINGS_ITEM.href, reportParam) }}
+              item={{ ...SETTINGS_ITEM, href: buildNavHref(SETTINGS_ITEM.href, activeReportParam, activeDomainParam) }}
               active={SETTINGS_ITEM.matchFn(pathname, section)}
               locked={!planLoading && !canAccess(tier, NAV_GATES.settings ?? 'free')}
               collapsed={isCollapsed}

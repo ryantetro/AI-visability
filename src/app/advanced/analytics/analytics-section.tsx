@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { DashboardPanel, SectionTitle } from '@/components/app/dashboard-primitives';
+import { DashboardPanel } from '@/components/app/dashboard-primitives';
 import { ExportButton } from '@/components/ui/export-button';
 import { cn } from '@/lib/utils';
 import {
@@ -138,9 +138,12 @@ export function AnalyticsSection({
   const effectiveDays = days === 0 ? crawlerChartData.length : days;
   const tickInterval = effectiveDays <= 14 ? 1 : effectiveDays <= 30 ? 2 : Math.max(1, Math.floor(crawlerChartData.length / 15));
 
-  const activeCrawlerProviders = PROVIDER_DISPLAY_ORDER.filter(p =>
-    providerSummaries.some(s => s.provider === p && s.visits > 0)
-  );
+  const activeCrawlerProviders = [
+    ...PROVIDER_DISPLAY_ORDER.filter(p =>
+      providerSummaries.some(s => s.provider === p && s.visits > 0)
+    ),
+    ...(providerSummaries.some(s => s.provider === 'other' && s.visits > 0) ? ['other'] : []),
+  ];
 
   const activeReferralEngines = REFERRER_ENGINE_ORDER.filter(e =>
     engineSummaries.some(s => s.engine === e && s.visits > 0)

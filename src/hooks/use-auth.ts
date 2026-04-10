@@ -1,14 +1,24 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AuthSessionState, AuthUser } from '@/types/auth';
 import { invalidatePlanCache } from '@/hooks/use-plan';
+import { hydratePlanCache } from '@/lib/plan-cache';
 import { setClientStorageScope } from '@/lib/client-storage-scope';
 
 const REFRESH_INTERVAL_MS = 45 * 60 * 1000; // 45 minutes (before 1hr token expiry)
 const BROADCAST_CHANNEL_NAME = 'aiso_auth';
 let lastKnownAuthEmail: string | null = null;
+let refreshPromise: Promise<void> | null = null;
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let authSubscriberCount = 0;
+
+interface AuthSnapshot {
+  user: AuthUser | null;
+  loading: boolean;
+  initialized: boolean;
+}
 
 interface AuthState {
   user: AuthUser | null;
@@ -17,53 +27,108 @@ interface AuthState {
   logout: () => Promise<void>;
 }
 
+const listeners = new Set<() => void>();
+let authSnapshot: AuthSnapshot = {
+  user: null,
+  loading: true,
+  initialized: false,
+};
+
+function emitAuthSnapshot(next: Partial<AuthSnapshot>) {
+  authSnapshot = { ...authSnapshot, ...next };
+  listeners.forEach((listener) => listener());
+}
+
+function getAuthSnapshot() {
+  return authSnapshot;
+}
+
+function subscribeToAuth(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function applySignedOutState() {
+  lastKnownAuthEmail = null;
+  setClientStorageScope(null);
+  invalidatePlanCache();
+  emitAuthSnapshot({ user: null, loading: false, initialized: true });
+}
+
+async function refreshAuthSnapshot() {
+  if (!refreshPromise) {
+    emitAuthSnapshot({ loading: !authSnapshot.initialized });
+
+    refreshPromise = (async () => {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        const payload = await res.json() as AuthSessionState;
+
+        // Only clear user on definitive auth failures, not transient errors.
+        if (!res.ok && res.status >= 500) {
+          return;
+        }
+
+        if (payload.reason === 'no_session' || payload.reason === 'refresh_failed') {
+          applySignedOutState();
+          return;
+        }
+
+        const nextEmail = payload.user?.email ?? null;
+        if (lastKnownAuthEmail !== null && nextEmail !== lastKnownAuthEmail) {
+          invalidatePlanCache();
+        }
+        hydratePlanCache(payload);
+        lastKnownAuthEmail = nextEmail;
+        setClientStorageScope(nextEmail);
+        emitAuthSnapshot({
+          user: payload.user ?? null,
+          loading: false,
+          initialized: true,
+        });
+      } catch {
+        // Network/fetch error is transient. Keep current user state if present.
+      } finally {
+        emitAuthSnapshot({ loading: false, initialized: true });
+        refreshPromise = null;
+      }
+    })();
+  }
+
+  return refreshPromise;
+}
+
+function startAuthRefreshTimer() {
+  if (refreshTimer) return;
+  refreshTimer = setInterval(() => {
+    void refreshAuthSnapshot();
+  }, REFRESH_INTERVAL_MS);
+}
+
+function stopAuthRefreshTimerIfIdle() {
+  if (authSubscriberCount > 0 || !refreshTimer) return;
+  clearInterval(refreshTimer);
+  refreshTimer = null;
+}
+
 export function useAuth(): AuthState {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const snapshot = useSyncExternalStore(
+    subscribeToAuth,
+    getAuthSnapshot,
+    getAuthSnapshot,
+  );
 
   const refresh = useCallback(async () => {
-    try {
-      const res = await fetch('/api/auth/me', { cache: 'no-store' });
-      const payload = await res.json() as AuthSessionState;
-
-      // Only clear user on definitive auth failures, not transient errors
-      if (!res.ok && res.status >= 500) {
-        // Transient server error — keep current user state
-        return;
-      }
-
-      if (payload.reason === 'no_session' || payload.reason === 'refresh_failed') {
-        lastKnownAuthEmail = null;
-        setClientStorageScope(null);
-        invalidatePlanCache();
-        setUser(null);
-        return;
-      }
-
-      const nextEmail = payload.user?.email ?? null;
-      if (nextEmail !== lastKnownAuthEmail) {
-        invalidatePlanCache();
-      }
-      lastKnownAuthEmail = nextEmail;
-      setClientStorageScope(nextEmail);
-      setUser(payload.user ?? null);
-    } catch {
-      // Network/fetch error — transient, keep current user
-      // Don't clear user state on network failures
-    } finally {
-      setLoading(false);
-    }
+    await refreshAuthSnapshot();
   }, []);
 
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
-    lastKnownAuthEmail = null;
-    setClientStorageScope(null);
-    invalidatePlanCache();
-    setUser(null);
+    applySignedOutState();
 
     // Broadcast logout to other tabs
     try {
@@ -73,21 +138,18 @@ export function useAuth(): AuthState {
     router.push('/login');
   }, [router]);
 
-  // Initial auth check
+  // Initial auth check. A loaded auth snapshot is reused across route changes.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    authSubscriberCount += 1;
+    startAuthRefreshTimer();
 
-  // Background token refresh every 45 minutes
-  useEffect(() => {
-    refreshTimerRef.current = setInterval(() => {
+    if (!authSnapshot.initialized) {
       void refresh();
-    }, REFRESH_INTERVAL_MS);
+    }
 
     return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
+      authSubscriberCount = Math.max(0, authSubscriberCount - 1);
+      stopAuthRefreshTimerIfIdle();
     };
   }, [refresh]);
 
@@ -102,10 +164,7 @@ export function useAuth(): AuthState {
       channel.onmessage = (event) => {
         const { type } = event.data ?? {};
         if (type === 'logout') {
-          lastKnownAuthEmail = null;
-          setClientStorageScope(null);
-          invalidatePlanCache();
-          setUser(null);
+          applySignedOutState();
           router.push('/login');
         } else if (type === 'login') {
           // Another tab logged in — refresh our auth state
@@ -122,5 +181,5 @@ export function useAuth(): AuthState {
     }
   }, [refresh, router]);
 
-  return { user, loading, refresh, logout };
+  return { user: snapshot.user, loading: snapshot.loading, refresh, logout };
 }

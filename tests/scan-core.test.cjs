@@ -1374,6 +1374,31 @@ test('Google crawler aliases map to Gemini while preserving Google-Extended lega
   assert.equal(getCrawlerProvider('Google-Extended'), 'gemini');
 });
 
+test('Grok crawler aliases map to the Grok provider', () => {
+  assert.deepEqual(
+    detectAiCrawler('Mozilla/5.0 (compatible; GrokBot; +https://x.ai)'),
+    {
+      botName: 'GrokBot',
+      category: 'indexing',
+      company: 'xAI',
+      provider: 'grok',
+    }
+  );
+  assert.deepEqual(
+    detectAiCrawler('Grok'),
+    {
+      botName: 'Grok',
+      category: 'indexing',
+      company: 'xAI',
+      provider: 'grok',
+    }
+  );
+  assert.equal(getCrawlerProvider('GrokBot'), 'grok');
+  assert.equal(getCrawlerProvider('Grok'), 'grok');
+  assert.equal(getCrawlerProvider('xAI-Bot'), 'grok');
+  assert.equal(getCrawlerProvider('xai-grok'), 'grok');
+});
+
 test('mock alert service logs opportunity alert payload', async () => {
   const originalLog = console.log;
   const entries = [];

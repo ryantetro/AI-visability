@@ -22,7 +22,8 @@ export function CompetitorsDashboard({ domain }: CompetitorsDashboardProps) {
   const [newlyAddedId, setNewlyAddedId] = useState<string | null>(null);
   const battleCardsRef = useRef<HTMLDivElement>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setLoading(true);
     try {
       const res = await fetch(`/api/competitors/list?domain=${encodeURIComponent(domain)}`);
       if (!res.ok) {
@@ -49,7 +50,7 @@ export function CompetitorsDashboard({ domain }: CompetitorsDashboardProps) {
     const hasScanning = data.competitors.some((c) => c.status === 'scanning');
     if (!hasScanning) return;
 
-    const interval = setInterval(() => void fetchData(), 5000);
+    const interval = setInterval(() => void fetchData({ silent: true }), 5000);
     return () => clearInterval(interval);
   }, [data, fetchData]);
 
@@ -70,7 +71,7 @@ export function CompetitorsDashboard({ domain }: CompetitorsDashboardProps) {
 
     setShowAddForm(false);
     setNewlyAddedId(addedId);
-    await fetchData();
+    await fetchData({ silent: true });
 
     // Scroll the new battle card into view after render
     requestAnimationFrame(() => {
@@ -94,7 +95,7 @@ export function CompetitorsDashboard({ domain }: CompetitorsDashboardProps) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error ?? 'Failed to delete');
     }
-    await fetchData();
+    await fetchData({ silent: true });
   };
 
   const handleRescan = async (id: string) => {
@@ -103,11 +104,11 @@ export function CompetitorsDashboard({ domain }: CompetitorsDashboardProps) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error ?? 'Failed to start rescan');
     }
-    await fetchData();
+    await fetchData({ silent: true });
   };
 
   const handleScanComplete = useCallback(() => {
-    void fetchData();
+    void fetchData({ silent: true });
   }, [fetchData]);
 
   if (loading) {

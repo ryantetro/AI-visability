@@ -8,7 +8,7 @@ export default function AnalyticsPage() {
     <WorkspaceShell sectionKey="analytics">
       {(ctx) => (
         <AnalyticsSection
-          report={ctx.report}
+          report={ctx.report!}
           recentScans={ctx.recentScans}
           domain={ctx.domain}
           lastScannedAt={ctx.expandedSite.lastTouchedAt}

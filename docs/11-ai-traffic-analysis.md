@@ -2,7 +2,7 @@
 
 ## What it does
 
-Displays AI crawler traffic data grouped by **provider** (ChatGPT, Perplexity, Gemini, Claude) as a new "Traffic" tab on the brand page (`/brand`). Shows a daily multi-line chart alongside a "Top Providers" leaderboard with visit counts, progress bars, and trend percentages comparing the current period to the previous equivalent period.
+Displays AI crawler traffic data grouped by **provider** (ChatGPT, Perplexity, Gemini, Claude, Grok) as a new "Traffic" tab on the brand page (`/brand`). Shows a daily multi-line chart alongside a "Top Providers" leaderboard with visit counts, progress bars, and trend percentages comparing the current period to the previous equivalent period.
 
 ## Key files
 
@@ -17,14 +17,14 @@ Displays AI crawler traffic data grouped by **provider** (ChatGPT, Perplexity, G
 
 ## How it works
 
-1. **Bot-to-provider mapping**: Each bot name (GPTBot, ClaudeBot, GoogleOther, Google-CloudVertexBot, etc.) is mapped to a provider key (`chatgpt`, `claude`, `gemini`, etc.) using a shared crawler catalog.
+1. **Bot-to-provider mapping**: Each bot name (GPTBot, ClaudeBot, GoogleOther, Google-CloudVertexBot, GrokBot, Grok, etc.) is mapped to a provider key (`chatgpt`, `claude`, `gemini`, `grok`, etc.) using a shared crawler catalog.
 2. **API route**: Fetches `days * 2` of visits, splits into current/previous periods. Builds:
    - `providerTimeline`: Zero-filled daily rows with visit counts per provider
    - `providerSummaries`: Aggregated visits, unique paths, and trend % per provider
    - Legacy `timeline` (weekly, per-bot) for backward compatibility
 3. **Trend calculation**: `((current - previous) / previous) * 100`, rounded. If no previous data and current > 0, shows +100%.
 4. **UI panel**: Side-by-side layout with a Recharts `LineChart` (daily buckets, styled dots, glow filter, CartesianGrid) and a ranked leaderboard sidebar (hidden on mobile).
-5. **"Other" provider**: Shown in sidebar if >0 visits; shown in chart only if ≥5% of total.
+5. **"Other" provider**: Shown in the sidebar and chart if >0 visits. Known Grok/xAI aliases are mapped to `grok` before falling back to `other`.
 
 ## API contracts
 

@@ -8,7 +8,7 @@ export default function BrandPage() {
     <WorkspaceShell sectionKey="brand">
       {(ctx) => (
         <BrandSection
-          report={ctx.report}
+          report={ctx.report!}
           files={ctx.files}
           domain={ctx.domain}
           platformLabel={ctx.platformLabel}

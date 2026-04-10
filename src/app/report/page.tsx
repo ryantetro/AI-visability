@@ -8,7 +8,7 @@ export default function ReportPage() {
     <WorkspaceShell sectionKey="report">
       {(ctx) => (
         <DashboardSection
-          report={ctx.report}
+          report={ctx.report!}
           recentScans={ctx.recentScans}
           domain={ctx.domain}
           lastScannedAt={ctx.expandedSite.lastTouchedAt}

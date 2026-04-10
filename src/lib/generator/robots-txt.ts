@@ -26,6 +26,12 @@ Allow: /
 User-agent: anthropic-ai
 Allow: /
 
+User-agent: GrokBot
+Allow: /
+
+User-agent: Grok
+Allow: /
+
 User-agent: Bytespider
 Allow: /
 `.trim();

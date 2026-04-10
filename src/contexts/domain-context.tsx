@@ -7,6 +7,7 @@ import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
 import { invalidateBillingStatus } from '@/hooks/use-billing-status';
 import { invalidatePlanCache, usePlan } from '@/hooks/use-plan';
 import { getCurrentAppPath } from '@/lib/app-paths';
+import { buildScopedStorageKey, getClientStorageScope } from '@/lib/client-storage-scope';
 import { useAuth } from '@/hooks/use-auth';
 import {
   loadStoredDomains,
@@ -34,6 +35,7 @@ interface DomainContextValue {
   trackedSites: SiteSummary[];
   scannedSites: SiteSummary[];
   selectedDomain: string | null;
+  activeReportId: string | null;
   selectDomain: (domain: string) => void;
 
   // Add domain
@@ -82,7 +84,75 @@ interface DomainContextValue {
 
 const DomainContext = createContext<DomainContextValue | null>(null);
 const PENDING_DOMAIN_STORAGE_KEY = 'aiso_pending_domain_upgrade';
+const SELECTED_DOMAIN_STORAGE_KEY = 'aiso_selected_domain';
 const CHECKOUT_BANNER_DURATION_MS = 12000;
+
+const recentScansMemoryCache = new Map<string, RecentScanData[]>();
+const domainListMemoryCache = new Map<string, { manualDomains: string[]; hiddenDomains: string[] }>();
+const monitoringMemoryCache = new Map<string, {
+  connected: Record<string, boolean>;
+  latestScanAtByDomain: Record<string, number | null>;
+}>();
+
+function loadSelectedDomain(scopeKey?: string | null): string | null {
+  if (typeof window === 'undefined') return null;
+  const storageKey = buildScopedStorageKey(SELECTED_DOMAIN_STORAGE_KEY, scopeKey);
+  if (!storageKey) return null;
+  return window.localStorage.getItem(storageKey);
+}
+
+function saveSelectedDomain(domain: string | null, scopeKey?: string | null) {
+  if (typeof window === 'undefined') return;
+  const storageKey = buildScopedStorageKey(SELECTED_DOMAIN_STORAGE_KEY, scopeKey);
+  if (!storageKey) return;
+  if (domain) {
+    window.localStorage.setItem(storageKey, domain);
+  } else {
+    window.localStorage.removeItem(storageKey);
+  }
+}
+
+function loadSelectedDomainForScopes(primaryScope?: string | null, secondaryScope?: string | null): string | null {
+  return loadSelectedDomain(primaryScope)
+    ?? (secondaryScope && secondaryScope !== primaryScope ? loadSelectedDomain(secondaryScope) : null);
+}
+
+function saveSelectedDomainForScopes(domain: string | null, primaryScope?: string | null, secondaryScope?: string | null) {
+  saveSelectedDomain(domain, primaryScope);
+  if (secondaryScope && secondaryScope !== primaryScope) {
+    saveSelectedDomain(domain, secondaryScope);
+  }
+}
+
+function loadStoredDomainsForScopes(primaryScope?: string | null, secondaryScope?: string | null): string[] {
+  const primaryDomains = loadStoredDomains(primaryScope);
+  if (primaryDomains.length > 0 || !secondaryScope || secondaryScope === primaryScope) {
+    return primaryDomains;
+  }
+  return loadStoredDomains(secondaryScope);
+}
+
+function saveStoredDomainsForScopes(domains: string[], primaryScope?: string | null, secondaryScope?: string | null) {
+  saveStoredDomains(domains, primaryScope);
+  if (secondaryScope && secondaryScope !== primaryScope) {
+    saveStoredDomains(domains, secondaryScope);
+  }
+}
+
+function loadHiddenDomainsForScopes(primaryScope?: string | null, secondaryScope?: string | null): string[] {
+  const primaryDomains = loadHiddenDomains(primaryScope);
+  if (primaryDomains.length > 0 || !secondaryScope || secondaryScope === primaryScope) {
+    return primaryDomains;
+  }
+  return loadHiddenDomains(secondaryScope);
+}
+
+function saveHiddenDomainsForScopes(domains: string[], primaryScope?: string | null, secondaryScope?: string | null) {
+  saveHiddenDomains(domains, primaryScope);
+  if (secondaryScope && secondaryScope !== primaryScope) {
+    saveHiddenDomains(domains, secondaryScope);
+  }
+}
 
 export function useDomainContext() {
   const ctx = useContext(DomainContext);
@@ -108,19 +178,30 @@ export function DomainContextProvider({
   const debugPaidPreview = process.env.NODE_ENV === 'development' && searchParams.get('debugPaid') === '1';
   const { isPaid: planIsPaid } = usePlan();
   const { user: authUser } = useAuth();
-  const storageScope = authUser?.id ?? authUser?.email ?? null;
+  const storageScope = authUser?.id ?? authUser?.email ?? getClientStorageScope();
+  const secondaryStorageScope = authUser?.id && authUser.email && authUser.email !== authUser.id
+    ? authUser.email
+    : null;
+  const cachedDomainState = storageScope ? domainListMemoryCache.get(storageScope) : undefined;
+  const cachedMonitoringState = storageScope ? monitoringMemoryCache.get(storageScope) : undefined;
+  const cachedRecentScans = storageScope ? recentScansMemoryCache.get(storageScope) : undefined;
   const prefilledDomain = normalizeDomainInput(searchParams.get('prefillDomain') ?? '');
-  const shouldAutoStartPrefilledScan = searchParams.get('autoStart') === '1' && Boolean(prefilledDomain);
   const shouldLoadFilesForSection = workspaceRouteNeedsFiles(pathname ?? '', searchParams.get('section'));
 
-  const [recentScans, setRecentScans] = useState<RecentScanData[]>([]);
-  const [recentLoading, setRecentLoading] = useState(true);
-  const [manualDomains, setManualDomains] = useState<string[]>([]);
-  const [hiddenDomains, setHiddenDomains] = useState<string[]>([]);
+  const [recentScans, setRecentScans] = useState<RecentScanData[]>(() => cachedRecentScans ?? []);
+  const [recentLoading, setRecentLoading] = useState(() => storageScope ? !cachedRecentScans : true);
+  const [manualDomains, setManualDomains] = useState<string[]>(() => (
+    cachedDomainState?.manualDomains ?? loadStoredDomainsForScopes(storageScope, secondaryStorageScope)
+  ));
+  const [hiddenDomains, setHiddenDomains] = useState<string[]>(() => (
+    cachedDomainState?.hiddenDomains ?? loadHiddenDomainsForScopes(storageScope, secondaryStorageScope)
+  ));
   const [paidOverride, setPaidOverride] = useState(false);
   const [pendingDomain, setPendingDomain] = useState<string | null>(null);
   const domainParam = searchParams.get('domain');
-  const [selectedDomain, setSelectedDomainRaw] = useState<string | null>(domainParam);
+  const [selectedDomain, setSelectedDomainRaw] = useState<string | null>(() => (
+    normalizeDomainInput(domainParam ?? '') || loadSelectedDomainForScopes(storageScope, secondaryStorageScope)
+  ));
   const [files, setFiles] = useState<FilesData | null>(null);
   const [report, setReport] = useState<DashboardReportData | null>(null);
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
@@ -131,12 +212,28 @@ export function DomainContextProvider({
   const [reauditLoading, setReauditLoading] = useState(false);
   const [checkoutBanner, setCheckoutBanner] = useState<string | null>(null);
   const [monitoringLoading, setMonitoringLoading] = useState(false);
-  const [monitoringConnected, setMonitoringConnected] = useState<Record<string, boolean>>({});
-  const [monitoringLatestScanAtByDomain, setMonitoringLatestScanAtByDomain] = useState<Record<string, number | null>>({});
+  const [monitoringConnected, setMonitoringConnected] = useState<Record<string, boolean>>(() => cachedMonitoringState?.connected ?? {});
+  const [monitoringLatestScanAtByDomain, setMonitoringLatestScanAtByDomain] = useState<Record<string, number | null>>(() => cachedMonitoringState?.latestScanAtByDomain ?? {});
   const [addDomainInput, setAddDomainInput] = useState('');
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [scanAutoStarting, setScanAutoStarting] = useState(false);
+
+  useEffect(() => {
+    const normalizedDomainParam = normalizeDomainInput(domainParam ?? '');
+    if (normalizedDomainParam && normalizedDomainParam !== selectedDomain) {
+      setSelectedDomainRaw(normalizedDomainParam);
+      saveSelectedDomainForScopes(normalizedDomainParam, storageScope, secondaryStorageScope);
+      return;
+    }
+
+    if (!normalizedDomainParam && !selectedDomain && storageScope) {
+      const storedDomain = loadSelectedDomainForScopes(storageScope, secondaryStorageScope);
+      if (storedDomain) {
+        setSelectedDomainRaw(storedDomain);
+      }
+    }
+  }, [domainParam, selectedDomain, storageScope, secondaryStorageScope]);
 
   useEffect(() => {
     if (!prefilledDomain) return;
@@ -145,18 +242,22 @@ export function DomainContextProvider({
   }, [prefilledDomain, manualDomains.length]);
 
   // Persist selected domain in URL so refresh restores it
-  const setSelectedDomain = useCallback((domain: string | null) => {
+  const setSelectedDomain = useCallback((domain: string | null, options?: { preserveReport?: boolean }) => {
     setSelectedDomainRaw(domain);
+    saveSelectedDomainForScopes(domain, storageScope, secondaryStorageScope);
     const params = new URLSearchParams(window.location.search);
     if (domain) {
       params.set('domain', domain);
     } else {
       params.delete('domain');
     }
+    if (!options?.preserveReport) {
+      params.delete('report');
+    }
     const qs = params.toString();
     const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, '', nextUrl);
-  }, []);
+  }, [storageScope, secondaryStorageScope]);
   const dismissCheckoutBanner = useCallback(() => {
     setCheckoutBanner(null);
   }, []);
@@ -173,8 +274,14 @@ export function DomainContextProvider({
       return;
     }
 
-    setManualDomains(loadStoredDomains(storageScope));
-    setHiddenDomains(loadHiddenDomains(storageScope));
+    const cached = domainListMemoryCache.get(storageScope);
+    if (cached) {
+      setManualDomains(cached.manualDomains);
+      setHiddenDomains(cached.hiddenDomains);
+    } else {
+      setManualDomains(loadStoredDomainsForScopes(storageScope, secondaryStorageScope));
+      setHiddenDomains(loadHiddenDomainsForScopes(storageScope, secondaryStorageScope));
+    }
 
     let active = true;
     (async () => {
@@ -186,21 +293,32 @@ export function DomainContextProvider({
         if (!active) return;
 
         setManualDomains(dbDomains);
-        saveStoredDomains(dbDomains, storageScope);
-        const nextHiddenDomains = reconcileHiddenDomains(loadHiddenDomains(storageScope), dbDomains);
+        saveStoredDomainsForScopes(dbDomains, storageScope, secondaryStorageScope);
+        const nextHiddenDomains = reconcileHiddenDomains(loadHiddenDomainsForScopes(storageScope, secondaryStorageScope), dbDomains);
         setHiddenDomains(nextHiddenDomains);
-        saveHiddenDomains(nextHiddenDomains, storageScope);
+        saveHiddenDomainsForScopes(nextHiddenDomains, storageScope, secondaryStorageScope);
+        domainListMemoryCache.set(storageScope, {
+          manualDomains: dbDomains,
+          hiddenDomains: nextHiddenDomains,
+        });
       } catch { /* keep localStorage data on network failure */ }
     })();
 
     return () => { active = false; };
-  }, [storageScope]);
+  }, [storageScope, secondaryStorageScope]);
 
   // --- Hydrate monitoring status from DB ---
   useEffect(() => {
     if (!storageScope) {
       setMonitoringConnected({});
+      setMonitoringLatestScanAtByDomain({});
       return;
+    }
+
+    const cached = monitoringMemoryCache.get(storageScope);
+    if (cached) {
+      setMonitoringConnected(cached.connected);
+      setMonitoringLatestScanAtByDomain(cached.latestScanAtByDomain);
     }
 
     let active = true;
@@ -221,6 +339,7 @@ export function DomainContextProvider({
         }
         setMonitoringConnected(connected);
         setMonitoringLatestScanAtByDomain(latestScanAtByDomain);
+        monitoringMemoryCache.set(storageScope, { connected, latestScanAtByDomain });
       } catch { /* keep current state on failure */ }
     })();
     return () => { active = false; };
@@ -234,8 +353,15 @@ export function DomainContextProvider({
       return;
     }
 
+    const scopeKey = storageScope;
     let active = true;
-    setRecentLoading(true);
+    const cached = recentScansMemoryCache.get(scopeKey);
+    if (cached) {
+      setRecentScans(cached);
+      setRecentLoading(false);
+    } else {
+      setRecentLoading(true);
+    }
     async function loadRecentScans() {
       let shouldUseStorageFallback = false;
       try {
@@ -265,24 +391,28 @@ export function DomainContextProvider({
           } catch { /* skip */ }
         }
 
-        setRecentScans(
-          scans
-            .filter((entry): entry is RecentScanData => Boolean(entry))
-            .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))
-        );
+        const sortedScans = scans
+          .filter((entry): entry is RecentScanData => Boolean(entry))
+          .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
+        setRecentScans(sortedScans);
+        recentScansMemoryCache.set(scopeKey, sortedScans);
       } catch {
         if (!shouldUseStorageFallback) {
           return;
         }
         // Fallback to localStorage method
-        const fromStorage = getRecentScanEntries(storageScope).map((entry) => entry.id);
+        const fromStorage = getRecentScanEntries(scopeKey).map((entry) => entry.id);
         const ids = [...new Set([...fromStorage, initialReportId].filter(Boolean))];
         if (ids.length === 0) { if (active) { setRecentScans([]); } return; }
         const results = await Promise.all(ids.map(async (scanId) => {
           try { const response = await fetch(`/api/scan/${scanId}`); if (!response.ok) return null; return (await response.json()) as RecentScanData; } catch { return null; }
         }));
         if (!active) return;
-        setRecentScans(results.filter((entry): entry is RecentScanData => Boolean(entry)).sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt)));
+        const sortedScans = results
+          .filter((entry): entry is RecentScanData => Boolean(entry))
+          .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
+        setRecentScans(sortedScans);
+        recentScansMemoryCache.set(scopeKey, sortedScans);
       } finally {
         if (active) setRecentLoading(false);
       }
@@ -292,6 +422,11 @@ export function DomainContextProvider({
   }, [initialReportId, storageScope]);
 
   useEffect(() => { if (initialReportId) rememberRecentScan(initialReportId, storageScope); }, [initialReportId, storageScope]);
+
+  useEffect(() => {
+    if (!storageScope || recentLoading) return;
+    recentScansMemoryCache.set(storageScope, recentScans);
+  }, [recentLoading, recentScans, storageScope]);
 
   // Re-fetch a single scan's metadata and update its entry in recentScans
   const refreshScanEntry = useCallback(async (scanId: string) => {
@@ -330,7 +465,7 @@ export function DomainContextProvider({
           if (pendingDomainFromStorage) {
             const nextManualDomains = addPendingDomainToManualDomains(manualDomains, pendingDomainFromStorage);
             setManualDomains(nextManualDomains);
-            saveStoredDomains(nextManualDomains, storageScope);
+            saveStoredDomainsForScopes(nextManualDomains, storageScope, secondaryStorageScope);
             setSelectedDomain(pendingDomainFromStorage);
             setPendingDomain(null);
             window.sessionStorage.removeItem(PENDING_DOMAIN_STORAGE_KEY);
@@ -341,7 +476,7 @@ export function DomainContextProvider({
       } catch { /* silently fail */ }
     })();
     return () => { active = false; };
-  }, [searchParams, initialReportId, manualDomains, recentScans, setSelectedDomain, storageScope]);
+  }, [searchParams, initialReportId, manualDomains, recentScans, setSelectedDomain, storageScope, secondaryStorageScope]);
 
   // Auto-navigate to Brand > Services tab when arriving with ?fms=start (Fix 3)
   useEffect(() => {
@@ -435,7 +570,7 @@ export function DomainContextProvider({
     if (initialReportId && recentScans.length > 0) {
       const matchedScan = recentScans.find((scan) => scan.id === initialReportId);
       if (matchedScan) {
-        setSelectedDomain(getDomain(matchedScan.url));
+        setSelectedDomain(getDomain(matchedScan.url), { preserveReport: true });
         return;
       }
     }
@@ -449,7 +584,8 @@ export function DomainContextProvider({
     : false;
   const activeWorkspaceReportId = initialBelongsToSelected
     ? initialReportId
-    : expandedSite?.latestScan?.id ?? expandedSite?.latestPaidScan?.id ?? (initialReportId || '');
+    : expandedSite?.latestScan?.id ?? expandedSite?.latestPaidScan?.id ?? (!selectedDomain ? initialReportId : '');
+  const activeReportId = activeWorkspaceReportId || null;
 
   // --- Fetch workspace data (with caching) ---
   useEffect(() => {
@@ -652,10 +788,16 @@ export function DomainContextProvider({
 
     const nextManual = manualDomains.includes(normalized) ? manualDomains : [...manualDomains, normalized];
     setManualDomains(nextManual);
-    saveStoredDomains(nextManual, storageScope);
+    saveStoredDomainsForScopes(nextManual, storageScope, secondaryStorageScope);
     const nextHidden = hiddenDomains.filter((d) => d !== normalized);
     setHiddenDomains(nextHidden);
-    saveHiddenDomains(nextHidden, storageScope);
+    saveHiddenDomainsForScopes(nextHidden, storageScope, secondaryStorageScope);
+    if (storageScope) {
+      domainListMemoryCache.set(storageScope, {
+        manualDomains: nextManual,
+        hiddenDomains: nextHidden,
+      });
+    }
     const matchingPaidScan = getLatestPaidScanByDomain(recentScans, normalized);
     if (matchingPaidScan) {
       try {
@@ -665,7 +807,16 @@ export function DomainContextProvider({
           body: JSON.stringify({ scanId: matchingPaidScan.id, alertThreshold: 5 }),
         });
         if (res.ok) {
-          setMonitoringConnected((c) => ({ ...c, [normalized]: true }));
+          setMonitoringConnected((c) => {
+            const next = { ...c, [normalized]: true };
+            if (storageScope) {
+              monitoringMemoryCache.set(storageScope, {
+                connected: next,
+                latestScanAtByDomain: monitoringLatestScanAtByDomain,
+              });
+            }
+            return next;
+          });
         }
       } catch { /* silently fail */ }
     }
@@ -675,7 +826,7 @@ export function DomainContextProvider({
     }
     setSelectedDomain(normalized);
     return { ok: true };
-  }, [manualDomains, hiddenDomains, recentScans, setSelectedDomain, storageScope]);
+  }, [manualDomains, hiddenDomains, monitoringLatestScanAtByDomain, recentScans, setSelectedDomain, storageScope, secondaryStorageScope]);
 
   const handleAddDomain = useCallback(async () => {
     setAddError(null);
@@ -724,7 +875,7 @@ export function DomainContextProvider({
       }
 
       rememberRecentScan(payload.id, storageScope);
-      router.replace(`/dashboard?report=${payload.id}`);
+      router.replace(`/dashboard?report=${payload.id}&domain=${encodeURIComponent(normalizedDomain)}`);
       return { ok: true };
     } catch (err) {
       setScanAutoStarting(false);
@@ -745,9 +896,15 @@ export function DomainContextProvider({
 
     const nextManual = manualDomains.filter((e) => e !== domain);
     const nextHidden = hiddenDomains.includes(domain) ? hiddenDomains : [...hiddenDomains, domain];
-    setManualDomains(nextManual); saveStoredDomains(nextManual, storageScope); setHiddenDomains(nextHidden); saveHiddenDomains(nextHidden, storageScope);
+    setManualDomains(nextManual); saveStoredDomainsForScopes(nextManual, storageScope, secondaryStorageScope); setHiddenDomains(nextHidden); saveHiddenDomainsForScopes(nextHidden, storageScope, secondaryStorageScope);
+    if (storageScope) {
+      domainListMemoryCache.set(storageScope, {
+        manualDomains: nextManual,
+        hiddenDomains: nextHidden,
+      });
+    }
     if (selectedDomain === domain) setSelectedDomain(null);
-  }, [manualDomains, hiddenDomains, selectedDomain, setSelectedDomain, storageScope]);
+  }, [manualDomains, hiddenDomains, selectedDomain, setSelectedDomain, storageScope, secondaryStorageScope]);
 
   const handleUnlockComplete = useCallback((plan?: string) => {
     const selectedPlan = plan || 'starter_monthly';
@@ -786,7 +943,7 @@ export function DomainContextProvider({
             invalidateBillingStatus();
             const nextManual = addPendingDomainToManualDomains(manualDomains, pendingDomain);
             setManualDomains(nextManual);
-            saveStoredDomains(nextManual, storageScope);
+            saveStoredDomainsForScopes(nextManual, storageScope, secondaryStorageScope);
             if (pendingDomain) setSelectedDomain(pendingDomain);
             setPendingDomain(null);
             if (typeof window !== 'undefined') {
@@ -809,7 +966,7 @@ export function DomainContextProvider({
         setUnlockLoading(false);
       }
     })();
-  }, [pendingDomain, manualDomains, setSelectedDomain, storageScope]);
+  }, [pendingDomain, manualDomains, setSelectedDomain, storageScope, secondaryStorageScope]);
 
   // Auto-trigger checkout when arriving from pricing page with ?upgrade= param (Fix 1)
   useEffect(() => {
@@ -825,12 +982,13 @@ export function DomainContextProvider({
 
   const handleRunFirstScan = useCallback(async (site: SiteSummary) => {
     setActionError('');
-    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: site.url }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); rememberRecentScan(payload.id, storageScope); router.push(`/dashboard?report=${payload.id}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); }
+    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: site.url }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); rememberRecentScan(payload.id, storageScope); router.push(`/dashboard?report=${payload.id}&domain=${encodeURIComponent(site.domain)}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); }
   }, [router, storageScope]);
 
   const handleReaudit = useCallback(async () => {
     const scanUrl = files?.url ?? report?.url ?? (expandedSite ? expandedSite.url : null);
     if (!scanUrl) return;
+    const scanDomain = expandedSite?.domain ?? getDomain(scanUrl);
     setActionError(''); setReauditLoading(true);
     try {
       const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: scanUrl, force: true }) });
@@ -848,7 +1006,7 @@ export function DomainContextProvider({
       setRecentScans((prev) => [newScanEntry, ...prev]);
       setReport(null); setFiles(null); setLoadError(''); setWorkspaceLoading(true);
       setReportCache({}); setFilesCache({});
-      router.push(`/dashboard?report=${payload.id}`);
+      router.push(`/dashboard?report=${payload.id}&domain=${encodeURIComponent(scanDomain)}`);
     } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); } finally { setReauditLoading(false); }
   }, [files?.url, report?.url, expandedSite, router, storageScope]);
 
@@ -860,8 +1018,26 @@ export function DomainContextProvider({
       return;
     }
     setMonitoringLoading(true); setActionError('');
-    try { const res = await fetch('/api/monitoring', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scanId: monitoringScan.id, alertThreshold: 5 }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to enable monitoring'); setMonitoringConnected((c) => ({ ...c, [expandedSite.domain]: true })); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to enable monitoring'); } finally { setMonitoringLoading(false); }
-  }, [expandedSite, hasPaidAccess, recentScans]);
+    try {
+      const res = await fetch('/api/monitoring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scanId: monitoringScan.id, alertThreshold: 5 }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Failed to enable monitoring');
+      setMonitoringConnected((c) => {
+        const next = { ...c, [expandedSite.domain]: true };
+        if (storageScope) {
+          monitoringMemoryCache.set(storageScope, {
+            connected: next,
+            latestScanAtByDomain: monitoringLatestScanAtByDomain,
+          });
+        }
+        return next;
+      });
+    } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to enable monitoring'); } finally { setMonitoringLoading(false); }
+  }, [expandedSite, hasPaidAccess, monitoringLatestScanAtByDomain, recentScans, storageScope]);
 
   const handleDisableMonitoring = useCallback(async () => {
     if (!expandedSite?.domain) return;
@@ -869,15 +1045,26 @@ export function DomainContextProvider({
     try {
       const res = await fetch(`/api/monitoring/${encodeURIComponent(expandedSite.domain)}`, { method: 'DELETE' });
       if (!res.ok) { const payload = await res.json().catch(() => ({})); throw new Error(payload.error || 'Failed to disable monitoring'); }
-      setMonitoringConnected((c) => { const next = { ...c }; delete next[expandedSite.domain]; return next; });
+      setMonitoringConnected((c) => {
+        const next = { ...c };
+        delete next[expandedSite.domain];
+        if (storageScope) {
+          monitoringMemoryCache.set(storageScope, {
+            connected: next,
+            latestScanAtByDomain: monitoringLatestScanAtByDomain,
+          });
+        }
+        return next;
+      });
     } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to disable monitoring'); } finally { setMonitoringLoading(false); }
-  }, [expandedSite]);
+  }, [expandedSite, monitoringLatestScanAtByDomain, storageScope]);
 
   const value = useMemo<DomainContextValue>(() => ({
     monitoredSites,
     trackedSites,
     scannedSites,
     selectedDomain,
+    activeReportId,
     selectDomain,
     addDomainInput,
     setAddDomainInput: (v: string) => { setAddDomainInput(v); setAddError(null); },
@@ -915,7 +1102,7 @@ export function DomainContextProvider({
     dismissCheckoutBanner,
     inputFaviconUrl,
   }), [
-    monitoredSites, trackedSites, scannedSites, selectedDomain, selectDomain, addDomainInput, handleAddDomain, addTrackedDomain, handleRemoveDomain,
+    monitoredSites, trackedSites, scannedSites, selectedDomain, activeReportId, selectDomain, addDomainInput, handleAddDomain, addTrackedDomain, handleRemoveDomain,
     addError, confirmChecked, scanAutoStarting, hasPaidAccess, report, files, workspaceLoading, loadError, recentScans,
     recentLoading, expandedSite, actionError, reauditLoading, handleReaudit, handleRunFirstScan,
     monitoringConnected, monitoringLoading, handleEnableMonitoring, handleDisableMonitoring, unlockModalOpen, handleUnlockComplete,
