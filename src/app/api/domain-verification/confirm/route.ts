@@ -8,6 +8,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
+  const userEmail = user.email?.trim().toLowerCase();
+  if (!userEmail) {
+    return NextResponse.json({ error: 'Authenticated user email is required.' }, { status: 400 });
+  }
+
   const body = await request.json();
   const {
     domain,
@@ -22,13 +27,14 @@ export async function POST(request: NextRequest) {
 
   const result = await confirmDomainVerification({
     domain,
+    email: userEmail,
     enablePublicScore,
     enableBadge,
     enableLeaderboard,
   });
 
   if (!result.verified) {
-    return NextResponse.json(result, { status: 409 });
+    return NextResponse.json(result, { status: result.unauthorized ? 403 : 409 });
   }
 
   return NextResponse.json(result);

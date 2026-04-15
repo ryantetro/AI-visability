@@ -3,26 +3,26 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ensureProtocol, getDomain, getFaviconUrl } from '@/lib/url-utils';
-import { getRecentScanEntries, rememberRecentScan } from '@/lib/recent-scans';
+import { getRecentScanEntriesForScopes, rememberRecentScanForScopes } from '@/lib/recent-scans';
 import { invalidateBillingStatus } from '@/hooks/use-billing-status';
 import { invalidatePlanCache, usePlan } from '@/hooks/use-plan';
 import { getCurrentAppPath } from '@/lib/app-paths';
 import { buildScopedStorageKey, getClientStorageScope } from '@/lib/client-storage-scope';
 import { useAuth } from '@/hooks/use-auth';
 import {
-  loadStoredDomains,
+  loadStoredDomainsAcrossScopes,
   saveStoredDomains,
-  loadHiddenDomains,
+  loadHiddenDomainsAcrossScopes,
   saveHiddenDomains,
 } from '@/app/advanced/lib/storage';
 import {
   normalizeDomainInput,
-  getLatestScanByDomain,
   getLatestPaidScanByDomain,
   getLatestMonitorableScanByDomain,
 } from '@/app/advanced/lib/utils';
 import {
   addPendingDomainToManualDomains,
+  buildWorkspaceSiteSummaries,
   reconcileHiddenDomains,
   workspaceRouteNeedsFiles,
 } from '@/lib/workspace-ui';
@@ -56,6 +56,7 @@ interface DomainContextValue {
   workspaceLoading: boolean;
   loadError: string;
   recentScans: RecentScanData[];
+  domainsLoading: boolean;
   recentLoading: boolean;
 
   // Actions
@@ -94,6 +95,53 @@ const monitoringMemoryCache = new Map<string, {
   latestScanAtByDomain: Record<string, number | null>;
 }>();
 
+function mergeUniqueDomains(...lists: Array<string[] | undefined>) {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+
+  for (const list of lists) {
+    if (!list) continue;
+    for (const value of list) {
+      const normalized = value.trim().toLowerCase();
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      merged.push(normalized);
+    }
+  }
+
+  return merged;
+}
+
+function mergeRecentScanLists(...lists: Array<RecentScanData[] | undefined>) {
+  const byId = new Map<string, RecentScanData>();
+
+  for (const list of lists) {
+    if (!list) continue;
+    for (const scan of list) {
+      const existing = byId.get(scan.id);
+      const nextTimestamp = scan.completedAt ?? scan.createdAt;
+      const existingTimestamp = existing ? (existing.completedAt ?? existing.createdAt) : -1;
+      if (!existing || nextTimestamp >= existingTimestamp) {
+        byId.set(scan.id, scan);
+      }
+    }
+  }
+
+  return [...byId.values()].sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
+}
+
+function getScopedMemoryCacheValue<T>(
+  cache: Map<string, T>,
+  primaryScope?: string | null,
+  secondaryScope?: string | null,
+) {
+  const primaryValue = primaryScope ? cache.get(primaryScope) : undefined;
+  if (!secondaryScope || secondaryScope === primaryScope) {
+    return primaryValue;
+  }
+  return primaryValue ?? cache.get(secondaryScope);
+}
+
 function loadSelectedDomain(scopeKey?: string | null): string | null {
   if (typeof window === 'undefined') return null;
   const storageKey = buildScopedStorageKey(SELECTED_DOMAIN_STORAGE_KEY, scopeKey);
@@ -125,11 +173,7 @@ function saveSelectedDomainForScopes(domain: string | null, primaryScope?: strin
 }
 
 function loadStoredDomainsForScopes(primaryScope?: string | null, secondaryScope?: string | null): string[] {
-  const primaryDomains = loadStoredDomains(primaryScope);
-  if (primaryDomains.length > 0 || !secondaryScope || secondaryScope === primaryScope) {
-    return primaryDomains;
-  }
-  return loadStoredDomains(secondaryScope);
+  return loadStoredDomainsAcrossScopes(primaryScope, secondaryScope);
 }
 
 function saveStoredDomainsForScopes(domains: string[], primaryScope?: string | null, secondaryScope?: string | null) {
@@ -140,11 +184,7 @@ function saveStoredDomainsForScopes(domains: string[], primaryScope?: string | n
 }
 
 function loadHiddenDomainsForScopes(primaryScope?: string | null, secondaryScope?: string | null): string[] {
-  const primaryDomains = loadHiddenDomains(primaryScope);
-  if (primaryDomains.length > 0 || !secondaryScope || secondaryScope === primaryScope) {
-    return primaryDomains;
-  }
-  return loadHiddenDomains(secondaryScope);
+  return loadHiddenDomainsAcrossScopes(primaryScope, secondaryScope);
 }
 
 function saveHiddenDomainsForScopes(domains: string[], primaryScope?: string | null, secondaryScope?: string | null) {
@@ -177,19 +217,62 @@ export function DomainContextProvider({
   const initialReportId = reportId ?? '';
   const debugPaidPreview = process.env.NODE_ENV === 'development' && searchParams.get('debugPaid') === '1';
   const { isPaid: planIsPaid } = usePlan();
-  const { user: authUser } = useAuth();
+  const { user: authUser, loading: authLoading } = useAuth();
   const storageScope = authUser?.id ?? authUser?.email ?? getClientStorageScope();
   const secondaryStorageScope = authUser?.id && authUser.email && authUser.email !== authUser.id
     ? authUser.email
     : null;
-  const cachedDomainState = storageScope ? domainListMemoryCache.get(storageScope) : undefined;
-  const cachedMonitoringState = storageScope ? monitoringMemoryCache.get(storageScope) : undefined;
-  const cachedRecentScans = storageScope ? recentScansMemoryCache.get(storageScope) : undefined;
+  const cachedDomainState = useMemo(() => {
+    const primaryCachedDomainState = getScopedMemoryCacheValue(domainListMemoryCache, storageScope, secondaryStorageScope);
+    const secondaryCachedDomainState = secondaryStorageScope && secondaryStorageScope !== storageScope
+      ? domainListMemoryCache.get(secondaryStorageScope)
+      : undefined;
+
+    if (!primaryCachedDomainState && !secondaryCachedDomainState) {
+      return undefined;
+    }
+
+    return {
+      manualDomains: mergeUniqueDomains(primaryCachedDomainState?.manualDomains, secondaryCachedDomainState?.manualDomains),
+      hiddenDomains: mergeUniqueDomains(primaryCachedDomainState?.hiddenDomains, secondaryCachedDomainState?.hiddenDomains),
+    };
+  }, [storageScope, secondaryStorageScope]);
+  const cachedMonitoringState = useMemo(() => {
+    const primaryCachedMonitoringState = getScopedMemoryCacheValue(monitoringMemoryCache, storageScope, secondaryStorageScope);
+    const secondaryCachedMonitoringState = secondaryStorageScope && secondaryStorageScope !== storageScope
+      ? monitoringMemoryCache.get(secondaryStorageScope)
+      : undefined;
+
+    if (!primaryCachedMonitoringState && !secondaryCachedMonitoringState) {
+      return undefined;
+    }
+
+    return {
+      connected: {
+        ...(secondaryCachedMonitoringState?.connected ?? {}),
+        ...(primaryCachedMonitoringState?.connected ?? {}),
+      },
+      latestScanAtByDomain: {
+        ...(secondaryCachedMonitoringState?.latestScanAtByDomain ?? {}),
+        ...(primaryCachedMonitoringState?.latestScanAtByDomain ?? {}),
+      },
+    };
+  }, [storageScope, secondaryStorageScope]);
+  const cachedRecentScans = useMemo(
+    () => mergeRecentScanLists(
+      storageScope ? recentScansMemoryCache.get(storageScope) : undefined,
+      secondaryStorageScope && secondaryStorageScope !== storageScope
+        ? recentScansMemoryCache.get(secondaryStorageScope)
+        : undefined,
+    ),
+    [storageScope, secondaryStorageScope]
+  );
   const prefilledDomain = normalizeDomainInput(searchParams.get('prefillDomain') ?? '');
   const shouldLoadFilesForSection = workspaceRouteNeedsFiles(pathname ?? '', searchParams.get('section'));
 
-  const [recentScans, setRecentScans] = useState<RecentScanData[]>(() => cachedRecentScans ?? []);
-  const [recentLoading, setRecentLoading] = useState(() => storageScope ? !cachedRecentScans : true);
+  const [recentScans, setRecentScans] = useState<RecentScanData[]>(() => cachedRecentScans);
+  const [recentLoading, setRecentLoading] = useState(() => storageScope ? cachedRecentScans.length === 0 : true);
+  const [domainsLoading, setDomainsLoading] = useState(() => Boolean(storageScope));
   const [manualDomains, setManualDomains] = useState<string[]>(() => (
     cachedDomainState?.manualDomains ?? loadStoredDomainsForScopes(storageScope, secondaryStorageScope)
   ));
@@ -271,10 +354,11 @@ export function DomainContextProvider({
     if (!storageScope) {
       setManualDomains([]);
       setHiddenDomains([]);
+      setDomainsLoading(false);
       return;
     }
 
-    const cached = domainListMemoryCache.get(storageScope);
+    const cached = cachedDomainState;
     if (cached) {
       setManualDomains(cached.manualDomains);
       setHiddenDomains(cached.hiddenDomains);
@@ -283,10 +367,17 @@ export function DomainContextProvider({
       setHiddenDomains(loadHiddenDomainsForScopes(storageScope, secondaryStorageScope));
     }
 
+    if (authLoading) {
+      setDomainsLoading(false);
+      return;
+    }
+
+    setDomainsLoading(true);
+
     let active = true;
     (async () => {
       try {
-        const res = await fetch('/api/user/domains');
+        const res = await fetch('/api/user/domains', { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         const dbDomains: string[] = (data.domains ?? []).map((d: { domain: string }) => d.domain);
@@ -301,11 +392,22 @@ export function DomainContextProvider({
           manualDomains: dbDomains,
           hiddenDomains: nextHiddenDomains,
         });
+        if (secondaryStorageScope && secondaryStorageScope !== storageScope) {
+          domainListMemoryCache.set(secondaryStorageScope, {
+            manualDomains: dbDomains,
+            hiddenDomains: nextHiddenDomains,
+          });
+        }
       } catch { /* keep localStorage data on network failure */ }
+      finally {
+        if (active) {
+          setDomainsLoading(false);
+        }
+      }
     })();
 
     return () => { active = false; };
-  }, [storageScope, secondaryStorageScope]);
+  }, [authLoading, cachedDomainState, storageScope, secondaryStorageScope]);
 
   // --- Hydrate monitoring status from DB ---
   useEffect(() => {
@@ -315,16 +417,20 @@ export function DomainContextProvider({
       return;
     }
 
-    const cached = monitoringMemoryCache.get(storageScope);
+    const cached = cachedMonitoringState;
     if (cached) {
       setMonitoringConnected(cached.connected);
       setMonitoringLatestScanAtByDomain(cached.latestScanAtByDomain);
     }
 
+    if (authLoading) {
+      return;
+    }
+
     let active = true;
     (async () => {
       try {
-        const res = await fetch('/api/monitoring');
+        const res = await fetch('/api/monitoring', { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         const domains: Array<{ domain: string; status: string; latestDomainScanAt?: number | null }> = data.domains ?? [];
@@ -340,10 +446,13 @@ export function DomainContextProvider({
         setMonitoringConnected(connected);
         setMonitoringLatestScanAtByDomain(latestScanAtByDomain);
         monitoringMemoryCache.set(storageScope, { connected, latestScanAtByDomain });
+        if (secondaryStorageScope && secondaryStorageScope !== storageScope) {
+          monitoringMemoryCache.set(secondaryStorageScope, { connected, latestScanAtByDomain });
+        }
       } catch { /* keep current state on failure */ }
     })();
     return () => { active = false; };
-  }, [storageScope]);
+  }, [authLoading, cachedMonitoringState, storageScope, secondaryStorageScope]);
 
   // --- Load recent scans from DB API ---
   useEffect(() => {
@@ -355,17 +464,21 @@ export function DomainContextProvider({
 
     const scopeKey = storageScope;
     let active = true;
-    const cached = recentScansMemoryCache.get(scopeKey);
-    if (cached) {
-      setRecentScans(cached);
+    if (cachedRecentScans.length > 0) {
+      setRecentScans(cachedRecentScans);
       setRecentLoading(false);
     } else {
       setRecentLoading(true);
     }
+
+    if (authLoading) {
+      return () => { active = false; };
+    }
+
     async function loadRecentScans() {
       let shouldUseStorageFallback = false;
       try {
-        const res = await fetch('/api/user/scans');
+        const res = await fetch('/api/user/scans', { cache: 'no-store' });
         if (!res.ok) {
           if (res.status === 401 || res.status === 403) {
             if (active) {
@@ -383,7 +496,7 @@ export function DomainContextProvider({
         // If we have an initialReportId not in the list, also fetch it individually
         if (initialReportId && !scans.some((s) => s.id === initialReportId)) {
           try {
-            const singleRes = await fetch(`/api/scan/${initialReportId}`);
+            const singleRes = await fetch(`/api/scan/${initialReportId}`, { cache: 'no-store' });
             if (singleRes.ok) {
               const singleData = await singleRes.json() as RecentScanData;
               scans.unshift(singleData);
@@ -396,16 +509,19 @@ export function DomainContextProvider({
           .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
         setRecentScans(sortedScans);
         recentScansMemoryCache.set(scopeKey, sortedScans);
+        if (secondaryStorageScope && secondaryStorageScope !== scopeKey) {
+          recentScansMemoryCache.set(secondaryStorageScope, sortedScans);
+        }
       } catch {
         if (!shouldUseStorageFallback) {
           return;
         }
         // Fallback to localStorage method
-        const fromStorage = getRecentScanEntries(scopeKey).map((entry) => entry.id);
+        const fromStorage = getRecentScanEntriesForScopes(scopeKey, secondaryStorageScope).map((entry) => entry.id);
         const ids = [...new Set([...fromStorage, initialReportId].filter(Boolean))];
         if (ids.length === 0) { if (active) { setRecentScans([]); } return; }
         const results = await Promise.all(ids.map(async (scanId) => {
-          try { const response = await fetch(`/api/scan/${scanId}`); if (!response.ok) return null; return (await response.json()) as RecentScanData; } catch { return null; }
+          try { const response = await fetch(`/api/scan/${scanId}`, { cache: 'no-store' }); if (!response.ok) return null; return (await response.json()) as RecentScanData; } catch { return null; }
         }));
         if (!active) return;
         const sortedScans = results
@@ -413,25 +529,35 @@ export function DomainContextProvider({
           .sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
         setRecentScans(sortedScans);
         recentScansMemoryCache.set(scopeKey, sortedScans);
+        if (secondaryStorageScope && secondaryStorageScope !== scopeKey) {
+          recentScansMemoryCache.set(secondaryStorageScope, sortedScans);
+        }
       } finally {
         if (active) setRecentLoading(false);
       }
     }
     void loadRecentScans();
     return () => { active = false; };
-  }, [initialReportId, storageScope]);
+  }, [authLoading, cachedRecentScans, initialReportId, secondaryStorageScope, storageScope]);
 
-  useEffect(() => { if (initialReportId) rememberRecentScan(initialReportId, storageScope); }, [initialReportId, storageScope]);
+  useEffect(() => {
+    if (initialReportId) {
+      rememberRecentScanForScopes(initialReportId, storageScope, secondaryStorageScope);
+    }
+  }, [initialReportId, storageScope, secondaryStorageScope]);
 
   useEffect(() => {
     if (!storageScope || recentLoading) return;
     recentScansMemoryCache.set(storageScope, recentScans);
-  }, [recentLoading, recentScans, storageScope]);
+    if (secondaryStorageScope && secondaryStorageScope !== storageScope) {
+      recentScansMemoryCache.set(secondaryStorageScope, recentScans);
+    }
+  }, [recentLoading, recentScans, storageScope, secondaryStorageScope]);
 
   // Re-fetch a single scan's metadata and update its entry in recentScans
   const refreshScanEntry = useCallback(async (scanId: string) => {
     try {
-      const res = await fetch(`/api/scan/${scanId}`);
+      const res = await fetch(`/api/scan/${scanId}`, { cache: 'no-store' });
       if (!res.ok) return;
       const data = (await res.json()) as RecentScanData;
       setRecentScans(prev => {
@@ -510,46 +636,21 @@ export function DomainContextProvider({
   }, [checkoutBanner]);
 
   // --- Computed values ---
-  const paidDomains = useMemo(() => {
-    const seen = new Set<string>();
-    return recentScans.reduce<string[]>((domains, scan) => {
-      if (!scan.hasPaid) return domains;
-      const domain = getDomain(scan.url);
-      if (hiddenDomains.includes(domain) || seen.has(domain)) return domains;
-      seen.add(domain); domains.push(domain); return domains;
-    }, []);
-  }, [recentScans, hiddenDomains]);
-
   const monitoredSites = useMemo<SiteSummary[]>(() => {
-    const domains = new Set<string>();
-    const addDomain = (domain: string) => { if (!domain || hiddenDomains.includes(domain)) return; domains.add(domain); };
-    paidDomains.forEach(addDomain);
-    manualDomains.forEach(addDomain);
-    if (report?.url) addDomain(getDomain(report.url));
-    if (initialReportId) {
-      const match = recentScans.find((s) => s.id === initialReportId);
-      if (match) addDomain(getDomain(match.url));
-    }
-    return [...domains].map<SiteSummary>((domain) => {
-      const latestScan = getLatestScanByDomain(recentScans, domain);
-      const latestPaidScan = getLatestPaidScanByDomain(recentScans, domain);
-      const lastTouchedAt = Math.max(
-        latestPaidScan?.completedAt ?? 0,
-        latestPaidScan?.createdAt ?? 0,
-        latestScan?.completedAt ?? 0,
-        latestScan?.createdAt ?? 0,
-        monitoringLatestScanAtByDomain[domain] ?? 0,
-      ) || null;
-      return {
-        domain,
-        url: latestPaidScan?.url ?? latestScan?.url ?? `https://${domain}`,
-        latestScan,
-        latestPaidScan,
-        lastTouchedAt,
-        source: manualDomains.includes(domain) ? 'tracked' : 'scan',
-      };
-    }).sort((a, b) => (b.lastTouchedAt ?? 0) - (a.lastTouchedAt ?? 0));
-  }, [hiddenDomains, manualDomains, monitoringLatestScanAtByDomain, paidDomains, recentScans, report?.url, initialReportId]);
+    return buildWorkspaceSiteSummaries({
+      hiddenDomains,
+      manualDomains,
+      monitoringLatestScanAtByDomain,
+      recentScans,
+      selectedDomain,
+    });
+  }, [
+    hiddenDomains,
+    manualDomains,
+    monitoringLatestScanAtByDomain,
+    recentScans,
+    selectedDomain,
+  ]);
 
   const trackedSites = useMemo(
     () => monitoredSites.filter((site) => site.source === 'tracked'),
@@ -561,21 +662,22 @@ export function DomainContextProvider({
     [monitoredSites]
   );
 
-  // Auto-select domain when none selected (or URL param domain not in list)
+  // Auto-select from the authoritative tracked-domain registry once it has reconciled.
   useEffect(() => {
-    if (recentLoading || monitoredSites.length === 0) return;
-    // If already selected and the domain exists in the list, keep it
+    if (domainsLoading || monitoredSites.length === 0) return;
     if (selectedDomain && monitoredSites.some(s => s.domain === selectedDomain)) return;
-    // Try to match initialReportId
+
     if (initialReportId && recentScans.length > 0) {
       const matchedScan = recentScans.find((scan) => scan.id === initialReportId);
-      if (matchedScan) {
-        setSelectedDomain(getDomain(matchedScan.url), { preserveReport: true });
+      const matchedDomain = matchedScan ? getDomain(matchedScan.url) : null;
+      if (matchedDomain && monitoredSites.some((site) => site.domain === matchedDomain)) {
+        setSelectedDomain(matchedDomain, { preserveReport: true });
         return;
       }
     }
+
     setSelectedDomain(monitoredSites[0].domain);
-  }, [selectedDomain, monitoredSites, recentLoading, initialReportId, recentScans, setSelectedDomain]);
+  }, [domainsLoading, selectedDomain, monitoredSites, initialReportId, recentScans, setSelectedDomain]);
 
   const expandedSite = monitoredSites.find((s) => s.domain === selectedDomain) ?? null;
 
@@ -613,7 +715,7 @@ export function DomainContextProvider({
       let active = true;
       (async () => {
         try {
-          const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`);
+          const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`, { cache: 'no-store' });
           if (!filesRes.ok) {
             if (filesRes.status === 403) {
               if (active) setFiles(null);
@@ -637,13 +739,24 @@ export function DomainContextProvider({
       return () => { active = false; };
     }
 
+    const shouldPreserveVisibleWorkspace = Boolean(
+      report?.url &&
+      selectedDomain &&
+      getDomain(report.url) === selectedDomain
+    );
+
     setWorkspaceLoading(true);
-    setLoadError(''); setActionError(''); setFiles(null); setReport(null);
+    setLoadError('');
+    setActionError('');
+    if (!shouldPreserveVisibleWorkspace) {
+      setFiles(null);
+      setReport(null);
+    }
 
     let active = true;
     (async () => {
       try {
-        const reportRes = await fetch(`/api/scan/${activeWorkspaceReportId}/report`);
+        const reportRes = await fetch(`/api/scan/${activeWorkspaceReportId}/report`, { cache: 'no-store' });
         if (reportRes.status === 202) {
           const pendingPayload = (await reportRes.json().catch(() => ({}))) as ApiErrorPayload;
           if (!active) return;
@@ -661,7 +774,7 @@ export function DomainContextProvider({
           return;
         }
 
-        const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`);
+        const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`, { cache: 'no-store' });
         if (!filesRes.ok) {
           if (filesRes.status === 403) {
             setFiles(null);
@@ -694,7 +807,7 @@ export function DomainContextProvider({
     const interval = setInterval(async () => {
       try {
         if (loadError === 'Scan not complete') {
-          const scanRes = await fetch(`/api/scan/${activeWorkspaceReportId}`);
+          const scanRes = await fetch(`/api/scan/${activeWorkspaceReportId}`, { cache: 'no-store' });
           if (!scanRes.ok) return;
           const scanPayload = await scanRes.json() as RecentScanData & { status?: string; progress?: { error?: string } };
           if (scanPayload.status === 'failed') {
@@ -707,7 +820,7 @@ export function DomainContextProvider({
           }
         }
 
-        const reportRes = await fetch(`/api/scan/${activeWorkspaceReportId}/report`);
+        const reportRes = await fetch(`/api/scan/${activeWorkspaceReportId}/report`, { cache: 'no-store' });
         if (reportRes.status === 202) {
           setLoadError('Scan not complete');
           return;
@@ -727,7 +840,7 @@ export function DomainContextProvider({
           return;
         }
 
-        const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`);
+        const filesRes = await fetch(`/api/scan/${activeWorkspaceReportId}/files`, { cache: 'no-store' });
         if (filesRes.ok) {
           const filesPayload = (await filesRes.json()) as FilesData;
           setFiles(filesPayload);
@@ -797,6 +910,12 @@ export function DomainContextProvider({
         manualDomains: nextManual,
         hiddenDomains: nextHidden,
       });
+      if (secondaryStorageScope && secondaryStorageScope !== storageScope) {
+        domainListMemoryCache.set(secondaryStorageScope, {
+          manualDomains: nextManual,
+          hiddenDomains: nextHidden,
+        });
+      }
     }
     const matchingPaidScan = getLatestPaidScanByDomain(recentScans, normalized);
     if (matchingPaidScan) {
@@ -814,6 +933,12 @@ export function DomainContextProvider({
                 connected: next,
                 latestScanAtByDomain: monitoringLatestScanAtByDomain,
               });
+              if (secondaryStorageScope && secondaryStorageScope !== storageScope) {
+                monitoringMemoryCache.set(secondaryStorageScope, {
+                  connected: next,
+                  latestScanAtByDomain: monitoringLatestScanAtByDomain,
+                });
+              }
             }
             return next;
           });
@@ -874,7 +999,7 @@ export function DomainContextProvider({
         throw new Error(payload.error || 'Failed to start scan');
       }
 
-      rememberRecentScan(payload.id, storageScope);
+      rememberRecentScanForScopes(payload.id, storageScope, secondaryStorageScope);
       router.replace(`/dashboard?report=${payload.id}&domain=${encodeURIComponent(normalizedDomain)}`);
       return { ok: true };
     } catch (err) {
@@ -884,7 +1009,7 @@ export function DomainContextProvider({
       router.replace(`/dashboard?domain=${encodeURIComponent(normalizedDomain)}`);
       return { ok: true, error: message };
     }
-  }, [normalizedDomain, manualDomains, confirmChecked, addTrackedDomain, storageScope, router]);
+  }, [normalizedDomain, manualDomains, confirmChecked, addTrackedDomain, storageScope, secondaryStorageScope, router]);
 
   const handleRemoveDomain = useCallback((domain: string) => {
     // Write-through to DB
@@ -902,6 +1027,12 @@ export function DomainContextProvider({
         manualDomains: nextManual,
         hiddenDomains: nextHidden,
       });
+      if (secondaryStorageScope && secondaryStorageScope !== storageScope) {
+        domainListMemoryCache.set(secondaryStorageScope, {
+          manualDomains: nextManual,
+          hiddenDomains: nextHidden,
+        });
+      }
     }
     if (selectedDomain === domain) setSelectedDomain(null);
   }, [manualDomains, hiddenDomains, selectedDomain, setSelectedDomain, storageScope, secondaryStorageScope]);
@@ -982,8 +1113,8 @@ export function DomainContextProvider({
 
   const handleRunFirstScan = useCallback(async (site: SiteSummary) => {
     setActionError('');
-    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: site.url }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); rememberRecentScan(payload.id, storageScope); router.push(`/dashboard?report=${payload.id}&domain=${encodeURIComponent(site.domain)}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); }
-  }, [router, storageScope]);
+    try { const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: site.url }) }); const payload = await res.json(); if (!res.ok) throw new Error(payload.error || 'Failed to start scan'); rememberRecentScanForScopes(payload.id, storageScope, secondaryStorageScope); router.push(`/dashboard?report=${payload.id}&domain=${encodeURIComponent(site.domain)}`); } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); }
+  }, [router, storageScope, secondaryStorageScope]);
 
   const handleReaudit = useCallback(async () => {
     const scanUrl = files?.url ?? report?.url ?? (expandedSite ? expandedSite.url : null);
@@ -994,7 +1125,7 @@ export function DomainContextProvider({
       const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: scanUrl, force: true }) });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Failed to start scan');
-      rememberRecentScan(payload.id, storageScope);
+      rememberRecentScanForScopes(payload.id, storageScope, secondaryStorageScope);
       const newScanEntry: RecentScanData = {
         id: payload.id,
         url: scanUrl,
@@ -1004,11 +1135,11 @@ export function DomainContextProvider({
         createdAt: Date.now(),
       };
       setRecentScans((prev) => [newScanEntry, ...prev]);
-      setReport(null); setFiles(null); setLoadError(''); setWorkspaceLoading(true);
-      setReportCache({}); setFilesCache({});
+      setLoadError('');
+      setWorkspaceLoading(true);
       router.push(`/dashboard?report=${payload.id}&domain=${encodeURIComponent(scanDomain)}`);
     } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to start scan'); } finally { setReauditLoading(false); }
-  }, [files?.url, report?.url, expandedSite, router, storageScope]);
+  }, [files?.url, report?.url, expandedSite, router, storageScope, secondaryStorageScope]);
 
   const handleEnableMonitoring = useCallback(async () => {
     if (!expandedSite?.domain) return;
@@ -1033,11 +1164,17 @@ export function DomainContextProvider({
             connected: next,
             latestScanAtByDomain: monitoringLatestScanAtByDomain,
           });
+          if (secondaryStorageScope && secondaryStorageScope !== storageScope) {
+            monitoringMemoryCache.set(secondaryStorageScope, {
+              connected: next,
+              latestScanAtByDomain: monitoringLatestScanAtByDomain,
+            });
+          }
         }
         return next;
       });
     } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to enable monitoring'); } finally { setMonitoringLoading(false); }
-  }, [expandedSite, hasPaidAccess, monitoringLatestScanAtByDomain, recentScans, storageScope]);
+  }, [expandedSite, hasPaidAccess, monitoringLatestScanAtByDomain, recentScans, storageScope, secondaryStorageScope]);
 
   const handleDisableMonitoring = useCallback(async () => {
     if (!expandedSite?.domain) return;
@@ -1053,11 +1190,17 @@ export function DomainContextProvider({
             connected: next,
             latestScanAtByDomain: monitoringLatestScanAtByDomain,
           });
+          if (secondaryStorageScope && secondaryStorageScope !== storageScope) {
+            monitoringMemoryCache.set(secondaryStorageScope, {
+              connected: next,
+              latestScanAtByDomain: monitoringLatestScanAtByDomain,
+            });
+          }
         }
         return next;
       });
     } catch (err) { setActionError(err instanceof Error ? err.message : 'Failed to disable monitoring'); } finally { setMonitoringLoading(false); }
-  }, [expandedSite, monitoringLatestScanAtByDomain, storageScope]);
+  }, [expandedSite, monitoringLatestScanAtByDomain, storageScope, secondaryStorageScope]);
 
   const value = useMemo<DomainContextValue>(() => ({
     monitoredSites,
@@ -1081,6 +1224,7 @@ export function DomainContextProvider({
     workspaceLoading,
     loadError,
     recentScans,
+    domainsLoading,
     recentLoading,
     expandedSite,
     actionError,
@@ -1104,7 +1248,7 @@ export function DomainContextProvider({
   }), [
     monitoredSites, trackedSites, scannedSites, selectedDomain, activeReportId, selectDomain, addDomainInput, handleAddDomain, addTrackedDomain, handleRemoveDomain,
     addError, confirmChecked, scanAutoStarting, hasPaidAccess, report, files, workspaceLoading, loadError, recentScans,
-    recentLoading, expandedSite, actionError, reauditLoading, handleReaudit, handleRunFirstScan,
+    domainsLoading, recentLoading, expandedSite, actionError, reauditLoading, handleReaudit, handleRunFirstScan,
     monitoringConnected, monitoringLoading, handleEnableMonitoring, handleDisableMonitoring, unlockModalOpen, handleUnlockComplete,
     unlockLoading, pendingDomain, paidOverride, debugPaidPreview, checkoutBanner, dismissCheckoutBanner, inputFaviconUrl,
   ]);

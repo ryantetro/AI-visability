@@ -163,10 +163,20 @@ export async function getTeamMembers(teamId: string): Promise<TeamMember[]> {
 export async function getTeamMemberUserIds(teamId: string): Promise<string[]> {
   const supabase = getSupabaseClient();
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('team_members')
     .select('user_id')
-    .eq('team_id', teamId);
+    .eq('team_id', teamId)
+    .eq('status', 'active');
+
+  if (error && isMissingTeamStatusSchemaError(error)) {
+    const fallback = await supabase
+      .from('team_members')
+      .select('user_id')
+      .eq('team_id', teamId);
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !data) return [];
   return data.map((row) => row.user_id);
@@ -176,6 +186,26 @@ export async function getEffectiveUserIds(userId: string): Promise<string[]> {
   const teamInfo = await getTeamForUser(userId);
   if (!teamInfo) return [userId];
   return getTeamMemberUserIds(teamInfo.team.id);
+}
+
+export async function getEffectiveUserEmails(userId: string, fallbackEmail?: string | null): Promise<string[]> {
+  const normalizedFallback = fallbackEmail?.trim().toLowerCase() || null;
+  const teamInfo = await getTeamForUser(userId);
+
+  if (!teamInfo) {
+    return normalizedFallback ? [normalizedFallback] : [];
+  }
+
+  const members = await getTeamMembers(teamInfo.team.id);
+  const emails = members
+    .map((member) => member.email?.trim().toLowerCase() || null)
+    .filter((email): email is string => Boolean(email));
+
+  if (normalizedFallback) {
+    emails.unshift(normalizedFallback);
+  }
+
+  return [...new Set(emails)];
 }
 
 /* ── Invitations ────────────────────────────────────────────────── */

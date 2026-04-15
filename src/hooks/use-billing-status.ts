@@ -17,9 +17,11 @@ function buildEmptyStatus(): BillingStatus | null {
   return null;
 }
 
-export function useBillingStatus() {
+export function useBillingStatus(options?: { enabled?: boolean; deferMs?: number }) {
+  const enabled = options?.enabled ?? true;
+  const deferMs = options?.deferMs ?? 0;
   const [status, setStatus] = useState<BillingStatus | null>(() => billingStatusCache?.status ?? buildEmptyStatus());
-  const [loading, setLoading] = useState(() => !billingStatusCache);
+  const [loading, setLoading] = useState(() => enabled && !billingStatusCache);
   const [error, setError] = useState<string | null>(() => billingStatusCache?.error ?? null);
 
   const refresh = useCallback(async () => {
@@ -64,9 +66,24 @@ export function useBillingStatus() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
+    const triggerRefresh = () => {
+      void refresh();
+    };
 
     if (typeof window === 'undefined') return;
+
+    const timer = deferMs > 0 && !billingStatusCache
+      ? window.setTimeout(triggerRefresh, deferMs)
+      : null;
+
+    if (timer === null) {
+      triggerRefresh();
+    }
 
     const handleInvalidation = () => {
       void refresh();
@@ -74,9 +91,12 @@ export function useBillingStatus() {
 
     window.addEventListener(BILLING_STATUS_INVALIDATED_EVENT, handleInvalidation);
     return () => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
       window.removeEventListener(BILLING_STATUS_INVALIDATED_EVENT, handleInvalidation);
     };
-  }, [refresh]);
+  }, [deferMs, enabled, refresh]);
 
   return {
     status,

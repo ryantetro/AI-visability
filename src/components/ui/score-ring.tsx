@@ -15,6 +15,7 @@ interface ScoreRingProps {
   loading?: boolean;
   loadingText?: string;
   coreRef?: Ref<HTMLDivElement>;
+  animateOnMount?: boolean;
 }
 
 export function ScoreRing({
@@ -28,9 +29,10 @@ export function ScoreRing({
   loading = false,
   loadingText = 'Analyzing',
   coreRef,
+  animateOnMount = true,
 }: ScoreRingProps) {
   const safeScore = Math.max(0, Math.min(100, score ?? 0));
-  const animatedScore = useScoreAnimation(safeScore);
+  const animatedScore = useScoreAnimation(safeScore, 1500, { animateOnMount });
   const strokeWidth = emphasis === 'hero' ? 12 : emphasis === 'compact' ? 8 : 10;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;

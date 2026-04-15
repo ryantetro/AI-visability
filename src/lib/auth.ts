@@ -11,6 +11,7 @@ export const REFRESH_COOKIE_NAME = 'aiso_refresh_token';
 const ACCESS_MAX_AGE = 60 * 60; // 1 hour
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 export const PASSWORD_MIN_LENGTH = 8;
+const ACCESS_TOKEN_CACHE_TTL_MS = 15_000;
 
 export type AuthFailureReason = 'no_session' | 'token_invalid' | 'refresh_failed' | 'signed_out';
 type AuthCallbackType = 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change' | 'email';
@@ -24,6 +25,20 @@ export interface AuthSessionState {
     expiresAt?: string | null;
   } | null;
 }
+
+interface RefreshedAuthSession {
+  user: AuthUser;
+  session: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: string | null;
+  };
+  rawSession: unknown;
+}
+
+const accessTokenUserCache = new Map<string, { user: AuthUser | null; cachedAt: number }>();
+const accessTokenUserInflight = new Map<string, Promise<AuthUser | null>>();
+const refreshSessionInflight = new Map<string, Promise<RefreshedAuthSession | null>>();
 
 export class AuthActionError extends Error {
   code: string;
@@ -255,32 +270,73 @@ async function getUserFromAccessToken(accessToken: string): Promise<AuthUser | n
   const testUser = _testTokens.get(accessToken);
   if (testUser) return testUser;
 
-  try {
-    const supabase = getSupabaseClient();
-    const { data, error } = await supabase.auth.getUser(accessToken);
-    if (error || !data.user) return null;
-    return toAuthUser(data.user);
-  } catch {
-    return null;
+  const cached = accessTokenUserCache.get(accessToken);
+  if (cached && Date.now() - cached.cachedAt < ACCESS_TOKEN_CACHE_TTL_MS) {
+    return cached.user;
   }
+
+  const inFlight = accessTokenUserInflight.get(accessToken);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const request = (async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.auth.getUser(accessToken);
+      const user = error || !data.user ? null : toAuthUser(data.user);
+      accessTokenUserCache.set(accessToken, { user, cachedAt: Date.now() });
+      return user;
+    } catch {
+      accessTokenUserCache.set(accessToken, { user: null, cachedAt: Date.now() });
+      return null;
+    } finally {
+      accessTokenUserInflight.delete(accessToken);
+    }
+  })();
+
+  accessTokenUserInflight.set(accessToken, request);
+  return request;
 }
 
-export async function refreshAuthSession(refreshToken: string) {
-  const supabase = createRouteHandlerSupabaseClient();
-  const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
-  if (error || !data.session || !data.user) {
-    return null;
+export async function refreshAuthSession(refreshToken: string): Promise<RefreshedAuthSession | null> {
+  const inFlight = refreshSessionInflight.get(refreshToken);
+  if (inFlight) {
+    return inFlight;
   }
 
-  return {
-    user: toAuthUser(data.user),
-    session: {
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-      expiresAt: expiresAtIso(data.session.expires_at),
-    },
-    rawSession: data.session,
-  };
+  const request = (async () => {
+    const supabase = createRouteHandlerSupabaseClient();
+    const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+    if (error || !data.session || !data.user) {
+      return null;
+    }
+
+    const user = toAuthUser(data.user);
+    if (!user) {
+      return null;
+    }
+
+    accessTokenUserCache.set(data.session.access_token, {
+      user,
+      cachedAt: Date.now(),
+    });
+
+    return {
+      user,
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: expiresAtIso(data.session.expires_at),
+      },
+      rawSession: data.session,
+    };
+  })().finally(() => {
+    refreshSessionInflight.delete(refreshToken);
+  });
+
+  refreshSessionInflight.set(refreshToken, request);
+  return request;
 }
 
 export async function getServerAuthSession(request: NextRequest): Promise<AuthSessionState> {

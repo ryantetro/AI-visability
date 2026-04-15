@@ -71,6 +71,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
     workspaceLoading,
     loadError,
     recentScans,
+    domainsLoading,
     recentLoading,
     expandedSite,
     actionError,
@@ -93,7 +94,7 @@ function AdvancedPageContent({ reportId }: { reportId: string | null }) {
   } = useDomainContext();
 
   // --- Render ---
-  if (recentLoading || planLoading) return <CenteredLoading label="Preparing your advanced workspace..." />;
+  if (domainsLoading || recentLoading || planLoading) return <CenteredLoading label="Preparing your advanced workspace..." />;
 
   if (roadmapTab) {
     return (

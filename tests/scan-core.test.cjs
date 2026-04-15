@@ -47,8 +47,11 @@ const { mockReferralVisits, resetMockReferralVisits } = require('../src/lib/serv
 const archiveRoute = require('../src/app/api/scan/[id]/files/archive/route.ts');
 const reportRoute = require('../src/app/api/scan/[id]/report/route.ts');
 const monitoringDomainRoute = require('../src/app/api/monitoring/[domain]/route.ts');
+const monitoringRoute = require('../src/app/api/monitoring/route.ts');
+const scanEmailRoute = require('../src/app/api/scan/[id]/email/route.ts');
 const opportunityAlertRoute = require('../src/app/api/opportunity-alert/route.ts');
 const cronMonitorRoute = require('../src/app/api/cron/monitor/route.ts');
+const domainVerificationConfirmRoute = require('../src/app/api/domain-verification/confirm/route.ts');
 const publicScorePage = require('../src/app/score/[id]/page.tsx');
 const {
   AUTH_COOKIE_NAME,
@@ -1234,6 +1237,124 @@ test('monitoring records can be added and removed for owned scans', async () => 
 
   const remainingRecords = await listMonitoringDomains('alerts@example.com');
   assert.equal(remainingRecords.length, 0);
+});
+
+test('POST /api/scan/[id]/email does not allow claiming another user scan', async () => {
+  const scan = await saveCompletedScan('claimed-scan', {
+    email: 'owner@example.com',
+  });
+
+  const request = createAuthedJsonRequest(
+    `http://localhost/api/scan/${scan.id}/email`,
+    'POST',
+    {},
+    'attacker@example.com'
+  );
+
+  const response = await scanEmailRoute.POST(request, {
+    params: Promise.resolve({ id: scan.id }),
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.match(payload.error, /belongs to another account/i);
+
+  const savedScan = await mockDb.getScan(scan.id);
+  assert.equal(savedScan.email, 'owner@example.com');
+});
+
+test('POST /api/monitoring rejects another user scan id', async () => {
+  const scan = await saveCompletedScan('monitoring-foreign-scan', {
+    email: 'owner@example.com',
+  });
+
+  const request = createAuthedJsonRequest(
+    'http://localhost/api/monitoring',
+    'POST',
+    { scanId: scan.id, alertThreshold: 9 },
+    'attacker@example.com'
+  );
+
+  const response = await monitoringRoute.POST(request);
+  const payload = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.match(payload.error, /belongs to another account/i);
+});
+
+test('POST /api/domain-verification/confirm requires the same account that started verification', async () => {
+  const secureCrawlData = createCrawlData({
+    url: 'https://secure-example.com/',
+    normalizedUrl: 'https://secure-example.com',
+  });
+  const scan = await saveCompletedScan('secure-verified-public', {
+    email: 'owner@example.com',
+    crawlData: secureCrawlData,
+  });
+
+  const started = await startDomainVerification({
+    scanId: scan.id,
+    url: scan.url,
+    email: scan.email,
+    enablePublicScore: true,
+    enableBadge: true,
+    enableLeaderboard: true,
+  });
+
+  await withMockFetch(
+    async (url) => {
+      if (url === 'https://secure-example.com' || url === 'https://secure-example.com/') {
+        return {
+          ok: true,
+          text: async () =>
+            `<!doctype html><html><head>${started.instructions.metaTag}</head><body></body></html>`,
+        };
+      }
+
+      return {
+        ok: false,
+        text: async () => '',
+      };
+    },
+    async () => {
+      const attackerRequest = createAuthedJsonRequest(
+        'http://localhost/api/domain-verification/confirm',
+        'POST',
+        {
+          domain: 'secure-example.com',
+          enablePublicScore: true,
+          enableBadge: true,
+          enableLeaderboard: true,
+        },
+        'attacker@example.com'
+      );
+
+      const attackerResponse = await domainVerificationConfirmRoute.POST(attackerRequest);
+      const attackerPayload = await attackerResponse.json();
+
+      assert.equal(attackerResponse.status, 403);
+      assert.match(attackerPayload.reason, /belongs to another account/i);
+
+      const ownerRequest = createAuthedJsonRequest(
+        'http://localhost/api/domain-verification/confirm',
+        'POST',
+        {
+          domain: 'secure-example.com',
+          enablePublicScore: true,
+          enableBadge: true,
+          enableLeaderboard: true,
+        },
+        'owner@example.com'
+      );
+
+      const ownerResponse = await domainVerificationConfirmRoute.POST(ownerRequest);
+      const ownerPayload = await ownerResponse.json();
+
+      assert.equal(ownerResponse.status, 200);
+      assert.equal(ownerPayload.verified, true);
+      assert.equal(ownerPayload.method, 'meta-tag');
+    }
+  );
 });
 
 test('opportunity summary ranks providers and pages for qualifying traffic', () => {

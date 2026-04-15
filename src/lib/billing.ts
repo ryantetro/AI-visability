@@ -801,9 +801,9 @@ export async function buildPlanUsageSnapshot(
   context: BillingContext,
   targetPlan: string,
   effectiveAt: string | null = null,
-  options: { forceChecks?: boolean } = {},
+  options: { forceChecks?: boolean; rows?: UsageRows } = {},
 ): Promise<PlanUsageSnapshot> {
-  const rows = await loadUsageRows(context.effectiveUserIds);
+  const rows = options.rows ?? await loadUsageRows(context.effectiveUserIds);
   const currentTier = context.access.tier;
   const targetTier = planStringToTier(targetPlan);
   const sameEntitlements = currentTier === targetTier;
@@ -1321,12 +1321,21 @@ export async function getBillingStatus(userId: string, email: string): Promise<B
       }
     : null;
 
-  const [activeReadiness, readiness] = await Promise.all([
-    buildPlanUsageSnapshot(context, resolvedCurrentPlan, resolvedCurrentPeriodEnd, { forceChecks: true }),
-    pendingChange
-      ? buildPlanUsageSnapshot(context, pendingChange.targetPlan, pendingChange.effectiveAt)
-      : buildPlanUsageSnapshot(context, resolvedCurrentPlan, resolvedCurrentPeriodEnd),
-  ]);
+  const usageRows = await loadUsageRows(context.effectiveUserIds);
+  const activeReadiness = await buildPlanUsageSnapshot(
+    context,
+    resolvedCurrentPlan,
+    resolvedCurrentPeriodEnd,
+    { forceChecks: true, rows: usageRows },
+  );
+  const readiness = pendingChange
+    ? await buildPlanUsageSnapshot(
+        context,
+        pendingChange.targetPlan,
+        pendingChange.effectiveAt,
+        { rows: usageRows },
+      )
+    : activeReadiness;
 
   const overageIssues = activeReadiness.viewerIssues.filter((issue) => issue.severity === 'blocker');
 

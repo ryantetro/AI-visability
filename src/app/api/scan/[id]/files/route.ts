@@ -7,6 +7,7 @@ import { generateAllFiles } from '@/lib/generator';
 import { CrawlData } from '@/types/crawler';
 import { GeneratedFiles } from '@/types/generated-files';
 import { ScoreResult } from '@/types/score';
+import { getEffectiveUserEmails } from '@/lib/team-management';
 
 export async function GET(
   request: NextRequest,
@@ -25,7 +26,8 @@ export async function GET(
     return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
   }
 
-  if (!scan.email || scan.email.toLowerCase() !== user.email.toLowerCase()) {
+  const effectiveEmails = new Set(await getEffectiveUserEmails(user.id, user.email));
+  if (!scan.email || !effectiveEmails.has(scan.email.toLowerCase())) {
     return NextResponse.json({ error: 'This file bundle belongs to another account.' }, { status: 403 });
   }
 

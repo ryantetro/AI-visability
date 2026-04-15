@@ -1046,7 +1046,7 @@ function SidebarDomainList({ onCloseMobile, collapsed }: { onCloseMobile?: () =>
     confirmChecked,
     setConfirmChecked,
     inputFaviconUrl,
-    recentLoading,
+    domainsLoading,
   } = useDomainContext();
 
   const [showAddInput, setShowAddInput] = useState(false);
@@ -1121,7 +1121,7 @@ function SidebarDomainList({ onCloseMobile, collapsed }: { onCloseMobile?: () =>
             >
               <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Domains</p>
               <div className="space-y-0.5">
-                {recentLoading && monitoredSites.length === 0 ? (
+                {domainsLoading ? (
                   <div className="px-2.5 py-2 text-[11px] text-zinc-500">Loading…</div>
                 ) : (
                   monitoredSites.map((site) => (
@@ -1264,7 +1264,7 @@ function SidebarDomainList({ onCloseMobile, collapsed }: { onCloseMobile?: () =>
       </p>
 
       <div className="space-y-0.5">
-        {!mounted || (recentLoading && monitoredSites.length === 0) ? (
+        {!mounted || domainsLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="flex items-center gap-2.5 rounded-lg px-3 py-2">
               <span className="h-4 w-4 shrink-0 animate-pulse rounded-full bg-white/[0.06]" />

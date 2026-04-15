@@ -4,6 +4,10 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { useDomainContextSafe } from './domain-context';
 import type { CountResponse } from '@/types/action-checklist';
 
+const COUNT_CACHE_TTL_MS = 60_000;
+const COUNT_FETCH_DEFER_MS = 700;
+const countCache = new Map<string, { remaining: number; cachedAt: number }>();
+
 interface ActionChecklistContextValue {
   remainingCount: number | null;
   refreshCount: () => void;
@@ -19,17 +23,26 @@ export function ActionChecklistProvider({ children }: { children: React.ReactNod
   const domainCtx = useDomainContextSafe();
   const selectedDomain = domainCtx?.selectedDomain ?? null;
 
-  const fetchCount = useCallback(async () => {
+  const fetchCount = useCallback(async (options?: { force?: boolean }) => {
     if (!selectedDomain) {
       setRemainingCount(null);
       return;
     }
+
+    const cached = countCache.get(selectedDomain);
+    if (!options?.force && cached && Date.now() - cached.cachedAt < COUNT_CACHE_TTL_MS) {
+      setRemainingCount(cached.remaining);
+      return;
+    }
+
     try {
       const res = await fetch(
         `/api/action-checklist/count?domain=${encodeURIComponent(selectedDomain)}`,
+        { cache: 'no-store' },
       );
       if (res.ok) {
         const data: CountResponse = await res.json();
+        countCache.set(selectedDomain, { remaining: data.remaining, cachedAt: Date.now() });
         setRemainingCount(data.remaining);
       }
     } catch {
@@ -38,11 +51,28 @@ export function ActionChecklistProvider({ children }: { children: React.ReactNod
   }, [selectedDomain]);
 
   useEffect(() => {
-    fetchCount();
+    if (!selectedDomain) {
+      setRemainingCount(null);
+      return;
+    }
+
+    const cached = countCache.get(selectedDomain);
+    if (cached && Date.now() - cached.cachedAt < COUNT_CACHE_TTL_MS) {
+      setRemainingCount(cached.remaining);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchCount();
+    }, COUNT_FETCH_DEFER_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [fetchCount]);
 
   return (
-    <ActionChecklistContext.Provider value={{ remainingCount, refreshCount: fetchCount }}>
+    <ActionChecklistContext.Provider value={{ remainingCount, refreshCount: () => { void fetchCount({ force: true }); } }}>
       {children}
     </ActionChecklistContext.Provider>
   );

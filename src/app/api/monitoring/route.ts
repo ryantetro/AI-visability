@@ -10,26 +10,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  const domains = await listMonitoringDomains(user.email);
-  const db = getDatabase();
-  const enrichedDomains = await Promise.all(domains.map(async (domainRecord) => {
-    const latestScan = await db.findLatestScanByDomain(domainRecord.domain);
-    return {
-      ...domainRecord,
-      latestDomainScanId: latestScan?.id ?? null,
-      latestDomainScanAt: latestScan
-        ? (latestScan.completedAt ?? latestScan.createdAt ?? null)
-        : null,
-    };
-  }));
+  const userEmail = user.email?.trim().toLowerCase();
+  if (!userEmail) {
+    return NextResponse.json({ error: 'Authenticated user email is required.' }, { status: 400 });
+  }
 
-  return NextResponse.json({ domains: enrichedDomains });
+  const domains = await listMonitoringDomains(userEmail);
+  return NextResponse.json({ domains });
 }
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUserFromRequest(request);
   if (!user) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+
+  const userEmail = user.email?.trim().toLowerCase();
+  if (!userEmail) {
+    return NextResponse.json({ error: 'Authenticated user email is required.' }, { status: 400 });
   }
 
   const body = await request.json();
@@ -40,7 +38,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const readiness = await getCurrentBillingReadiness(user.id, user.email);
+    const db = getDatabase();
+    const scan = await db.getScan(scanId);
+
+    if (!scan) {
+      return NextResponse.json({ error: 'Scan not found.' }, { status: 404 });
+    }
+
+    if (!scan.email || scan.email.trim().toLowerCase() !== userEmail) {
+      return NextResponse.json({ error: 'This scan belongs to another account.' }, { status: 403 });
+    }
+
+    const readiness = await getCurrentBillingReadiness(user.id, userEmail);
     const hasDomainOverage = readiness.snapshot.issues.some((issue) => issue.category === 'domains');
     if (hasDomainOverage) {
       return NextResponse.json(
@@ -49,7 +58,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const record = await addMonitoringDomain({ scanId, alertThreshold });
+    const record = await addMonitoringDomain({ scanId, alertThreshold, email: userEmail });
     return NextResponse.json(record, { status: 201 });
   } catch (error) {
     return NextResponse.json(

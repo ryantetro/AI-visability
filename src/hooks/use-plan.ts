@@ -79,7 +79,10 @@ export function usePlan(): PlanState {
       void refresh();
     };
 
-    void refresh();
+    syncFromCache();
+    if (getPlanCacheSnapshot().tier === null) {
+      void refresh();
+    }
 
     if (typeof window === 'undefined') return;
 

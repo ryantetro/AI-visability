@@ -168,19 +168,28 @@ export async function getChecklistCount(
   const qs = new URLSearchParams({
     user_id: `eq.${userId}`,
     domain: `eq.${domain}`,
-    select: 'manual_status,scan_status',
+    scan_status: 'neq.pass',
+    or: '(manual_status.neq.done,scan_status.eq.fail)',
+    select: 'id',
   });
+
+  const countRes = await fetch(supabaseUrl(`action_checklist?${qs}`), {
+    method: 'HEAD',
+    headers: supabaseHeaders({ Prefer: 'count=exact' }),
+  });
+
+  const contentRange = countRes.headers.get('content-range');
+  const countedRemaining = contentRange ? Number.parseInt(contentRange.split('/').pop() ?? '', 10) : Number.NaN;
+
+  if (countRes.ok && Number.isFinite(countedRemaining)) {
+    return { remaining: countedRemaining };
+  }
 
   const res = await fetch(supabaseUrl(`action_checklist?${qs}`), {
     method: 'GET',
     headers: supabaseHeaders(),
   });
-  const rows: Pick<ChecklistRow, 'manual_status' | 'scan_status'>[] = await res.json();
+  const rows: Array<Pick<ChecklistRow, 'id'>> = await res.json();
 
-  const remaining = rows.filter((row) => {
-    const { isComplete } = deriveCompletion(row.manual_status, row.scan_status);
-    return !isComplete;
-  }).length;
-
-  return { remaining };
+  return { remaining: rows.length };
 }

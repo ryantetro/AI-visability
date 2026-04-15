@@ -33,6 +33,25 @@ export function getRecentScanEntries(scopeKey?: string | null): RecentScanEntry[
   }
 }
 
+export function getRecentScanEntriesForScopes(primaryScope?: string | null, secondaryScope?: string | null): RecentScanEntry[] {
+  const primaryEntries = getRecentScanEntries(primaryScope);
+  if (!secondaryScope || secondaryScope === primaryScope) {
+    return primaryEntries;
+  }
+
+  const byId = new Map<string, RecentScanEntry>();
+  for (const entry of [...primaryEntries, ...getRecentScanEntries(secondaryScope)]) {
+    const existing = byId.get(entry.id);
+    if (!existing || entry.touchedAt > existing.touchedAt) {
+      byId.set(entry.id, entry);
+    }
+  }
+
+  return [...byId.values()]
+    .sort((a, b) => b.touchedAt - a.touchedAt)
+    .slice(0, MAX_RECENT);
+}
+
 export function rememberRecentScan(id: string, scopeKey?: string | null) {
   if (!canUseStorage() || !id) return;
 
@@ -48,5 +67,12 @@ export function rememberRecentScan(id: string, scopeKey?: string | null) {
     window.localStorage.setItem(storageKey, JSON.stringify(nextEntries));
   } catch {
     // Ignore storage failures so scan flow never breaks.
+  }
+}
+
+export function rememberRecentScanForScopes(id: string, primaryScope?: string | null, secondaryScope?: string | null) {
+  rememberRecentScan(id, primaryScope);
+  if (secondaryScope && secondaryScope !== primaryScope) {
+    rememberRecentScan(id, secondaryScope);
   }
 }

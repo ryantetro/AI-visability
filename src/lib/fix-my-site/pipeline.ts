@@ -9,6 +9,7 @@ import { query, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { getDatabase } from '@/lib/services/registry';
 import type { ScoreResult } from '@/types/score';
+import { getSupabaseClient } from '@/lib/supabase';
 import {
   getOrderById,
   updateOrderProgress,
@@ -34,7 +35,17 @@ export async function triggerFixMySiteAgent(orderId: string): Promise<void> {
 
   // Find the latest scan for this domain
   const db = getDatabase();
-  const scan = await db.findLatestScanByDomain(order.domain);
+  const { data: ownerProfile } = await getSupabaseClient()
+    .from('user_profiles')
+    .select('email')
+    .eq('id', order.user_id)
+    .maybeSingle();
+  const ownerEmail = typeof ownerProfile?.email === 'string'
+    ? ownerProfile.email.trim().toLowerCase()
+    : '';
+  const scan = ownerEmail
+    ? await db.findLatestScanByDomain(order.domain, ownerEmail)
+    : null;
 
   if (!scan?.crawlData || !scan.scoreResult) {
     // No scan data — mark as needing scan

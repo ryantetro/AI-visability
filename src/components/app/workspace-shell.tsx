@@ -34,6 +34,7 @@ import { usePlan } from '@/hooks/use-plan';
 import { canAccess, NAV_GATES, type PlanTier } from '@/lib/pricing';
 import { formatPlatformLabel } from '@/lib/platform-detection';
 import { buildLoginHref } from '@/lib/app-paths';
+import { getDomain } from '@/lib/url-utils';
 
 import { CenteredLoading, CenteredWorkspaceState } from '@/app/advanced/panels/shared';
 import type { SiteSummary } from '@/app/advanced/lib/types';
@@ -65,7 +66,7 @@ export function WorkspaceShell({
   const searchParams = useSearchParams();
   const { user: authUser, loading: authLoading } = useAuth();
   const { tier, loading: planLoading } = usePlan();
-  const billingStatus = useBillingStatus();
+  const billingStatus = useBillingStatus({ deferMs: sectionKey === 'settings' ? 0 : 1500 });
 
   // Client-side auth guard — redirect to login if no authenticated user
   useEffect(() => {
@@ -85,6 +86,7 @@ export function WorkspaceShell({
     workspaceLoading,
     loadError,
     recentScans,
+    domainsLoading,
     recentLoading,
     expandedSite,
     actionError,
@@ -111,14 +113,24 @@ export function WorkspaceShell({
   const isFreeUser = !hasPaidAccess;
   const isMonitoring = selectedDomain ? Boolean(monitoringConnected[selectedDomain]) : false;
   const platformLabel = files ? formatPlatformLabel(files.detectedPlatform) : null;
+  const reportMatchesSelectedDomain = Boolean(
+    report?.url &&
+    selectedDomain &&
+    getDomain(report.url) === selectedDomain
+  );
+  const workspaceRefreshing = reportMatchesSelectedDomain && (workspaceLoading || loadError === 'Scan not complete');
 
   // Block rendering until auth check completes — prevents flash of content for unauthenticated users
   if (authLoading || planLoading || (!authUser && !authLoading)) {
     return <CenteredLoading label="Loading workspace..." />;
   }
 
-  if (recentLoading && monitoredSites.length === 0) {
+  if (domainsLoading) {
     return <CenteredLoading label="Loading workspace..." />;
+  }
+
+  if (mustHaveReport && recentLoading && !reportMatchesSelectedDomain) {
+    return <CenteredWorkspaceState label="Loading this domain workspace..." />;
   }
 
   // Gating check — show locked overlay if tier is insufficient
@@ -154,10 +166,10 @@ export function WorkspaceShell({
     return <CenteredLoading label="Loading workspace..." />;
   }
 
-  if (mustHaveReport && workspaceLoading) {
+  if (mustHaveReport && workspaceLoading && !reportMatchesSelectedDomain) {
     return <CenteredWorkspaceState label="Loading this domain workspace..." />;
   }
-  if (mustHaveReport && loadError && !report) {
+  if (mustHaveReport && loadError && !reportMatchesSelectedDomain) {
     const isScanInProgress = loadError === 'Scan not complete';
     if (isScanInProgress) {
       return <ScanInProgressView domain={selectedDomain ?? ''} scanId={expandedSite?.latestScan?.id ?? ''} />;
@@ -189,7 +201,7 @@ export function WorkspaceShell({
     );
   }
 
-  if (mustHaveReport && !report) {
+  if (mustHaveReport && !reportMatchesSelectedDomain) {
     // If the latest scan is still in progress, show progress view instead of a dead-end message
     const latestStatus = expandedSite?.latestScan?.status;
     if (latestStatus && latestStatus !== 'complete' && latestStatus !== 'failed') {
@@ -317,6 +329,15 @@ export function WorkspaceShell({
         {actionError && (
           <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/8 px-3.5 py-2.5 text-xs text-red-300">
             {actionError}
+          </div>
+        )}
+
+        {workspaceRefreshing && (
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#356df4]/25 bg-[#356df4]/10 px-3 py-1.5 text-[11px] font-medium text-[#c6d9ff]">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {loadError === 'Scan not complete'
+              ? 'Refreshing score from the latest scan...'
+              : 'Updating this workspace...'}
           </div>
         )}
 

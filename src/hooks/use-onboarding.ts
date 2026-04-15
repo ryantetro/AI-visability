@@ -27,6 +27,7 @@ export function useOnboarding() {
 
   const { tier } = usePlan();
 
+  const [hydrated, setHydrated] = useState(false);
   const [reportViewed, setReportViewed] = useState(false);
   const [trackingInstalled, setTrackingInstalled] = useState(false);
   const [trackingKeyOnServer, setTrackingKeyOnServer] = useState(false);
@@ -34,6 +35,7 @@ export function useOnboarding() {
 
   // Read localStorage on mount
   useEffect(() => {
+    setHydrated(true);
     setReportViewed(localStorage.getItem(LS_REPORT_VIEWED) === '1');
     // Don't trust localStorage for tracking — server check is the source of truth
     setTrackingInstalled(false);
@@ -84,6 +86,7 @@ export function useOnboarding() {
   }, []);
 
   const isMonitoring = selectedDomain ? Boolean(monitoringConnected[selectedDomain]) : false;
+  const effectiveTier = hydrated ? tier : 'free';
 
   const steps: OnboardingStep[] = useMemo(() => {
     const base: OnboardingStep[] = [
@@ -91,41 +94,41 @@ export function useOnboarding() {
         key: 'add_domain',
         label: 'Add your first domain',
         description: 'Enter the domain you want to monitor for AI visibility.',
-        completed: monitoredSites.length > 0,
+        completed: hydrated && monitoredSites.length > 0,
         href: '/dashboard',
       },
       {
         key: 'run_scan',
         label: 'Run your first scan',
         description: 'Full analysis takes 4\u20135 minutes. We\u2019ll scan your site across all AI engines.',
-        completed: expandedSite?.latestScan?.status === 'complete',
+        completed: hydrated && expandedSite?.latestScan?.status === 'complete',
         href: '/dashboard',
       },
       {
         key: 'review_report',
         label: 'Review your AI visibility score',
         description: 'See how AI engines rank and reference your site.',
-        completed: reportViewed || !!report,
+        completed: hydrated && (reportViewed || !!report),
         href: '/dashboard',
       },
       {
         key: 'install_tracking',
         label: 'Install AI bot tracking',
         description: 'Add a one-line script to track which AI bots visit your site.',
-        completed: trackingInstalled || trackingKeyOnServer,
+        completed: hydrated && (trackingInstalled || trackingKeyOnServer),
         href: '/report#tracking',
       },
       {
         key: 'enable_monitoring',
         label: 'Enable weekly score updates',
         description: 'Get notified when your AI visibility score changes.',
-        completed: isMonitoring,
+        completed: hydrated && isMonitoring,
         href: '/report#monitoring',
       },
     ];
 
     // Add plan-specific steps for paid users
-    if (tier === 'pro' || tier === 'growth') {
+    if (effectiveTier === 'pro' || effectiveTier === 'growth') {
       base.push({
         key: 'add_competitor',
         label: 'Add a competitor to track',
@@ -139,12 +142,13 @@ export function useOnboarding() {
   }, [
     monitoredSites.length,
     expandedSite?.latestScan?.status,
+    hydrated,
     reportViewed,
     report,
     trackingInstalled,
     trackingKeyOnServer,
     isMonitoring,
-    tier,
+    effectiveTier,
   ]);
 
   const completedCount = steps.filter((s) => s.completed).length;

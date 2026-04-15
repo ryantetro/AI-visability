@@ -35,6 +35,7 @@ interface ScoreSummaryHeroProps {
   note?: string;
   actions?: ReactNode;
   className?: string;
+  animateScoresOnMount?: boolean;
 }
 
 export function ScoreSummaryHero({
@@ -47,6 +48,7 @@ export function ScoreSummaryHero({
   note,
   actions,
   className,
+  animateScoresOnMount = true,
 }: ScoreSummaryHeroProps) {
   return (
     <section className={cn('px-2 py-6 sm:py-8', className)}>
@@ -81,6 +83,7 @@ export function ScoreSummaryHero({
             label={overall.label ?? 'Overall Score'}
             caption={overall.caption}
             coreRef={coreRef}
+            animateOnMount={animateScoresOnMount}
           />
         </div>
 
@@ -106,6 +109,7 @@ export function ScoreSummaryHero({
                 color={item.color}
                 label={item.label}
                 caption={item.caption}
+                animateOnMount={animateScoresOnMount}
               />
               {SCORE_TOOLTIPS[item.label] && (
                 <InfoTooltip text={SCORE_TOOLTIPS[item.label]} className="mt-1" />

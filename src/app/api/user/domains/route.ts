@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('user_domains')
-    .select('domain, url, created_at')
+    .select('domain')
     .in('user_id', userIds)
     .eq('hidden', false)
     .order('created_at', { ascending: false });

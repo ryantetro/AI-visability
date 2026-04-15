@@ -179,7 +179,13 @@ export async function GET(request: NextRequest) {
       for (const record of monitoredDomains) {
         try {
           const domain = getDomain(record.url);
-          const latestScan = await db.findLatestScanByDomain(domain);
+          const ownerEmail = record.email?.trim().toLowerCase();
+          if (!ownerEmail) {
+            rescans.push({ domain, status: 'missing owner email, skipping' });
+            continue;
+          }
+
+          const latestScan = await db.findLatestScanByDomain(domain, ownerEmail);
           const lastCompleted = latestScan?.completedAt ?? 0;
 
           if (Date.now() - lastCompleted < RESCAN_STALENESS_MS) {
@@ -192,7 +198,7 @@ export async function GET(request: NextRequest) {
             continue;
           }
 
-          const userId = await getUserIdByEmail(record.email);
+          const userId = await getUserIdByEmail(ownerEmail);
           if (!userId) {
             rescans.push({ domain, status: 'no user found, skipping' });
             continue;
@@ -203,7 +209,7 @@ export async function GET(request: NextRequest) {
             domain,
             record: {
               url: record.url,
-              email: record.email,
+              email: ownerEmail,
             },
             userId,
             summaryIndex,
@@ -226,7 +232,13 @@ export async function GET(request: NextRequest) {
       for (const record of monitoredForAlerts) {
         try {
           const domain = getDomain(record.url);
-          const latestScan = await db.findLatestScanByDomain(domain);
+          const ownerEmail = record.email?.trim().toLowerCase();
+          if (!ownerEmail) {
+            results.push({ domain, status: 'missing owner email' });
+            continue;
+          }
+
+          const latestScan = await db.findLatestScanByDomain(domain, ownerEmail);
           if (!latestScan) {
             results.push({ domain, status: 'no scan found' });
             continue;
@@ -249,7 +261,7 @@ export async function GET(request: NextRequest) {
               previousScore: currentScore,
               currentScore,
               threshold: alertThreshold,
-              recipientEmail: record.email || latestScan.email || 'unknown',
+              recipientEmail: ownerEmail || latestScan.email || 'unknown',
             });
           }
         } catch {
@@ -269,6 +281,12 @@ export async function GET(request: NextRequest) {
       for (const record of monitoredForOpportunities) {
         try {
           const domain = getDomain(record.url);
+          const ownerEmail = record.email?.trim().toLowerCase();
+
+          if (!ownerEmail) {
+            opportunityAlerts.push({ domain, status: 'missing owner email' });
+            continue;
+          }
 
           if (!record.opportunityAlertsEnabled) {
             opportunityAlerts.push({ domain, status: 'disabled' });
@@ -277,7 +295,7 @@ export async function GET(request: NextRequest) {
 
           const summary = await getOpportunityAlertSummary({
             domain,
-            userEmail: record.email,
+            userEmail: ownerEmail,
             fallbackScanId: record.scanId,
           });
 
@@ -297,11 +315,11 @@ export async function GET(request: NextRequest) {
           }
 
           await alertService.sendOpportunityAlert({
-            recipientEmail: record.email || 'unknown',
+            recipientEmail: ownerEmail,
             summary,
           });
 
-          await updateMonitoringDomain(domain, record.email, {
+          await updateMonitoringDomain(domain, ownerEmail, {
             lastOpportunityAlertAt: Date.now(),
           });
 

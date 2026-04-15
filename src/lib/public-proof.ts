@@ -54,6 +54,11 @@ const globalStore = globalThis as unknown as {
   __aisoDomainVerifications?: Map<string, DomainVerificationRecord>;
 };
 
+function normalizeEmail(email: string | null | undefined) {
+  const normalized = email?.trim().toLowerCase();
+  return normalized || null;
+}
+
 function getPublicProfileStore() {
   if (!globalStore.__aisoPublicProfiles) {
     globalStore.__aisoPublicProfiles = new Map();
@@ -145,7 +150,7 @@ function verificationRowToRecord(row: {
     verifiedAt: row.verified_at ? Date.parse(row.verified_at) : undefined,
     scanId: row.scan_id ?? '',
     url: row.url ?? `https://${row.domain}`,
-    email: row.email ?? undefined,
+    email: normalizeEmail(row.email) ?? undefined,
   };
 }
 
@@ -333,7 +338,7 @@ export async function startDomainVerification(input: {
     domain,
     url: input.url,
     scanId: input.scanId,
-    email: input.email,
+    email: normalizeEmail(input.email) ?? undefined,
     verificationToken: token,
     status: 'pending',
     method: undefined,
@@ -364,6 +369,7 @@ export async function startDomainVerification(input: {
 
 export async function confirmDomainVerification(input: {
   domain: string;
+  email?: string;
   enablePublicScore?: boolean;
   enableBadge?: boolean;
   enableLeaderboard?: boolean;
@@ -373,6 +379,23 @@ export async function confirmDomainVerification(input: {
 
   if (!verification) {
     return { verified: false, reason: 'Verification not started.' as const };
+  }
+
+  const requestedEmail = normalizeEmail(input.email);
+  if (requestedEmail) {
+    let verificationOwnerEmail = normalizeEmail(verification.email);
+    if (!verificationOwnerEmail && verification.scanId) {
+      const scan = await getDatabase().getScan(verification.scanId);
+      verificationOwnerEmail = normalizeEmail(scan?.email);
+    }
+
+    if (verificationOwnerEmail && verificationOwnerEmail !== requestedEmail) {
+      return {
+        verified: false,
+        reason: 'This verification belongs to another account.' as const,
+        unauthorized: true as const,
+      };
+    }
   }
 
   const instructions = buildInstructions(normalizedDomain, verification.verificationToken);

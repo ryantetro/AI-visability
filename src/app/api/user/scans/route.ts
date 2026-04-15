@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { ScoreSnapshot } from '@/types/score';
+import { getEffectiveUserEmails } from '@/lib/team-management';
 
 interface ScanSummaryRow {
   id: string;
@@ -23,14 +24,25 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = getSupabaseClient();
+    const effectiveEmails = await getEffectiveUserEmails(user.id, user.email);
+
+    if (effectiveEmails.length === 0) {
+      return NextResponse.json({ scans: [] });
+    }
+
     // Only fetch the score summary fields the workspace list needs; full scan JSON can exceed serverless limits.
-    const { data, error } = await supabase
+    let query = supabase
       .from('scans')
       .select(
         'id, url, status, paid, email, created_at, completed_at, percentage:score_result->percentage, scores:score_result->scores'
       )
-      .eq('email', user.email.toLowerCase())
       .order('created_at', { ascending: false });
+
+    query = effectiveEmails.length === 1
+      ? query.eq('email', effectiveEmails[0])
+      : query.in('email', effectiveEmails);
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('[api/user/scans] failed to load scans', {

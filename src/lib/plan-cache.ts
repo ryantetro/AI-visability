@@ -1,4 +1,5 @@
 import { type PlanTier, planStringToTier } from '@/lib/pricing';
+import { fetchClientAuthMe } from '@/lib/client-auth-me';
 
 export interface PlanCacheSnapshot {
   tier: PlanTier | null;
@@ -114,8 +115,14 @@ export async function refreshPlanCache(fetcher: typeof fetch = fetch): Promise<P
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const res = await fetcher('/api/auth/me', { cache: 'no-store' });
-        const payload = await res.json().catch(() => null);
+        const { payload } = fetcher === fetch
+          ? await fetchClientAuthMe<AuthMePayload>(fetcher)
+          : await (async () => {
+              const res = await fetcher('/api/auth/me', { cache: 'no-store' });
+              return {
+                payload: await res.json().catch(() => null),
+              };
+            })();
 
         if (isAuthMePayload(payload)) {
           return hydratePlanCache(payload);

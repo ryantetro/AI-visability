@@ -39,6 +39,10 @@ function supabaseUrl(path: string) {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, '')}/rest/v1/${path}`;
 }
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 function supabaseHeaders(extra?: HeadersInit): HeadersInit {
   return {
     apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -80,7 +84,7 @@ function fromRow(row: {
     domain: row.domain,
     url: row.url ?? `https://${row.domain}`,
     scanId: row.scan_id ?? '',
-    email: row.email ?? '',
+    email: row.email ? normalizeEmail(row.email) : '',
     alertThreshold: row.alert_threshold,
     opportunityAlertsEnabled: row.opportunity_alerts_enabled ?? true,
     lastOpportunityAlertAt: row.last_opportunity_alert_at ? Date.parse(row.last_opportunity_alert_at) : null,
@@ -125,6 +129,7 @@ async function saveRecord(record: MonitoringRecord) {
 export async function addMonitoringDomain(input: {
   scanId: string;
   alertThreshold?: number;
+  email?: string;
 }) {
   const db = getDatabase();
   const scan = await db.getScan(input.scanId);
@@ -133,7 +138,14 @@ export async function addMonitoringDomain(input: {
     throw new Error('Scan not found.');
   }
 
-  if (!scan.email) {
+  const scanEmail = scan.email ? normalizeEmail(scan.email) : '';
+  const requestedEmail = input.email ? normalizeEmail(input.email) : '';
+
+  if (requestedEmail) {
+    if (!scanEmail || scanEmail !== requestedEmail) {
+      throw new Error('This scan belongs to another account.');
+    }
+  } else if (!scanEmail) {
     throw new Error('Email is required before monitoring can be enabled.');
   }
 
@@ -145,7 +157,7 @@ export async function addMonitoringDomain(input: {
     domain,
     url: scan.url,
     scanId: scan.id,
-    email: scan.email,
+    email: requestedEmail || scanEmail,
     alertThreshold: Math.max(1, Math.min(input.alertThreshold ?? 5, 100)),
     opportunityAlertsEnabled: true,
     lastOpportunityAlertAt: null,
@@ -160,6 +172,8 @@ export async function addMonitoringDomain(input: {
 }
 
 export async function listMonitoringDomains(email: string) {
+  const normalizedEmail = normalizeEmail(email);
+
   if (hasSupabaseConfig()) {
     const rows = await querySupabase<
       Array<{
@@ -175,12 +189,12 @@ export async function listMonitoringDomains(email: string) {
         url?: string | null;
         email?: string | null;
       }>
-    >(`monitoring_domains?email=eq.${encodeURIComponent(email)}&select=*`);
+    >(`monitoring_domains?email=eq.${encodeURIComponent(normalizedEmail)}&select=*`);
     return rows.map(fromRow).sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   return [...getMonitoringStore().values()]
-    .filter((record) => record.email === email)
+    .filter((record) => normalizeEmail(record.email) === normalizedEmail)
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
@@ -209,11 +223,12 @@ export async function listActiveMonitoringDomains(): Promise<MonitoringRecord[]>
 
 export async function removeMonitoringDomain(domain: string, email?: string) {
   const normalizedDomain = domain.toLowerCase();
+  const normalizedEmail = email ? normalizeEmail(email) : undefined;
 
   if (hasSupabaseConfig()) {
     const filters = [`domain=eq.${encodeURIComponent(normalizedDomain)}`];
-    if (email) {
-      filters.push(`email=eq.${encodeURIComponent(email)}`);
+    if (normalizedEmail) {
+      filters.push(`email=eq.${encodeURIComponent(normalizedEmail)}`);
     }
 
     const response = await fetch(supabaseUrl(`monitoring_domains?${filters.join('&')}`), {
@@ -232,13 +247,14 @@ export async function removeMonitoringDomain(domain: string, email?: string) {
 
   const record = getMonitoringStore().get(normalizedDomain);
   if (!record) return false;
-  if (email && record.email !== email) return false;
+  if (normalizedEmail && normalizeEmail(record.email) !== normalizedEmail) return false;
   getMonitoringStore().delete(normalizedDomain);
   return true;
 }
 
 export async function getMonitoringDomain(domain: string, email: string): Promise<MonitoringRecord | null> {
   const normalizedDomain = domain.toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
   if (hasSupabaseConfig()) {
     const rows = await querySupabase<
@@ -255,12 +271,12 @@ export async function getMonitoringDomain(domain: string, email: string): Promis
         url?: string | null;
         email?: string | null;
       }>
-    >(`monitoring_domains?domain=eq.${encodeURIComponent(normalizedDomain)}&email=eq.${encodeURIComponent(email)}&order=updated_at.desc&limit=1&select=*`);
+    >(`monitoring_domains?domain=eq.${encodeURIComponent(normalizedDomain)}&email=eq.${encodeURIComponent(normalizedEmail)}&order=updated_at.desc&limit=1&select=*`);
     return rows[0] ? fromRow(rows[0]) : null;
   }
 
   const record = getMonitoringStore().get(normalizedDomain);
-  if (!record || record.email !== email) return null;
+  if (!record || normalizeEmail(record.email) !== normalizedEmail) return null;
   return record;
 }
 
@@ -273,6 +289,7 @@ export async function updateMonitoringDomain(
   }
 ): Promise<MonitoringRecord | null> {
   const normalizedDomain = domain.toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
   const nowIso = new Date().toISOString();
 
   if (hasSupabaseConfig()) {
@@ -291,7 +308,7 @@ export async function updateMonitoringDomain(
     }
 
     const response = await fetch(
-      supabaseUrl(`monitoring_domains?domain=eq.${encodeURIComponent(normalizedDomain)}&email=eq.${encodeURIComponent(email)}&select=*`),
+      supabaseUrl(`monitoring_domains?domain=eq.${encodeURIComponent(normalizedDomain)}&email=eq.${encodeURIComponent(normalizedEmail)}&select=*`),
       {
         method: 'PATCH',
         headers: supabaseHeaders({
@@ -323,7 +340,7 @@ export async function updateMonitoringDomain(
   }
 
   const current = getMonitoringStore().get(normalizedDomain);
-  if (!current || current.email !== email) return null;
+  if (!current || normalizeEmail(current.email) !== normalizedEmail) return null;
 
   const next: MonitoringRecord = {
     ...current,

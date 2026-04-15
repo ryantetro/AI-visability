@@ -8,6 +8,7 @@ import { getAuthUserFromRequest } from '@/lib/auth';
 import { getUserAccess } from '@/lib/access';
 import { getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { resolveScanState } from '@/lib/scan-state';
+import { getEffectiveUserEmails } from '@/lib/team-management';
 
 interface PreviewHomepageData {
   assetUrls?: string[];
@@ -56,7 +57,8 @@ export async function GET(
     return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
   }
 
-  if (!scan.email || scan.email.toLowerCase() !== user.email.toLowerCase()) {
+  const effectiveEmails = new Set(await getEffectiveUserEmails(user.id, user.email));
+  if (!scan.email || !effectiveEmails.has(scan.email.toLowerCase())) {
     return NextResponse.json({ error: 'This scan belongs to another account.' }, { status: 403 });
   }
 

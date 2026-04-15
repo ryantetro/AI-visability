@@ -29,7 +29,8 @@ export async function POST(
 
   const supabase = getSupabaseClient();
 
-  // Monthly usage limit — count completed articles this month
+  // Monthly usage limit — count completed articles this month.
+  // Briefs alone should not consume the article-generation quota.
   const maxPages = PLANS[access.tier].contentPages;
   if (maxPages > 0) {
     const monthStart = new Date();
@@ -41,7 +42,7 @@ export async function POST(
         .from('content_studio_items')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .not('brief_markdown', 'is', null)
+        .not('article_markdown', 'is', null)
         .gte('created_at', monthStart.toISOString());
 
       if (count !== null && count >= maxPages) {

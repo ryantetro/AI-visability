@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { refreshRequestSession, sanitizeAuthUser } from '@/lib/auth';
-import { getOrCreateProfile } from '@/lib/user-profile';
 import { getUserAccess } from '@/lib/access';
 
 export async function GET(request: NextRequest) {
@@ -35,11 +34,12 @@ export async function GET(request: NextRequest) {
   let planExpiresAt: string | null = null;
   let planCancelAtPeriodEnd = false;
   try {
-    const profile = await getOrCreateProfile(auth.user.id, auth.user.email);
     const access = await getUserAccess(auth.user.id, auth.user.email);
     plan = access.plan;
     tier = access.tier;
     isPaid = access.isPaid;
+    scansUsed = access.scansUsed;
+    freeScanLimit = access.freeScanLimit;
     maxDomains = access.maxDomains;
     maxPrompts = access.maxPrompts;
     maxPlatforms = access.maxPlatforms;
@@ -52,8 +52,6 @@ export async function GET(request: NextRequest) {
     teamName = access.teamName;
     planExpiresAt = access.planExpiresAt;
     planCancelAtPeriodEnd = access.planCancelAtPeriodEnd;
-    scansUsed = profile.scans_used;
-    freeScanLimit = profile.free_scan_limit;
   } catch {
     // Non-blocking: return user info even if profile fetch fails
   }

@@ -6,6 +6,7 @@ import type { AuthSessionState, AuthUser } from '@/types/auth';
 import { invalidatePlanCache } from '@/hooks/use-plan';
 import { hydratePlanCache } from '@/lib/plan-cache';
 import { setClientStorageScope } from '@/lib/client-storage-scope';
+import { clearClientAuthMeCache, fetchClientAuthMe } from '@/lib/client-auth-me';
 
 const REFRESH_INTERVAL_MS = 45 * 60 * 1000; // 45 minutes (before 1hr token expiry)
 const BROADCAST_CHANNEL_NAME = 'aiso_auth';
@@ -53,6 +54,7 @@ function subscribeToAuth(listener: () => void) {
 function applySignedOutState() {
   lastKnownAuthEmail = null;
   setClientStorageScope(null);
+  clearClientAuthMeCache();
   invalidatePlanCache();
   emitAuthSnapshot({ user: null, loading: false, initialized: true });
 }
@@ -63,11 +65,14 @@ async function refreshAuthSnapshot() {
 
     refreshPromise = (async () => {
       try {
-        const res = await fetch('/api/auth/me', { cache: 'no-store' });
-        const payload = await res.json() as AuthSessionState;
+        const { ok, status, payload } = await fetchClientAuthMe<AuthSessionState>();
 
         // Only clear user on definitive auth failures, not transient errors.
-        if (!res.ok && res.status >= 500) {
+        if (!ok && status >= 500) {
+          return;
+        }
+
+        if (!payload) {
           return;
         }
 
@@ -77,12 +82,13 @@ async function refreshAuthSnapshot() {
         }
 
         const nextEmail = payload.user?.email ?? null;
+        const nextStorageScope = payload.user?.id ?? nextEmail;
         if (lastKnownAuthEmail !== null && nextEmail !== lastKnownAuthEmail) {
           invalidatePlanCache();
         }
         hydratePlanCache(payload);
         lastKnownAuthEmail = nextEmail;
-        setClientStorageScope(nextEmail);
+        setClientStorageScope(nextStorageScope);
         emitAuthSnapshot({
           user: payload.user ?? null,
           loading: false,

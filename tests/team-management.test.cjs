@@ -36,6 +36,7 @@ function makeChain(tableName) {
   let _selectFields = '*';
   let _limitN = null;
   let _singleMode = false;
+  let _maybeSingleMode = false;
   let _orderField = null;
   let _orderAsc = true;
   let _countMode = false;
@@ -94,6 +95,11 @@ function makeChain(tableName) {
       // Execute query immediately
       return chain._execute();
     },
+    maybeSingle() {
+      _singleMode = true;
+      _maybeSingleMode = true;
+      return chain._execute();
+    },
     _execute() {
       // INSERT
       if (_insertData) {
@@ -121,6 +127,7 @@ function makeChain(tableName) {
           }
           if (tableName === 'team_members') {
             newRow.joined_at = newRow.joined_at || newRow.created_at;
+            newRow.status = newRow.status || 'active';
           }
           // Apply DB column defaults for team_invitations
           if (tableName === 'team_invitations') {
@@ -192,7 +199,9 @@ function makeChain(tableName) {
 
       if (_singleMode) {
         if (rows.length === 0) {
-          return { data: null, error: { code: 'PGRST116', message: 'not found' } };
+          return _maybeSingleMode
+            ? { data: null, error: null }
+            : { data: null, error: { code: 'PGRST116', message: 'not found' } };
         }
         if (rows.length > 1) {
           return { data: null, error: { code: 'PGRST116', message: 'multiple rows returned' } };
@@ -245,6 +254,7 @@ const {
   getTeamMembers,
   getTeamMemberUserIds,
   getEffectiveUserIds,
+  getEffectiveUserEmails,
   createInvitation,
   getInvitationByToken,
   acceptInvitation,
@@ -340,6 +350,7 @@ test('getTeamMembers returns all members with emails', async () => {
     team_id: team.id,
     user_id: 'member-1',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
 
@@ -358,6 +369,7 @@ test('getTeamMemberUserIds returns array of user IDs', async () => {
     team_id: team.id,
     user_id: 'member-1',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
 
@@ -379,11 +391,32 @@ test('getEffectiveUserIds returns all team member IDs when in team', async () =>
     team_id: team.id,
     user_id: 'member-1',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
 
   const ids = await getEffectiveUserIds('owner-1');
   assert.deepEqual(ids.sort(), ['member-1', 'owner-1']);
+});
+
+test('getEffectiveUserEmails returns fallback email when user has no team', async () => {
+  const emails = await getEffectiveUserEmails('member-1', 'member@test.com');
+  assert.deepEqual(emails, ['member@test.com']);
+});
+
+test('getEffectiveUserEmails returns active team member emails without duplicates', async () => {
+  const team = await createTeam('owner-1', 'owner@test.com', 'My Team');
+  _tables.team_members.push({
+    id: 'mem-2',
+    team_id: team.id,
+    user_id: 'member-1',
+    role: 'member',
+    status: 'active',
+    joined_at: new Date().toISOString(),
+  });
+
+  const emails = await getEffectiveUserEmails('owner-1', 'owner@test.com');
+  assert.deepEqual(emails.sort(), ['member@test.com', 'owner@test.com']);
 });
 
 // ── Invitations ───────────────────────────────────────────────────
@@ -474,7 +507,7 @@ test('acceptInvitation rejects if user already in a team', async () => {
 
   // Put member-1 in a team already (manually, since unique index prevents via createTeam if already in one)
   _tables.teams.push({ id: 'team-b', name: 'Team B', owner_id: 'owner-2', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-  _tables.team_members.push({ id: 'mem-b', team_id: 'team-b', user_id: 'member-1', role: 'member', joined_at: new Date().toISOString() });
+  _tables.team_members.push({ id: 'mem-b', team_id: 'team-b', user_id: 'member-1', role: 'member', status: 'active', joined_at: new Date().toISOString() });
 
   const invitation = await createInvitation(team.id, 'owner-1', 'member@test.com');
 
@@ -496,6 +529,7 @@ test('acceptInvitation enforces seat limit', async () => {
     team_id: team.id,
     user_id: 'member-1',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
   // Add member-2 (fills seat 3 of 3)
@@ -504,6 +538,7 @@ test('acceptInvitation enforces seat limit', async () => {
     team_id: team.id,
     user_id: 'member-2',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
 
@@ -572,6 +607,7 @@ test('removeMember removes a member from the team', async () => {
     team_id: team.id,
     user_id: 'member-1',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
 
@@ -614,6 +650,7 @@ test('leaveTeam allows member to leave', async () => {
     team_id: team.id,
     user_id: 'member-1',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
 
@@ -654,6 +691,7 @@ test('dissolveTeam deletes team and all members', async () => {
     team_id: team.id,
     user_id: 'member-1',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
   await createInvitation(team.id, 'owner-1', 'pending@test.com');
@@ -676,6 +714,7 @@ test('dissolveTeam rejects non-owner', async () => {
     team_id: team.id,
     user_id: 'member-1',
     role: 'member',
+    status: 'active',
     joined_at: new Date().toISOString(),
   });
 
