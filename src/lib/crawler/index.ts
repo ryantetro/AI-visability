@@ -6,6 +6,7 @@ import { fetchRobotsTxt } from './robots-parser';
 import { fetchSitemap } from './sitemap-parser';
 import { fetchLlmsTxt } from './llms-parser';
 import { crawlPageWithoutBrowser } from './html-fallback';
+import { resolveCanonicalUrl } from './url-resolver';
 
 const MAX_PAGES = 10;
 const PAGE_TIMEOUT = 30000;
@@ -19,15 +20,22 @@ export async function crawlSite(
   onProgress?: CrawlProgressCallback
 ): Promise<CrawlData> {
   const startTime = Date.now();
-  const baseUrl = ensureProtocol(inputUrl);
-  const normalized = normalizeUrl(inputUrl);
   const errors: string[] = [];
+
+  // Resolve the canonical URL before any heavy work so robots/sitemap/
+  // homepage all hit the hostname the server actually serves. Identity
+  // dedup still uses the input form (`normalizeUrl` strips `www`).
+  onProgress?.('Resolving canonical URL...');
+  const inputProtocoled = ensureProtocol(inputUrl);
+  const resolved = await resolveCanonicalUrl(inputProtocoled, { errors });
+  const baseUrl = resolved.canonical;
+  const normalized = normalizeUrl(baseUrl);
 
   onProgress?.('Checking robots.txt...');
   const [robotsTxt, llmsTxt, rootHttp] = await Promise.all([
     fetchRobotsTxt(baseUrl),
     fetchLlmsTxt(baseUrl),
-    fetchRootHttp(baseUrl),
+    fetchRootHttp(baseUrl, errors),
   ]);
 
   onProgress?.('Checking sitemap...');
@@ -48,8 +56,8 @@ export async function crawlSite(
     // Crawl homepage first
     onProgress?.('Crawling homepage...');
     homepage = browser
-      ? await crawlPage(browser, baseUrl, startTime)
-      : await crawlPageWithoutBrowser(baseUrl, startTime);
+      ? await crawlPage(browser, baseUrl, startTime, errors)
+      : await crawlPageWithoutBrowser(baseUrl, startTime, errors);
     if (homepage) {
       pages.push(homepage);
     }
@@ -74,8 +82,8 @@ export async function crawlSite(
 
       try {
         const page = browser
-          ? await crawlPage(browser, pageUrl, Date.now())
-          : await crawlPageWithoutBrowser(pageUrl, Date.now());
+          ? await crawlPage(browser, pageUrl, Date.now(), errors)
+          : await crawlPageWithoutBrowser(pageUrl, Date.now(), errors);
         if (page) pages.push(page);
       } catch (err) {
         errors.push(`Failed to crawl ${pageUrl}: ${String(err)}`);
@@ -107,7 +115,8 @@ export async function crawlSite(
 async function crawlPage(
   browser: Awaited<ReturnType<typeof getBrowser>>,
   url: string,
-  startTime: number
+  startTime: number,
+  errors?: string[]
 ): Promise<CrawledPage | null> {
   const page = await browser.newPage();
   try {
@@ -119,8 +128,9 @@ async function crawlPage(
       timeout: PAGE_TIMEOUT,
     });
     return await extractPageData(page, url, startTime);
-  } catch {
-    return await crawlPageWithoutBrowser(url, startTime);
+  } catch (err) {
+    errors?.push(`Browser navigation for ${url} failed: ${err instanceof Error ? err.message : String(err)}`);
+    return await crawlPageWithoutBrowser(url, startTime, errors);
   } finally {
     await page.close();
   }
@@ -174,7 +184,9 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchRootHttp(url: string): Promise<RootHttpData> {
+const ROOT_HTTP_TIMEOUT_MS = 10000;
+
+export async function fetchRootHttp(url: string, errors?: string[]): Promise<RootHttpData> {
   try {
     const res = await fetch(url, {
       redirect: 'follow',
@@ -184,7 +196,7 @@ async function fetchRootHttp(url: string): Promise<RootHttpData> {
         Accept:
           'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
       },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(ROOT_HTTP_TIMEOUT_MS),
     });
 
     const headers = Object.fromEntries(
@@ -201,11 +213,20 @@ async function fetchRootHttp(url: string): Promise<RootHttpData> {
       xFrameOptions: headers['x-frame-options'],
       xContentTypeOptions: headers['x-content-type-options'],
     };
-  } catch {
+  } catch (err) {
+    const reason =
+      err instanceof Error
+        ? err.name === 'TimeoutError' || err.name === 'AbortError'
+          ? `request timed out after ${ROOT_HTTP_TIMEOUT_MS}ms`
+          : err.message || err.name
+        : String(err);
+    errors?.push(`Root HTTP probe for ${url} failed: ${reason}`);
     return {
       finalUrl: url,
       https: url.startsWith('https://'),
       headers: {},
+      unreachable: true,
+      unreachableError: reason,
     };
   }
 }

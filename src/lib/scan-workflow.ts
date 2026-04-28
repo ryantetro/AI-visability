@@ -443,6 +443,15 @@ export async function runScan(scanId: string, db = getDatabase()) {
       scan.progress.status = 'scoring';
     });
 
+    if (crawlData.pages.length === 0) {
+      const detail = crawlData.errors.length > 0
+        ? crawlData.errors.join(' • ')
+        : 'The server did not respond within the crawl timeout.';
+      throw new Error(
+        `We couldn't reach ${crawlData.url}. This usually means the site is down, behind a strict firewall, or actively blocking automated requests. Details: ${detail}`,
+      );
+    }
+
     const mentionTester = getMentionTester();
     const allAvailableEngines = mentionTester.availableEngines();
     let filteredEngines: typeof AI_ENGINES = allAvailableEngines;
