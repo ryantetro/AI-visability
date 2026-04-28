@@ -41,6 +41,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [35-managed-agents-integration.md](./35-managed-agents-integration.md) | Claude Managed Agents — feature suggestions for autonomous content, scanning, monitoring, and onboarding | `@anthropic-ai/claude-agent-sdk` |
 | [36-content-studio-pipeline.md](./36-content-studio-pipeline.md) | Content Studio AI Pipeline — Agent SDK autonomous brief/article generation with WebSearch | `src/lib/content-studio/`, `src/app/api/content-studio/[id]/generate/` |
 | [37-fix-my-site-agent.md](./37-fix-my-site-agent.md) | Fix My Site Agent — autonomous file generation after payment via Agent SDK | `src/lib/fix-my-site/`, `src/app/api/fix-my-site/[id]/download/` |
+| [39-crawler-reachability-failures.md](./39-crawler-reachability-failures.md) | Crawler treats unreachable sites as failed scans; surfaces real errors instead of silently producing empty pillars | `src/lib/crawler/`, `src/lib/scan-workflow.ts`, `src/types/crawler.ts` |
 
 ## Architecture Principles
 

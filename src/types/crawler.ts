@@ -55,6 +55,13 @@ export interface RootHttpData {
   contentSecurityPolicy?: string;
   xFrameOptions?: string;
   xContentTypeOptions?: string;
+  /**
+   * True when the root HTTP probe could not reach the origin. Downstream code
+   * should treat header-derived signals (HSTS, CSP, etc.) as unknown rather
+   * than "missing" when this flag is set.
+   */
+  unreachable?: boolean;
+  unreachableError?: string;
 }
 
 export interface RenderReadinessData {

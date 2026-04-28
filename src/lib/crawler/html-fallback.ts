@@ -14,7 +14,8 @@ export interface HtmlFallbackInput {
 
 export async function crawlPageWithoutBrowser(
   url: string,
-  startTime: number
+  startTime: number,
+  errors?: string[]
 ): Promise<CrawledPage | null> {
   try {
     const res = await fetch(url, {
@@ -28,6 +29,7 @@ export async function crawlPageWithoutBrowser(
     });
 
     if (!res.ok) {
+      errors?.push(`HTTP fallback for ${url} returned status ${res.status}`);
       return null;
     }
 
@@ -39,9 +41,20 @@ export async function crawlPageWithoutBrowser(
       statusCode: res.status,
       lastModified: res.headers.get('last-modified') ?? undefined,
     });
-  } catch {
+  } catch (err) {
+    errors?.push(`HTTP fallback for ${url} failed: ${describeFetchError(err)}`);
     return null;
   }
+}
+
+function describeFetchError(err: unknown): string {
+  if (err instanceof Error) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      return `request timed out after ${HTML_TIMEOUT_MS}ms`;
+    }
+    return err.message || err.name;
+  }
+  return String(err);
 }
 
 export function extractFallbackPageData({

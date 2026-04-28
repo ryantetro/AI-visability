@@ -12,6 +12,11 @@ const {
   crawlPageWithoutBrowser,
   extractFallbackPageData,
 } = require('../src/lib/crawler/html-fallback.ts');
+const { fetchRootHttp } = require('../src/lib/crawler/index.ts');
+const {
+  resolveCanonicalUrl,
+  buildCandidates,
+} = require('../src/lib/crawler/url-resolver.ts');
 const { detectPlatform } = require('../src/lib/platform-detection.ts');
 const { scoreCrawlData } = require('../src/lib/scorer/index.ts');
 const { runWebHealthEnrichment } = require('../src/lib/web-health/index.ts');
@@ -626,6 +631,235 @@ test('crawlPageWithoutBrowser falls back to fetch-only extraction', async () => 
       assert.equal(page.title, 'Example Co');
       assert.deepEqual(page.internalLinks, ['/about']);
       assert.equal(page.lastModified, 'Tue, 10 Mar 2026 12:00:00 GMT');
+    }
+  );
+});
+
+test('crawlPageWithoutBrowser records the status code when the response is not OK', async () => {
+  await withMockFetch(
+    async () => ({
+      ok: false,
+      status: 503,
+      url: 'https://blocked.example/',
+      headers: new Headers(),
+      text: async () => '',
+    }),
+    async () => {
+      const errors = [];
+      const page = await crawlPageWithoutBrowser('https://blocked.example', Date.now(), errors);
+
+      assert.equal(page, null);
+      assert.equal(errors.length, 1);
+      assert.match(errors[0], /status 503/);
+      assert.match(errors[0], /https:\/\/blocked\.example/);
+    }
+  );
+});
+
+test('crawlPageWithoutBrowser records the underlying error when the fetch throws', async () => {
+  await withMockFetch(
+    async () => {
+      const err = new Error('connect ETIMEDOUT');
+      err.name = 'TimeoutError';
+      throw err;
+    },
+    async () => {
+      const errors = [];
+      const page = await crawlPageWithoutBrowser('https://unreachable.example', Date.now(), errors);
+
+      assert.equal(page, null);
+      assert.equal(errors.length, 1);
+      assert.match(errors[0], /timed out/);
+      assert.match(errors[0], /https:\/\/unreachable\.example/);
+    }
+  );
+});
+
+test('fetchRootHttp marks the result unreachable and records the error when the probe fails', async () => {
+  await withMockFetch(
+    async () => {
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      throw err;
+    },
+    async () => {
+      const errors = [];
+      const root = await fetchRootHttp('https://unreachable.example', errors);
+
+      assert.equal(root.unreachable, true);
+      assert.match(root.unreachableError || '', /timed out/);
+      assert.equal(root.finalUrl, 'https://unreachable.example');
+      assert.equal(root.https, true);
+      assert.deepEqual(root.headers, {});
+      assert.equal(errors.length, 1);
+      assert.match(errors[0], /Root HTTP probe/);
+    }
+  );
+});
+
+test('fetchRootHttp returns header-derived signals on success without setting unreachable', async () => {
+  await withMockFetch(
+    async () => ({
+      ok: true,
+      status: 200,
+      url: 'https://example.com/',
+      headers: new Headers({
+        'strict-transport-security': 'max-age=63072000',
+        'content-security-policy': "default-src 'self'",
+      }),
+    }),
+    async () => {
+      const errors = [];
+      const root = await fetchRootHttp('https://example.com', errors);
+
+      assert.equal(root.unreachable, undefined);
+      assert.equal(root.statusCode, 200);
+      assert.equal(root.strictTransportSecurity, 'max-age=63072000');
+      assert.equal(root.contentSecurityPolicy, "default-src 'self'");
+      assert.equal(errors.length, 0);
+    }
+  );
+});
+
+test('buildCandidates produces apex+www variants for registrable domains only', () => {
+  assert.deepEqual(buildCandidates('https://example.com/'), [
+    'https://example.com/',
+    'https://www.example.com/',
+  ]);
+  assert.deepEqual(buildCandidates('https://www.example.com/'), [
+    'https://www.example.com/',
+    'https://example.com/',
+  ]);
+  // Subdomains are not www-twiddled.
+  assert.deepEqual(buildCandidates('https://app.example.com/'), [
+    'https://app.example.com/',
+  ]);
+  // IP literals are not twiddled.
+  assert.deepEqual(buildCandidates('https://192.168.1.1/'), [
+    'https://192.168.1.1/',
+  ]);
+  // localhost untouched.
+  assert.deepEqual(buildCandidates('http://localhost:3000/'), [
+    'http://localhost:3000/',
+  ]);
+});
+
+test('resolveCanonicalUrl picks the alternate variant when the input variant fails', async () => {
+  await withMockFetch(
+    async (url) => {
+      if (url === 'https://mastercraftutah.com/') {
+        const err = new Error('connect ETIMEDOUT');
+        err.name = 'TimeoutError';
+        throw err;
+      }
+      // www variant returns 200 after no redirect
+      return {
+        ok: true,
+        status: 200,
+        url: 'https://www.mastercraftutah.com/',
+        headers: new Headers(),
+      };
+    },
+    async () => {
+      const errors = [];
+      const resolved = await resolveCanonicalUrl('https://mastercraftutah.com/', { errors });
+
+      assert.equal(resolved.reachable, true);
+      assert.equal(resolved.canonical, 'https://www.mastercraftutah.com/');
+      assert.equal(resolved.finalStatusCode, 200);
+      // Failing candidate does not pollute errors when a winner exists.
+      assert.equal(errors.length, 0);
+      // Diagnostics retain both attempts in priority order.
+      assert.equal(resolved.candidates.length, 2);
+      assert.equal(resolved.candidates[0].ok, false);
+      assert.match(resolved.candidates[0].reason, /timed out/);
+      assert.equal(resolved.candidates[1].ok, true);
+    }
+  );
+});
+
+test('resolveCanonicalUrl prefers the input URL when both variants succeed', async () => {
+  await withMockFetch(
+    async (url) => ({
+      ok: true,
+      status: 200,
+      url, // no redirect — server returns the URL we asked for
+      headers: new Headers(),
+    }),
+    async () => {
+      const resolved = await resolveCanonicalUrl('https://www.example.com/');
+
+      assert.equal(resolved.reachable, true);
+      assert.equal(resolved.canonical, 'https://www.example.com/');
+    }
+  );
+});
+
+test('resolveCanonicalUrl follows server redirects to the canonical URL', async () => {
+  await withMockFetch(
+    async (url) => {
+      // Both apex and www end up resolving to www after fetch follows redirects.
+      return {
+        ok: true,
+        status: 200,
+        url: 'https://www.example.com/',
+        headers: new Headers(),
+      };
+    },
+    async () => {
+      const resolved = await resolveCanonicalUrl('https://example.com/');
+
+      assert.equal(resolved.reachable, true);
+      assert.equal(resolved.canonical, 'https://www.example.com/');
+    }
+  );
+});
+
+test('resolveCanonicalUrl falls back to the input URL and records errors when every variant fails', async () => {
+  await withMockFetch(
+    async () => {
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      throw err;
+    },
+    async () => {
+      const errors = [];
+      const resolved = await resolveCanonicalUrl('https://broken.example/', { errors });
+
+      assert.equal(resolved.reachable, false);
+      assert.equal(resolved.canonical, 'https://broken.example/');
+      assert.ok(errors.length >= 1);
+      assert.ok(errors.every((e) => /URL probe for/.test(e)));
+    }
+  );
+});
+
+test('resolveCanonicalUrl treats non-2xx/3xx responses as failed probes', async () => {
+  await withMockFetch(
+    async (url) => {
+      if (url.includes('www.')) {
+        return {
+          ok: true,
+          status: 200,
+          url,
+          headers: new Headers(),
+        };
+      }
+      return {
+        ok: false,
+        status: 503,
+        url,
+        headers: new Headers(),
+      };
+    },
+    async () => {
+      const resolved = await resolveCanonicalUrl('https://example.com/');
+
+      assert.equal(resolved.reachable, true);
+      assert.equal(resolved.canonical, 'https://www.example.com/');
+      assert.equal(resolved.candidates[0].ok, false);
+      assert.equal(resolved.candidates[0].statusCode, 503);
+      assert.equal(resolved.candidates[1].ok, true);
     }
   );
 });
