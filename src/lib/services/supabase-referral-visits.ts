@@ -17,6 +17,8 @@ function supabaseHeaders(extra?: HeadersInit): HeadersInit {
   };
 }
 
+const SUPABASE_PAGE_SIZE = 1000;
+
 interface VisitRow {
   id: string;
   domain: string;
@@ -37,6 +39,30 @@ function fromRow(row: VisitRow): ReferralVisit {
     userAgent: row.user_agent,
     visitedAt: row.visited_at,
   };
+}
+
+async function fetchAllVisitRows(path: string): Promise<VisitRow[]> {
+  const rows: VisitRow[] = [];
+
+  for (let offset = 0; ; offset += SUPABASE_PAGE_SIZE) {
+    const res = await fetch(
+      supabaseUrl(`${path}&limit=${SUPABASE_PAGE_SIZE}&offset=${offset}`),
+      { headers: supabaseHeaders(), cache: 'no-store' }
+    );
+
+    if (!res.ok) {
+      throw new Error(`Failed to list referral visits: ${res.status}`);
+    }
+
+    const page = (await res.json()) as VisitRow[];
+    rows.push(...page);
+
+    if (page.length < SUPABASE_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows;
 }
 
 export const supabaseReferralVisits: ReferralVisitService = {
@@ -63,12 +89,10 @@ export const supabaseReferralVisits: ReferralVisitService = {
     if (!hasSupabaseConfig()) throw new Error('Supabase is not configured.');
 
     const cutoff = new Date(Date.now() - days * 86400000).toISOString();
-    const res = await fetch(
-      supabaseUrl(`ai_referral_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=50000&select=*`),
-      { headers: supabaseHeaders(), cache: 'no-store' }
+    const rows = await fetchAllVisitRows(
+      `ai_referral_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&select=*`
     );
-    if (!res.ok) throw new Error(`Failed to list referral visits: ${res.status}`);
-    return ((await res.json()) as VisitRow[]).map(fromRow);
+    return rows.map(fromRow);
   },
 
   async countVisits(domain, days = 30) {

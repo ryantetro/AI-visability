@@ -17,6 +17,8 @@ function supabaseHeaders(extra?: HeadersInit): HeadersInit {
   };
 }
 
+const SUPABASE_PAGE_SIZE = 1000;
+
 interface VisitRow {
   id: string;
   domain: string;
@@ -39,6 +41,30 @@ function fromRow(row: VisitRow): CrawlerVisit {
     responseCode: row.response_code,
     visitedAt: row.visited_at,
   };
+}
+
+async function fetchAllVisitRows<T>(path: string): Promise<T[]> {
+  const rows: T[] = [];
+
+  for (let offset = 0; ; offset += SUPABASE_PAGE_SIZE) {
+    const res = await fetch(
+      supabaseUrl(`${path}&limit=${SUPABASE_PAGE_SIZE}&offset=${offset}`),
+      { headers: supabaseHeaders(), cache: 'no-store' }
+    );
+
+    if (!res.ok) {
+      throw new Error(`Failed to list crawler visits: ${res.status}`);
+    }
+
+    const page = (await res.json()) as T[];
+    rows.push(...page);
+
+    if (page.length < SUPABASE_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return rows;
 }
 
 export const supabaseCrawlerVisits: CrawlerVisitService = {
@@ -67,12 +93,10 @@ export const supabaseCrawlerVisits: CrawlerVisitService = {
     if (!hasSupabaseConfig()) throw new Error('Supabase is not configured.');
 
     const cutoff = new Date(Date.now() - days * 86400000).toISOString();
-    const res = await fetch(
-      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=50000&select=*`),
-      { headers: supabaseHeaders(), cache: 'no-store' }
+    const rows = await fetchAllVisitRows<VisitRow>(
+      `ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&select=*`
     );
-    if (!res.ok) throw new Error(`Failed to list visits: ${res.status}`);
-    return ((await res.json()) as VisitRow[]).map(fromRow);
+    return rows.map(fromRow);
   },
 
   async countVisits(domain, days = 30) {
@@ -94,18 +118,14 @@ export const supabaseCrawlerVisits: CrawlerVisitService = {
     if (!hasSupabaseConfig()) throw new Error('Supabase is not configured.');
 
     const cutoff = new Date(Date.now() - days * 86400000).toISOString();
-    const res = await fetch(
-      supabaseUrl(`ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&limit=50000&select=bot_name,bot_category,page_path,visited_at`),
-      { headers: supabaseHeaders(), cache: 'no-store' }
-    );
-    if (!res.ok) throw new Error(`Failed to list visit summaries: ${res.status}`);
-
-    const rows = (await res.json()) as Array<{
+    const rows = await fetchAllVisitRows<{
       bot_name: string;
       bot_category: string;
       page_path: string;
       visited_at: string;
-    }>;
+    }>(
+      `ai_crawler_visits?domain=eq.${encodeURIComponent(domain)}&visited_at=gte.${encodeURIComponent(cutoff)}&order=visited_at.desc&select=bot_name,bot_category,page_path,visited_at`
+    );
 
     const map = new Map<string, { category: string; count: number; paths: Set<string>; lastSeen: string }>();
     for (const row of rows) {
