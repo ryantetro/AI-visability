@@ -129,7 +129,10 @@ export function AnalyticsSection({
       const d = new Date((row.date as string) + 'T00:00:00Z');
       const month = d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
       const day = d.getUTCDate();
-      return { ...row, label: `${month} ${day}` };
+      return {
+        ...row,
+        label: `${month} ${day}`,
+      };
     });
 
   const crawlerChartData = formatChartData(providerTimeline);
