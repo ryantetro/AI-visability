@@ -72,3 +72,15 @@ The dashboard passes **`lastUsedAt`** from `GET /api/user/tracking-key` (same fi
 - No additional env vars required -- uses existing `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
 - Referral tracking activates when customers reinstall the latest snippet version
 - Existing snippets without the referrer block continue working (backward compatible)
+
+## Snippet runtime options
+
+`BotTrackingRuntime` in `src/lib/llm-prompts.ts` supports three install targets. The settings UI exposes them as a toggle (`src/app/advanced/settings/settings-section.tsx`):
+
+| Runtime | Use when | Target file |
+|---------|----------|-------------|
+| `next` | Customer site is a Next.js app | `middleware.ts` at project root, imports from `next/server` |
+| `vercel` | Customer site is on Vercel but not Next.js (Vite, Astro, SvelteKit, Nuxt, static SPA, etc.) | `middleware.ts` at project root, uses Web standard `Request` only — no `next/server` import |
+| `express` | Customer runs a Node/Express server | Existing `app.use()` middleware chain |
+
+The `next` snippet will silently no-op on a non-Next Vercel project (the `next/server` import won't resolve and the middleware file is never invoked), which surfaces as a generated key with `last_used_at = null` and zeros on the analytics dashboard. Pick `vercel` for those cases.

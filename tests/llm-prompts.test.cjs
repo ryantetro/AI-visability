@@ -213,3 +213,51 @@ test('buildBotTrackingSnippet returns the correct runtime-specific snippet', () 
   assert.ok(!expressSnippet.includes('Google-Extended'));
   assert.ok(!expressSnippet.includes('request.nextUrl.pathname'));
 });
+
+test('buildBotTrackingSnippet — vercel runtime emits framework-agnostic middleware', () => {
+  const vercelSnippet = buildBotTrackingSnippet(
+    'vercel',
+    'https://app.aiso.com',
+    'stk_1234567890abcdef1234567890abcdef'
+  );
+
+  // Must NOT depend on Next.js — check for the actual import statement and API,
+  // not substrings that could match prose in comments.
+  assert.ok(!/^\s*import\s.*from\s+['"]next\/server['"]/m.test(vercelSnippet));
+  assert.ok(!vercelSnippet.includes('NextResponse'));
+  assert.ok(!vercelSnippet.includes('request.nextUrl'));
+
+  // Must use Web standard Request + URL
+  assert.ok(vercelSnippet.includes('export default function middleware(request)'));
+  assert.ok(vercelSnippet.includes('new URL(request.url)'));
+  assert.ok(vercelSnippet.includes('url.pathname'));
+
+  // Must include the site key and tracking endpoint
+  assert.ok(vercelSnippet.includes("sk: 'stk_1234567890abcdef1234567890abcdef'"));
+  assert.ok(vercelSnippet.includes('https://app.aiso.com/api/track'));
+
+  // Must include both bot and referrer detection branches
+  assert.ok(vercelSnippet.includes('AI_BOTS'));
+  assert.ok(vercelSnippet.includes('AI_REFERRERS'));
+  assert.ok(vercelSnippet.includes("t: 'ref'"));
+
+  // Must include a matcher that excludes static asset paths
+  assert.ok(vercelSnippet.includes('export const config'));
+  assert.ok(vercelSnippet.includes('matcher'));
+  assert.ok(vercelSnippet.includes('assets'));
+});
+
+test('buildBotTrackingInstallPrompt — vercel runtime carries the right labels', () => {
+  const prompt = buildBotTrackingInstallPrompt({
+    domain: 'jordanelleaquapark.com',
+    runtime: 'vercel',
+    appUrl: 'https://app.aiso.com',
+    siteKey: 'stk_af33c40c942a97362717c418d9c0370b',
+  });
+
+  assert.ok(prompt.includes('Selected runtime: Vercel (framework-agnostic)'));
+  assert.ok(prompt.includes('middleware.ts at the project root'));
+  assert.ok(prompt.includes('Do not introduce a dependency on `next`'));
+  assert.ok(prompt.includes('https://app.aiso.com/api/track'));
+  assert.ok(prompt.includes("sk: 'stk_af33c40c942a97362717c418d9c0370b'"));
+});

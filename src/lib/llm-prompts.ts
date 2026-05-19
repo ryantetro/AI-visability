@@ -31,7 +31,7 @@ export interface ReportPromptBundle {
   sectionPrompts: Partial<Record<ReportPromptSectionKey, ReportPromptSection>>;
 }
 
-export type BotTrackingRuntime = 'next' | 'express';
+export type BotTrackingRuntime = 'next' | 'express' | 'vercel';
 
 const BOT_TRACKING_SNIPPET_BOTS = JSON.stringify(TRACKING_SNIPPET_BOTS, null, 2);
 
@@ -158,10 +158,33 @@ For each fix above, return:
 }
 
 export function buildBotTrackingSnippet(runtime: BotTrackingRuntime, appUrl: string, siteKey: string): string {
-  return runtime === 'next'
-    ? buildNextBotTrackingSnippet(appUrl, siteKey)
-    : buildExpressBotTrackingSnippet(appUrl, siteKey);
+  switch (runtime) {
+    case 'next':
+      return buildNextBotTrackingSnippet(appUrl, siteKey);
+    case 'express':
+      return buildExpressBotTrackingSnippet(appUrl, siteKey);
+    case 'vercel':
+      return buildVercelBotTrackingSnippet(appUrl, siteKey);
+  }
 }
+
+const BOT_TRACKING_RUNTIME_LABELS: Record<BotTrackingRuntime, string> = {
+  next: 'Next.js / Vercel',
+  express: 'Express / Node',
+  vercel: 'Vercel (framework-agnostic)',
+};
+
+const BOT_TRACKING_RUNTIME_FILES: Record<BotTrackingRuntime, string> = {
+  next: 'middleware.ts or middleware.js at the project root',
+  express: 'the main server entry file where app middleware is registered',
+  vercel: 'middleware.ts at the project root (next to vite.config.ts, astro.config.mjs, svelte.config.js, or your equivalent root config file)',
+};
+
+const BOT_TRACKING_RUNTIME_PLACEMENT: Record<BotTrackingRuntime, string> = {
+  next: 'If the project already has middleware, merge this logic into the existing middleware instead of replacing unrelated auth, redirects, rewrites, or header logic.',
+  express: 'Insert this as middleware before the main route handlers, and preserve any existing middleware order that affects auth, security, logging, or response behavior.',
+  vercel: 'Vercel runs a root-level middleware.ts on every request for any framework (Vite, Astro, SvelteKit, Nuxt, plain static, etc.). Add a new file rather than modifying framework-specific build output. Do not introduce a dependency on `next` — use the Web standard Request/Response types only.',
+};
 
 export function buildBotTrackingInstallPrompt({
   domain,
@@ -175,11 +198,9 @@ export function buildBotTrackingInstallPrompt({
   siteKey: string;
 }): string {
   const snippet = buildBotTrackingSnippet(runtime, appUrl, siteKey);
-  const runtimeLabel = runtime === 'next' ? 'Next.js / Vercel' : 'Express / Node';
-  const primaryFile = runtime === 'next' ? 'middleware.ts or middleware.js at the project root' : 'the main server entry file where app middleware is registered';
-  const placementNote = runtime === 'next'
-    ? 'If the project already has middleware, merge this logic into the existing middleware instead of replacing unrelated auth, redirects, rewrites, or header logic.'
-    : 'Insert this as middleware before the main route handlers, and preserve any existing middleware order that affects auth, security, logging, or response behavior.';
+  const runtimeLabel = BOT_TRACKING_RUNTIME_LABELS[runtime];
+  const primaryFile = BOT_TRACKING_RUNTIME_FILES[runtime];
+  const placementNote = BOT_TRACKING_RUNTIME_PLACEMENT[runtime];
 
   return `You are a senior web developer implementing an existing airadr bot-tracking integration inside a customer's website project.
 
@@ -419,6 +440,68 @@ export function middleware(request) {
   }
 
   return NextResponse.next();
+}`;
+}
+
+function buildVercelBotTrackingSnippet(appUrl: string, siteKey: string): string {
+  return `// Vercel framework-agnostic middleware — works for Vite, Astro, SvelteKit,
+// Nuxt, plain static sites, etc. Place this file at the project root.
+// Do NOT import from 'next/server'. This uses the Web standard Request only.
+
+const AI_BOTS = ${BOT_TRACKING_SNIPPET_BOTS};
+
+const AI_REFERRERS = ${BOT_TRACKING_SNIPPET_REFERRERS};
+
+export const config = {
+  matcher: '/((?!_next|_static|_vercel|assets|favicon\\\\.ico|robots\\\\.txt|sitemap\\\\.xml).*)',
+};
+
+export default function middleware(request) {
+  const url = new URL(request.url);
+  const ua = request.headers.get('user-agent') || '';
+
+  // Check for AI bot crawlers
+  for (const [bot, cat] of Object.entries(AI_BOTS)) {
+    if (ua.includes(bot)) {
+      fetch('${appUrl}/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sk: '${siteKey}',
+          bn: bot,
+          bc: cat,
+          p: url.pathname,
+          ua,
+        }),
+      }).catch(() => {});
+      break;
+    }
+  }
+
+  // Check for human visitors arriving from AI engines
+  const referer = request.headers.get('referer') || '';
+  if (referer) {
+    try {
+      const refHost = new URL(referer).hostname;
+      for (const [host, engine] of Object.entries(AI_REFERRERS)) {
+        if (refHost === host || refHost.endsWith('.' + host)) {
+          fetch('${appUrl}/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sk: '${siteKey}',
+              t: 'ref',
+              se: engine,
+              ref: referer.slice(0, 2048),
+              p: url.pathname,
+              ua,
+            }),
+          }).catch(() => {});
+          break;
+        }
+      }
+    } catch {}
+  }
 }`;
 }
 

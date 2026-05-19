@@ -2643,6 +2643,19 @@ export function SettingsSection({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setTrackingRuntime('vercel')}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors',
+                    trackingRuntime === 'vercel'
+                      ? 'bg-white/[0.1] text-white'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  )}
+                  title="For Vite, Astro, SvelteKit, Nuxt, or any non-Next.js project deployed to Vercel"
+                >
+                  Vercel
+                </button>
+                <button
+                  type="button"
                   onClick={() => setTrackingRuntime('express')}
                   className={cn(
                     'rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors',
@@ -2681,7 +2694,7 @@ export function SettingsSection({
             <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.06] bg-[#09090b]">
               <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-2">
                 <p className="text-[11px] font-medium text-zinc-500">
-                  {trackingRuntime === 'next' ? 'middleware.js' : 'server.js'}
+                  {trackingRuntime === 'next' ? 'middleware.js' : trackingRuntime === 'vercel' ? 'middleware.ts' : 'server.js'}
                 </p>
                 <span className="text-[10px] text-zinc-600">server-side</span>
               </div>
