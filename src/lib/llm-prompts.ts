@@ -31,7 +31,7 @@ export interface ReportPromptBundle {
   sectionPrompts: Partial<Record<ReportPromptSectionKey, ReportPromptSection>>;
 }
 
-export type BotTrackingRuntime = 'next' | 'express' | 'vercel';
+export type BotTrackingRuntime = 'next' | 'express' | 'vercel' | 'shopify';
 
 const BOT_TRACKING_SNIPPET_BOTS = JSON.stringify(TRACKING_SNIPPET_BOTS, null, 2);
 
@@ -165,6 +165,8 @@ export function buildBotTrackingSnippet(runtime: BotTrackingRuntime, appUrl: str
       return buildExpressBotTrackingSnippet(appUrl, siteKey);
     case 'vercel':
       return buildVercelBotTrackingSnippet(appUrl, siteKey);
+    case 'shopify':
+      return buildShopifyBotTrackingSnippet(appUrl, siteKey);
   }
 }
 
@@ -172,18 +174,21 @@ const BOT_TRACKING_RUNTIME_LABELS: Record<BotTrackingRuntime, string> = {
   next: 'Next.js / Vercel',
   express: 'Express / Node',
   vercel: 'Vercel (framework-agnostic)',
+  shopify: 'Shopify (client-side beacon)',
 };
 
 const BOT_TRACKING_RUNTIME_FILES: Record<BotTrackingRuntime, string> = {
   next: 'middleware.ts or middleware.js at the project root',
   express: 'the main server entry file where app middleware is registered',
   vercel: 'middleware.ts at the project root (next to vite.config.ts, astro.config.mjs, svelte.config.js, or your equivalent root config file)',
+  shopify: 'layout/theme.liquid in the active Shopify theme, immediately before the closing </head> tag',
 };
 
 const BOT_TRACKING_RUNTIME_PLACEMENT: Record<BotTrackingRuntime, string> = {
   next: 'If the project already has middleware, merge this logic into the existing middleware instead of replacing unrelated auth, redirects, rewrites, or header logic.',
   express: 'Insert this as middleware before the main route handlers, and preserve any existing middleware order that affects auth, security, logging, or response behavior.',
   vercel: 'Vercel runs a root-level middleware.ts on every request for any framework (Vite, Astro, SvelteKit, Nuxt, plain static, etc.). Add a new file rather than modifying framework-specific build output. Do not introduce a dependency on `next` — use the Web standard Request/Response types only.',
+  shopify: 'Shopify is a hosted platform with no server-side middleware access. Paste this <script> block into layout/theme.liquid just before </head> in the live theme. Traditional crawlers (GPTBot, ClaudeBot, etc.) do not execute JavaScript, so bot crawl tracking is best-effort — this primarily captures human visitors arriving from AI search engines and any agentic/operator bots that do run JS.',
 };
 
 export function buildBotTrackingInstallPrompt({
@@ -503,6 +508,65 @@ export default function middleware(request) {
     } catch {}
   }
 }`;
+}
+
+function buildShopifyBotTrackingSnippet(appUrl: string, siteKey: string): string {
+  return `<!-- airadr AI bot & referral tracking (client-side beacon) -->
+<!-- Place in layout/theme.liquid immediately before </head> -->
+<script>
+(function () {
+  if (typeof window === 'undefined') return;
+  var AI_BOTS = ${BOT_TRACKING_SNIPPET_BOTS};
+  var AI_REFERRERS = ${BOT_TRACKING_SNIPPET_REFERRERS};
+  var ua = navigator.userAgent || '';
+  var path = (location && location.pathname) || '/';
+  var endpoint = '${appUrl}/api/track';
+  var sk = '${siteKey}';
+
+  function send(body) {
+    try {
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        keepalive: true,
+        credentials: 'omit',
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  // Bot detection (catches agentic/operator bots that execute JS;
+  // traditional crawlers like GPTBot do not run this code).
+  for (var bot in AI_BOTS) {
+    if (Object.prototype.hasOwnProperty.call(AI_BOTS, bot) && ua.indexOf(bot) !== -1) {
+      send({ sk: sk, bn: bot, bc: AI_BOTS[bot], p: path, ua: ua });
+      break;
+    }
+  }
+
+  // Human visitors arriving from AI engines (chat.openai.com, perplexity.ai, etc.)
+  var referer = document.referrer || '';
+  if (referer) {
+    try {
+      var refHost = new URL(referer).hostname;
+      for (var host in AI_REFERRERS) {
+        if (!Object.prototype.hasOwnProperty.call(AI_REFERRERS, host)) continue;
+        if (refHost === host || refHost.endsWith('.' + host)) {
+          send({
+            sk: sk,
+            t: 'ref',
+            se: AI_REFERRERS[host],
+            ref: referer.slice(0, 2048),
+            p: path,
+            ua: ua,
+          });
+          break;
+        }
+      }
+    } catch (e) {}
+  }
+})();
+</script>`;
 }
 
 function buildExpressBotTrackingSnippet(appUrl: string, siteKey: string): string {

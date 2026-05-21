@@ -75,12 +75,28 @@ The dashboard passes **`lastUsedAt`** from `GET /api/user/tracking-key` (same fi
 
 ## Snippet runtime options
 
-`BotTrackingRuntime` in `src/lib/llm-prompts.ts` supports three install targets. The settings UI exposes them as a toggle (`src/app/advanced/settings/settings-section.tsx`):
+`BotTrackingRuntime` in `src/lib/llm-prompts.ts` supports four install targets. The settings UI exposes them as a toggle (`src/app/advanced/settings/settings-section.tsx`):
 
 | Runtime | Use when | Target file |
 |---------|----------|-------------|
 | `next` | Customer site is a Next.js app | `middleware.ts` at project root, imports from `next/server` |
 | `vercel` | Customer site is on Vercel but not Next.js (Vite, Astro, SvelteKit, Nuxt, static SPA, etc.) | `middleware.ts` at project root, uses Web standard `Request` only — no `next/server` import |
 | `express` | Customer runs a Node/Express server | Existing `app.use()` middleware chain |
+| `shopify` | Customer site is on Shopify or another hosted SaaS platform (Webflow, Squarespace, Wix) with no server-side middleware access | `<script>` block dropped into `layout/theme.liquid` just before `</head>` |
 
 The `next` snippet will silently no-op on a non-Next Vercel project (the `next/server` import won't resolve and the middleware file is never invoked), which surfaces as a generated key with `last_used_at = null` and zeros on the analytics dashboard. Pick `vercel` for those cases.
+
+### Shopify / client-side beacon limitations
+
+The `shopify` snippet runs in the browser, not on the server. This has a critical implication: **traditional AI crawlers (GPTBot, ClaudeBot, PerplexityBot, CCBot, etc.) do not execute JavaScript**, so they will never fire this snippet. The bot detection branch in this snippet only catches agentic/operator bots that do run JS (e.g., Browserbase, OpenAI operator-style agents).
+
+What the Shopify snippet reliably captures:
+
+- **Human visitors arriving from AI engines** (via `document.referrer`) — full parity with the server-side snippets.
+- **JS-running agentic bots** — best-effort, anything that loads a real browser context.
+
+What it cannot capture:
+
+- **Traditional headless crawlers** — these will continue to appear in zero-fill on the AI Crawler Traffic panel for Shopify customers.
+
+The settings UI shows an inline amber notice when `shopify` is selected to set this expectation. Customers who need full bot crawl tracking on Shopify must front the storefront with a Cloudflare Worker (or similar reverse proxy) that runs server-side detection.

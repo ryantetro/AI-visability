@@ -2666,6 +2666,19 @@ export function SettingsSection({
                 >
                   Express
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTrackingRuntime('shopify')}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors',
+                    trackingRuntime === 'shopify'
+                      ? 'bg-white/[0.1] text-white'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  )}
+                  title="Client-side beacon for Shopify, Webflow, Squarespace, and other hosted platforms"
+                >
+                  Shopify
+                </button>
               </div>
 
               <div className="flex items-center gap-2">
@@ -2691,12 +2704,26 @@ export function SettingsSection({
               </div>
             </div>
 
+            {trackingRuntime === 'shopify' && (
+              <p className="mt-2 text-[11px] leading-5 text-amber-300/80">
+                Client-side beacon. Captures human AI referrals reliably. Traditional crawlers (GPTBot, ClaudeBot, PerplexityBot) do not execute JavaScript, so bot crawl visits will be limited to agentic/operator bots that do.
+              </p>
+            )}
+
             <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.06] bg-[#09090b]">
               <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-2">
                 <p className="text-[11px] font-medium text-zinc-500">
-                  {trackingRuntime === 'next' ? 'middleware.js' : trackingRuntime === 'vercel' ? 'middleware.ts' : 'server.js'}
+                  {trackingRuntime === 'next'
+                    ? 'middleware.js'
+                    : trackingRuntime === 'vercel'
+                      ? 'middleware.ts'
+                      : trackingRuntime === 'shopify'
+                        ? 'theme.liquid'
+                        : 'server.js'}
                 </p>
-                <span className="text-[10px] text-zinc-600">server-side</span>
+                <span className="text-[10px] text-zinc-600">
+                  {trackingRuntime === 'shopify' ? 'client-side' : 'server-side'}
+                </span>
               </div>
               <pre className="max-h-[380px] overflow-auto px-4 py-3 text-[12px] leading-6 text-zinc-400">
                 <code>
