@@ -227,6 +227,30 @@ function resolveReusablePrompts(scan: ScanJob, latestScan: ScanJob | null, crawl
   return reusablePrompts;
 }
 
+export async function resolveReusablePromptsSafely(
+  scanId: string,
+  scanUrl: string,
+  ownerEmail: string | undefined,
+  crawlData: CrawlData,
+  db: DatabaseService,
+): Promise<MentionPrompt[] | null> {
+  try {
+    const currentScan = await db.getScan(scanId);
+    const domain = new URL(scanUrl).hostname.replace(/^www\./, '');
+    const latestCompletedScan = await db.findLatestScanByDomain(domain, ownerEmail);
+    return currentScan
+      ? resolveReusablePrompts(currentScan, latestCompletedScan, crawlData)
+      : null;
+  } catch (error) {
+    console.warn('[scan-workflow] Reusable prompt lookup failed; continuing without cached prompts.', {
+      scanId,
+      scanUrl,
+      error,
+    });
+    return null;
+  }
+}
+
 export function initialProgress(): ScanProgress {
   return normalizeScanProgress({
     status: 'pending',
@@ -489,12 +513,13 @@ export async function runScan(scanId: string, db = getDatabase()) {
       + `Filtered by platform settings: ${platformFilteredEngines.join(', ') || 'none'}.`
     );
 
-    const currentScan = await db.getScan(scanId);
-    const domain = new URL(scanUrl).hostname.replace(/^www\./, '');
-    const latestCompletedScan = await db.findLatestScanByDomain(domain, initialScan.email);
-    const cachedPrompts = currentScan
-      ? resolveReusablePrompts(currentScan, latestCompletedScan, crawlData)
-      : null;
+    const cachedPrompts = await resolveReusablePromptsSafely(
+      scanId,
+      scanUrl,
+      initialScan.email,
+      crawlData,
+      db,
+    );
 
     const siteScanPromise = (async () => {
       try {

@@ -31,12 +31,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Only fetch the score summary fields the workspace list needs; full scan JSON can exceed serverless limits.
+    // Bound the result set: the workspace list never needs more than the
+    // most-recent few hundred scans across all the user's tracked domains.
+    // Without this LIMIT, growth in scan history eventually trips
+    // statement_timeout (see migration 032 for the supporting index).
+    const SCAN_HISTORY_LIMIT = 200;
     let query = supabase
       .from('scans')
       .select(
         'id, url, status, paid, email, created_at, completed_at, percentage:score_result->percentage, scores:score_result->scores'
       )
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(SCAN_HISTORY_LIMIT);
 
     query = effectiveEmails.length === 1
       ? query.eq('email', effectiveEmails[0])

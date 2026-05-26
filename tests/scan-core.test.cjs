@@ -23,7 +23,11 @@ const { runWebHealthEnrichment } = require('../src/lib/web-health/index.ts');
 const { generateAllFiles } = require('../src/lib/generator/index.ts');
 const { createGeneratedFilesArchive } = require('../src/lib/files-archive.ts');
 const { estimateRemainingSeconds } = require('../src/lib/scan-eta.ts');
-const { initialProgress, startScan } = require('../src/lib/scan-workflow.ts');
+const {
+  initialProgress,
+  resolveReusablePromptsSafely,
+  startScan,
+} = require('../src/lib/scan-workflow.ts');
 const { getPublicScoreSummary } = require('../src/lib/public-score.ts');
 const { resetMockDb, mockDb } = require('../src/lib/services/mock-db.ts');
 const { resetScanRateLimitStore } = require('../src/lib/scan-rate-limit.ts');
@@ -1104,6 +1108,51 @@ test(
     assert.equal(forcedScan?.status, 'pending');
   }
 );
+
+test('reusable prompt lookup is best-effort when the latest-domain query times out', async () => {
+  const crawlData = createCrawlData();
+  const scan = {
+    id: 'prompt-reuse-timeout',
+    url: crawlData.url,
+    normalizedUrl: crawlData.normalizedUrl,
+    status: 'scoring',
+    progress: initialProgress(),
+    createdAt: Date.now(),
+    email: 'owner@example.com',
+    crawlData,
+  };
+
+  const db = {
+    async getScan(id) {
+      assert.equal(id, scan.id);
+      return scan;
+    },
+    async saveScan() {},
+    async findScanByUrl() {
+      return null;
+    },
+    async listCompletedScans() {
+      return [];
+    },
+    async findLatestScanByDomain(domain, email) {
+      assert.equal(domain, 'example.com');
+      assert.equal(email, 'owner@example.com');
+      throw new Error(
+        'Supabase request failed (500): {"code":"57014","message":"canceling statement due to statement timeout"}'
+      );
+    },
+  };
+
+  const prompts = await resolveReusablePromptsSafely(
+    scan.id,
+    scan.normalizedUrl,
+    scan.email,
+    crawlData,
+    db
+  );
+
+  assert.equal(prompts, null);
+});
 
 test('createGeneratedFilesArchive includes each generated file in the ZIP payload', async () => {
   const files = await generateAllFiles(createCrawlData({ detectedPlatform: 'webflow' }));

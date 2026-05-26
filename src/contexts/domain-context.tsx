@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ensureProtocol, getDomain, getFaviconUrl } from '@/lib/url-utils';
 import { getRecentScanEntriesForScopes, rememberRecentScanForScopes } from '@/lib/recent-scans';
@@ -26,6 +26,7 @@ import {
   reconcileHiddenDomains,
   workspaceRouteNeedsFiles,
 } from '@/lib/workspace-ui';
+import { formatScanFailureMessage } from '@/lib/scan-error-display';
 
 import type { DashboardReportData, FilesData, RecentScanData, SiteSummary, ApiErrorPayload } from '@/app/advanced/lib/types';
 
@@ -348,6 +349,19 @@ export function DomainContextProvider({
   // Caches for instant domain switching
   const [reportCache, setReportCache] = useState<Record<string, DashboardReportData>>({});
   const [filesCache, setFilesCache] = useState<Record<string, FilesData>>({});
+  // Terminal-failure cache: scan IDs known to be in `failed` state (HTTP 409
+  // from /api/scan/[id]/report). Prevents the workspace effect from re-hitting
+  // the API every time a parent re-render or section change refires it. A
+  // user-initiated rescan produces a NEW scan ID, so recovery is automatic.
+  //
+  // Implemented as a ref (not state) so the lookup inside the effect always
+  // reads the current value, even if the effect re-fires before React commits
+  // the previous render. UI updates happen via setLoadError, which already
+  // triggers re-renders for consumers that need to react to the failure.
+  const failedReportsRef = useRef<Record<string, string>>({});
+  const recordFailedReport = useCallback((scanId: string, message: string) => {
+    failedReportsRef.current[scanId] = message;
+  }, []);
 
   // --- Load initial data: scoped local cache first, then reconcile with DB ---
   useEffect(() => {
@@ -698,6 +712,21 @@ export function DomainContextProvider({
       return;
     }
 
+    // Short-circuit terminal failures: surface the cached error and skip
+    // the network call entirely. Without this, every section change re-fires
+    // the effect and re-hits /report for a scan we already know is failed.
+    // Read from the ref (not state) so we see the current value even if this
+    // effect run was scheduled before React committed the previous write.
+    const cachedFailure = failedReportsRef.current[activeWorkspaceReportId];
+    if (cachedFailure) {
+      setReport(null);
+      setFiles(null);
+      setLoadError(cachedFailure);
+      setActionError('');
+      setWorkspaceLoading(false);
+      return;
+    }
+
     const cachedReport = reportCache[activeWorkspaceReportId];
     const cachedFiles = filesCache[activeWorkspaceReportId];
     if (cachedReport) {
@@ -763,6 +792,17 @@ export function DomainContextProvider({
           setLoadError(pendingPayload.error || 'Scan not complete');
           return;
         }
+        if (reportRes.status === 409) {
+          // Terminal: scan is in `failed` state. Cache the error message so
+          // subsequent effect refires for this scan ID skip the API call.
+          const failedPayload = (await reportRes.json().catch(() => ({}))) as ApiErrorPayload;
+          if (!active) return;
+          const message = formatScanFailureMessage(failedPayload.error);
+          setLoadError(message);
+          recordFailedReport(activeWorkspaceReportId, message);
+          void refreshScanEntry(activeWorkspaceReportId);
+          return;
+        }
         if (!reportRes.ok) { const p = (await reportRes.json().catch(() => ({}))) as ApiErrorPayload; throw new Error(p.error || 'Failed to load report'); }
         const reportPayload = (await reportRes.json()) as DashboardReportData;
         if (!active) return;
@@ -811,7 +851,9 @@ export function DomainContextProvider({
           if (!scanRes.ok) return;
           const scanPayload = await scanRes.json() as RecentScanData & { status?: string; progress?: { error?: string } };
           if (scanPayload.status === 'failed') {
-            setLoadError(scanPayload.progress?.error || 'Scan failed');
+            const message = formatScanFailureMessage(scanPayload.progress?.error);
+            setLoadError(message);
+            recordFailedReport(activeWorkspaceReportId, message);
             void refreshScanEntry(activeWorkspaceReportId);
             return;
           }
@@ -823,6 +865,15 @@ export function DomainContextProvider({
         const reportRes = await fetch(`/api/scan/${activeWorkspaceReportId}/report`, { cache: 'no-store' });
         if (reportRes.status === 202) {
           setLoadError('Scan not complete');
+          return;
+        }
+        if (reportRes.status === 409) {
+          // Mid-poll transition to terminal failure. Cache to stop the
+          // workspace effect from re-fetching this scan on later renders.
+          const p = (await reportRes.json().catch(() => ({}))) as ApiErrorPayload;
+          const message = formatScanFailureMessage(p.error);
+          setLoadError(message);
+          recordFailedReport(activeWorkspaceReportId, message);
           return;
         }
         if (!reportRes.ok) {
