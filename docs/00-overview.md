@@ -42,6 +42,7 @@ This folder documents the core systems implemented in the AISO SaaS platform. Ea
 | [36-content-studio-pipeline.md](./36-content-studio-pipeline.md) | Content Studio AI Pipeline — Agent SDK autonomous brief/article generation with WebSearch | `src/lib/content-studio/`, `src/app/api/content-studio/[id]/generate/` |
 | [37-fix-my-site-agent.md](./37-fix-my-site-agent.md) | Fix My Site Agent — autonomous file generation after payment via Agent SDK | `src/lib/fix-my-site/`, `src/app/api/fix-my-site/[id]/download/` |
 | [39-crawler-reachability-failures.md](./39-crawler-reachability-failures.md) | Crawler treats unreachable sites as failed scans; surfaces real errors instead of silently producing empty pillars | `src/lib/crawler/`, `src/lib/scan-workflow.ts`, `src/types/crawler.ts` |
+| [40-scans-domain-index.md](./40-scans-domain-index.md) | Generated `scans.domain` column + composite index — fixes Postgres 57014 statement timeouts on domain lookups | `supabase/migrations/031_scans_domain_column.sql`, `src/lib/services/supabase-db.ts` |
 
 ## Architecture Principles
 

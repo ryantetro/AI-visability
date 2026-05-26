@@ -23,8 +23,11 @@ Core scan jobs. One row per website analysis.
 | `score_result` | `jsonb` | Scoring output |
 | `generated_files` | `jsonb` | Generated fix files (robots.txt, llms.txt, etc.) |
 | `mention_summary` | `jsonb` | AI mention analysis results |
+| `domain` | `text` GENERATED | `lower(hostname(url))`, www preserved. Stored, auto-maintained. Migration 031. |
 
-**Indexes**: `normalized_url`, `status`, `email`, `completed_at DESC`
+**Indexes**: `normalized_url`, `status`, `email`, `completed_at DESC`, `domain`, `(domain, status, completed_at DESC NULLS LAST, created_at DESC)`
+
+> `domain` is a STORED generated column derived from `url`, equivalent to `new URL(url).hostname.toLowerCase()`. Use `domain=eq.<host>` for domain-scoped lookups (e.g. `findLatestScanByDomain`) — never `url=ilike.*<host>*`, which forces a sequential scan and trips Supabase's `statement_timeout` (Postgres error 57014) once the table grows. See `docs/40-scans-domain-index.md`.
 
 ---
 

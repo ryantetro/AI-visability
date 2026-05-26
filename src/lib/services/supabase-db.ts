@@ -1,6 +1,5 @@
 import { DatabaseService } from '@/types/services';
 import { ScanJob } from '@/types/scan';
-import { getDomain } from '@/lib/url-utils';
 
 interface SupabaseScanRow {
   id: string;
@@ -153,14 +152,17 @@ export const supabaseDb: DatabaseService = {
       throw new Error('Supabase is not configured.');
     }
 
+    // Filter on the generated `domain` column (indexed) — see
+    // supabase/migrations/031_scans_domain_column.sql. Avoid
+    // `url=ilike.*x*` here: leading-wildcard ILIKE forces a seq scan
+    // and trips Postgres statement_timeout on large tables.
     const normalizedDomain = domain.toLowerCase();
-    let query = `status=eq.complete&order=completed_at.desc.nullslast,created_at.desc&limit=50&select=*&url=ilike.*${encodeURIComponent(normalizedDomain)}*`;
+    let query = `domain=eq.${encodeURIComponent(normalizedDomain)}&status=eq.complete&order=completed_at.desc.nullslast,created_at.desc&limit=1&select=*`;
     if (email) {
       query += `&email=eq.${encodeURIComponent(email)}`;
     }
 
     const rows = await queryRows(query);
-    const match = rows.find((row) => getDomain(row.url) === normalizedDomain);
-    return match ? fromRow(match) : null;
+    return rows[0] ? fromRow(rows[0]) : null;
   },
 };

@@ -1,0 +1,96 @@
+# robots.txt for www.mastercraftutah.com
+# Replaces the current Cloudflare Managed Content block.
+# All AI search bots are now explicitly allowed.
+
+User-agent: *
+Allow: /
+
+# Search engine indexing
+User-agent: Googlebot
+Allow: /
+
+User-agent: bingbot
+Allow: /
+Crawl-Delay: 2
+
+# AI search engines and assistants (explicitly allowed)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: CloudflareBrowserRenderingCrawler
+Allow: /
+
+# Social media link previewers
+User-agent: FacebookBot
+Crawl-Delay: 10
+
+User-agent: SiteAuditBot
+Crawl-Delay: 10
+
+# Preserved: legacy Dealer Spike .asp page disallows
+User-agent: *
+Disallow: /new_vehicle_detail.asp
+Disallow: /new_vehicle_compare.asp
+Disallow: /news_article.asp
+Disallow: /new_model_detail_print.asp
+Disallow: /used_bikes/
+Disallow: /default.asp?page=xCompareModels
+Disallow: /fiche_section_detail.asp
+Crawl-delay: 2
+
+# Preserved: low-value scraper blocks
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: YandexBot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: Ezooms
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+Sitemap: https://www.mastercraftutah.com/sitemap.xml

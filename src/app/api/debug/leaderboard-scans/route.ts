@@ -60,8 +60,9 @@ export async function GET(request: NextRequest) {
       `scans?id=eq.${encodeURIComponent(scanId)}&select=id,url,status,completed_at,created_at,score_result,mention_summary`
     );
   } else if (domainFilter) {
+    // Use the indexed generated `domain` column (migration 031).
     scans = await supabaseFetch(
-      `scans?url=ilike.${encodeURIComponent('%' + domainFilter + '%')}&select=id,url,status,completed_at,created_at,score_result,mention_summary&order=completed_at.desc.nullslast,created_at.desc`
+      `scans?domain=eq.${encodeURIComponent(domainFilter)}&select=id,url,status,completed_at,created_at,score_result,mention_summary&order=completed_at.desc.nullslast,created_at.desc`
     );
   } else {
     return NextResponse.json(
